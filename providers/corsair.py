@@ -20,11 +20,20 @@ Protocol from Sapd/HeadsetControl's corsair_void_v2w device:
 
 The reply carries no charging flag: HeadsetControl reports the level as
 available (not charging) for this family, and so does this provider.
+
+The Dark Core / Ironclaw mice and their dongles speak a second, unrelated
+protocol ("nxp" in ckb-next, which reads them): a single-field 64-byte packet
+`{CMD_GET 0x0e, FIELD_BATTERY 0x50}` answered with the level as an index into a
+five-step table `{0, 15, 30, 50, 100}` at byte 4 and a status byte at byte 5.
+ckb-next's source is the reference (src/daemon/nxp_proto.h and device.c,
+repo ckb-next/ckb-next; its protocol notes live in ckb-next/corsair-protocol).
+The status byte's meaning is not written down in either, so no charging state
+is reported, and the level is coarse, so it is shown as "about N%".
 """
 from __future__ import annotations
 
 import time
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 import hid
 
@@ -68,6 +77,44 @@ def make_request(endpoint: int, sub: int, command: int) -> List[int]:
     return frame + [0x00] * (MSG_SIZE_WRITE - len(frame))
 
 
+# --- second family: the "nxp" protocol of the Dark Core / Ironclaw mice --------------------
+# A wired mouse (1b1c:1b7e) exists too; nothing here can prove it answers, so only the
+# dongle is read.
+NXP_PIDS = {
+    0x1B7F: "Corsair Dark Core RGB Pro SE",
+}
+NXP_USAGE_PAGE = 0xFF42          # the dongle's two vendor collections, from the #56 dump
+NXP_CMD_GET = 0x0E               # ckb-next: CMD_GET
+NXP_FIELD_BATTERY = 0x50         # ckb-next: FIELD_BATTERY
+NXP_MSG_SIZE = 64                # ckb-next: MSG_SIZE (structures.h)
+NXP_LEVEL_INDEX = 4
+NXP_STATUS_INDEX = 5
+NXP_LEVELS = (0, 15, 30, 50, 100)   # ckb-next's nxp_battery_lut
+
+
+def nxp_request() -> bytes:
+    """The 64-byte nxp packet; hidapi wants the report id (0) in front of it."""
+    payload = bytearray(NXP_MSG_SIZE)
+    payload[0] = NXP_CMD_GET
+    payload[1] = NXP_FIELD_BATTERY
+    return b"\x00" + bytes(payload)
+
+
+def parse_nxp(reply) -> Optional[Tuple[int, str]]:
+    """-> (level, label) from a battery reply, or None when it is not one."""
+    if not reply:
+        return None
+    data = list(reply)
+    if len(data) >= NXP_MSG_SIZE + 1:      # hidapi may hand the report id back
+        data = data[1:]
+    if len(data) < NXP_STATUS_INDEX + 1:
+        return None
+    idx = data[NXP_LEVEL_INDEX]
+    if not 0 <= idx < len(NXP_LEVELS):
+        return None
+    return NXP_LEVELS[idx], f"about {NXP_LEVELS[idx]}%"
+
+
 def parse_level(r) -> Optional[int]:
     """Percent from a battery reply, or None when there is no usable value."""
     if not r or len(r) <= LEVEL_INDEX + 1:
@@ -91,6 +138,41 @@ class CorsairProvider(Provider):
         self._diag.append(f"  no interface {CONTROL_INTERFACE} collection; "
                           f"falling back to the first of {len(infos)}")
         return infos[0] if infos else None
+
+    def _pick_nxp(self, infos: List[dict]) -> List[dict]:
+        """The dongle's vendor collections, its own iface 1 first; the rest only
+        when the dump's collection is missing (a wrong endpoint then costs one read)."""
+        vend = [d for d in infos if d.get("usage_page") == NXP_USAGE_PAGE]
+        if not vend:
+            self._diag.append(f"  no {NXP_USAGE_PAGE:04x} collection; trying all "
+                              f"{len(infos)}")
+            vend = list(infos)
+        return sorted(vend, key=lambda d: (0 if d.get("usage") == 0x0001 else 1,
+                                           d.get("interface_number") or 99))
+
+    def _query_nxp(self, path: bytes) -> Optional[List[int]]:
+        dev = hid.device()
+        try:
+            dev.open_path(path)
+        except (OSError, IOError) as e:
+            self._diag.append(f"  open: {e}")
+            return None
+        try:
+            dev.write(nxp_request())
+            r = dev.read(NXP_MSG_SIZE + 1, READ_TIMEOUT_MS)
+            if not r:
+                self._diag.append("  no reply")
+                return None
+            self._diag.append(f"  reply: {hexdump(r)}")
+            return list(r)
+        except (OSError, IOError, ValueError) as e:
+            self._diag.append(f"  query error: {e}")
+            return None
+        finally:
+            try:
+                dev.close()
+            except Exception:
+                pass
 
     def _write(self, dev, endpoint: int, sub: int, command: int) -> bool:
         dev.write(make_request(endpoint, sub, command))
@@ -168,6 +250,22 @@ class CorsairProvider(Provider):
                 continue
             out.append(DeviceStatus(f"corsair:{pid:04x}", name, level, False, True,
                                     "corsair", kind="headset"))
+        for pid, name in NXP_PIDS.items():
+            mine = [d for d in infos if d["product_id"] == pid and d["path"] not in seen]
+            if not mine:
+                continue
+            self._diag.append(f"[Corsair nxp] pid={pid:04x} '{name}'")
+            for d in self._pick_nxp(mine):
+                self._diag.append(f"  iface={d.get('interface_number')} "
+                                  f"usage={d.get('usage_page', 0):04x}:{d.get('usage', 0):04x}")
+                seen.add(d["path"])
+                parsed = parse_nxp(self._query_nxp(d["path"]))
+                if parsed is None:
+                    continue
+                level, label = parsed
+                out.append(DeviceStatus(f"corsair:{pid:04x}", name, level, False, True,
+                                        "corsair", approx=label, kind="mouse"))
+                break
         return out
 
     def diagnostics(self) -> List[str]:

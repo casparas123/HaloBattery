@@ -12,6 +12,11 @@ and the project follows [Semantic Versioning](https://semver.org/).
   class lists them). The wired id 1532:025A has no battery and is left out.
   **Unverified** here: no Razer keyboard was on hand, so the level arrives as the
   reference describes it until the reporter of #56 confirms.
+- Corsair Dark Core RGB Pro SE: the battery over its 2.4 GHz dongle (1B1C:1B7F),
+  through the Dark Core / Ironclaw "nxp" protocol from ckb-next. Its five-step
+  level is shown as a gauge ("about 50%") and no charging state is reported.
+  **Unverified** here: no Corsair mouse was on hand, so the collection and the
+  offsets are the reference's until the reporter of #56 confirms.
 
 ### Changed
 - New tray menu in the Windows 11 style: Segoe UI Variable text, Fluent icons, an acrylic
@@ -33,6 +38,10 @@ and the project follows [Semantic Versioning](https://semver.org/).
   a game has already switched the controller, and the icon shows no level otherwise.
   **Preferences > PlayStation full mode (Bluetooth)** brings the old behaviour back for
   those who do not play such games. USB is unchanged.
+
+## [1.12.0.8] - 2026-09-28
+
+Test build from pull requests [#112](https://github.com/HeyOkay/HaloBattery/pull/112) (Razer BlackWidow V3 Pro) and [#113](https://github.com/HeyOkay/HaloBattery/pull/113) (Corsair Dark Core RGB Pro SE) for issue [#56](https://github.com/HeyOkay/HaloBattery/issues/56). Both devices are built from their references and unverified on hardware; the reporter's diagnostics settle them.
 
 ## [1.12.0] - 2026-09-28
 

@@ -79,7 +79,7 @@ from providers import (AmInfinityProvider, AstroProvider, AsusProvider,  # noqa:
                        GWolvesProvider, HyperXAlpha2Provider, HyperXCloud3Provider, HyperXProvider, JblProvider,
                        KeychronProvider, LamzuProvider, LofreeProvider, LogitechProvider,
                        MchoseProvider, NintendoProvider, PlayStationProvider, PulsarProvider,
-                       RazerProvider, SteelSeriesProvider, WLmouseProvider, XInputProvider)
+                       AirPodsProvider, RazerProvider, SteelSeriesProvider, WLmouseProvider, XInputProvider)
 from providers.bluetooth import BluetoothWatcher  # noqa: E402
 
 HEADSET_WORDS = ("blackshark", "kraken", "barracuda", "nari", "thresher", "headset",
@@ -115,6 +115,7 @@ DEFAULTS = {
 # devices keep their own switch ("bluetooth" above), as before.
 PROVIDER_LABELS = {
     "8bitdo": "8BitDo controllers",
+    "airpods": "AirPods",
     "am_infinity": "AM Infinity 8K (Angry Miao)",
     "astro": "Astro A50",
     "asus": "ASUS ROG / TUF mice",
@@ -148,7 +149,7 @@ def make_providers() -> list:
             JblProvider(), LogitechProvider(), SteelSeriesProvider(), XInputProvider(),
             PlayStationProvider(), EightBitDoProvider(), BarracudaProvider(), NintendoProvider(),
             AsusProvider(), GWolvesProvider(), LofreeProvider(), AstroProvider(), CorsairProvider(),
-            LamzuProvider(), AmInfinityProvider()]
+            LamzuProvider(), AmInfinityProvider(), AirPodsProvider()]
 
 
 # ---------------------------------------------------------------- config

@@ -1,4 +1,5 @@
 from .base import DeviceStatus, Provider  # noqa: F401
+from .airpods import AirPodsProvider  # noqa: F401
 from .barracuda import BarracudaProvider  # noqa: F401
 from .audeze import AudezeProvider  # noqa: F401
 from .razer import RazerProvider  # noqa: F401

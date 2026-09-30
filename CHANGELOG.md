@@ -6,6 +6,9 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- AirPods (Pro, Pro 2, 3, 2) over Bluetooth LE, without a driver or the vendor app: they report no battery to Windows at all, so they are read from the "proximity pairing" advertisement they broadcast - the packet an iPhone reads. Model id at bytes 3-4, case level in the high nibble of byte 5, the buds in the nibbles of byte 6, lid and in-ear flags in byte 7, every nibble times ten, `0xF` staying unknown. Checked against a live AirPods 3 capture on 2026-09-26 (left 90 %, right 80 %, case 20 %); the weaker bud is shown, charging follows the buds, and anything weaker than -70 dBm is ignored as somebody else's pair. **New dependency**: `bleak` (requirements.txt) - the reason the feature ships as a custom build rather than in the official release (#40).
+
 ## [1.13.0] - 2026-09-29
 
 A new Windows 11 style tray menu and a batch of tray features: turn device types off,

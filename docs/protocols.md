@@ -248,6 +248,12 @@ Any Xbox-compatible controller is read the same way as the GameSir G7 Pro: the b
 
 ## Bluetooth
 
+### AirPods (Pro, Pro 2, 3, 2)
+
+**Connection:** Bluetooth LE - no pairing to the PC needed
+
+AirPods give Windows no battery at all - no HID collection, no battery-class PnP property - so the level comes from the "proximity pairing" BLE advertisement they broadcast (the packet an iPhone reads): message type `0x07` at byte 0, the model id at bytes 3-4 (0x2014 AirPods Pro 2, 0x200E AirPods Pro, 0x2013 AirPods 3, 0x200F AirPods 2), the case level in the high nibble of byte 5 (charging flags `0x04` case, `0x02` left, `0x01` right in its low bits), the two buds in the nibbles of byte 6 and the lid/in-ear flags in byte 7 - every nibble times ten, `0xF` read as unknown, never as 150 %. The offsets are the ones AirPodsDesktop and RustPods use; checked against a live AirPods 3 capture on 2026-09-26 (`07 19 01 13 20 2b 98 8f` = left 90 %, right 80 %, case 20 %). The weaker bud is shown and charging follows the buds, not the case (the case can charge while the buds are in your ears). Advertisements are public, so anything weaker than -70 dBm is dropped as somebody else's pair - a pair two rooms away measured -75 dBm against -55 dBm for a same-desk pair. Needs the `bleak` library (requirements.txt); without it the provider reports nothing and says so in the diagnostics
+
 ### Bluetooth devices, tested on the 1MORE SonoFlow headset
 
 **Connection:** Bluetooth (on by default, can be turned off in the menu)

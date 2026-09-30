@@ -6,6 +6,9 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Rapoo VT9 Pro on its 2.4 GHz receiver (`24AE:185A`): the battery the receiver pushes by itself - a 7-byte report (id `0xBB`) about every 3 seconds, the level in byte 6 and charging in byte 5, listen-only (nothing is ever written). The shape is from [zbndev/rapoo_battery](https://github.com/zbndev/rapoo_battery) and was confirmed against the reporter's own USB capture in [#109](https://github.com/HeyOkay/HaloBattery/issues/109); the app itself is **Unverified** until his test build run
+
 ## [1.13.0] - 2026-09-29
 
 A new Windows 11 style tray menu and a batch of tray features: turn device types off,

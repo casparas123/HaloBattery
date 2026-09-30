@@ -19,6 +19,7 @@ Levels are read over USB/HID (a dongle, a receiver or a cable), from Xbox-style 
 | Device | Connection | Verified on hardware |
 |---|---|---|
 | [8BitDo Pro 2, Pro 3, SN30 Pro, SF30 Pro in D-input mode](docs/protocols.md#8bitdo-pro-2-pro-3-sn30-pro-sf30-pro-in-d-input-mode) | Bluetooth or USB | no |
+| [AJAZZ AJ179 V2 MAX](docs/protocols.md#ajazz-aj179-v2-max) | 2.4 GHz receiver | no |
 | [AM Infinity 8K (Angry Miao)](docs/protocols.md#am-infinity-8k-angry-miao) | 2.4 GHz receiver | no |
 | [Astro A50 Gen 5 (Logitech 046D:0B1C)](docs/protocols.md#astro-a50-gen-5-logitech-046d0b1c) | Base station | no |
 | [ASUS ROG Gladius III Aimpoint and other ROG / TUF wireless mice (list in `providers/asus.py`)](docs/protocols.md#asus-rog-gladius-iii-aimpoint-and-other-rog--tuf-wireless-mice) | 2.4 GHz receiver or USB cable | no |
@@ -142,6 +143,7 @@ Settings, the log and the diagnostics report live in `%APPDATA%\HaloBattery`.
 - MCHOSE protocol: the write-up by @alexfrih ([alexfrih/mchose-linux](https://github.com/alexfrih/mchose-linux), recovered from MCHOSE's own web driver); the G7 from @kek353's monitor and the dump in [#8](https://github.com/HeyOkay/HaloBattery/issues/8).
 - Hitscan Hyperlight protocol: @sopparus ([sopparus/hitscan-battery](https://github.com/sopparus/hitscan-battery)), who mapped it from the vendor application's USB traffic and confirmed it in the [libratbag discussion](https://github.com/libratbag/libratbag/issues/1893).
 - AM Infinity 8K protocol: the AJAZZ Control Center project ([Aiacos/ajazz-control-center](https://github.com/Aiacos/ajazz-control-center), GPL-3.0), which reads the same USB id on its own AJ159 APEX unit.
+- AJAZZ AJ179 V2 MAX protocol: @johan-akn ([johan-akn/aj179-linux](https://github.com/johan-akn/aj179-linux), MIT), a native Linux driver for the same receiver whose battery daemon listens for the same announcements; the exchange here is from the reporter's own USB captures in [#74](https://github.com/HeyOkay/HaloBattery/issues/74).
 - BlackShark V2 Pro 2023: the OpenRazer driver ([PR #2862](https://github.com/openrazer/openrazer/pull/2862)). Razer PIDs and transaction ids: OpenRazer and [RazerBatteryTaskbar](https://github.com/Tekk-Know/RazerBatteryTaskbar).
 - The reference implementations behind individual devices - HeadsetControl, rivalcfg, Solaar, G-Helper, HyperHeadset, mouse.xyz, [`@openmouse/protocol`](https://github.com/OpenMouse-Project/openmouse), keychron-battery-dkms, JBL_Baterry_Monitor and others - are credited next to the device they were used for in [docs/protocols.md](docs/protocols.md).
 

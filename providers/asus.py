@@ -23,6 +23,21 @@ Not included (they use a different collection, report id or byte position in
 G-Helper, and none was on hand to test): the OMNI receiver (0B05:1ACE), the Harpe II
 Ace, Keris II Ace / Origin, Harpe Ace Mini / Extreme, Strix Carry, Gladius II Wireless
 and the MD200.
+
+The ROG Pelta headset (0B05:1B84, #199) is the newer generation of that family, from
+G-Helper's app/Peripherals/Headset (AsusHeadset.cs and Pelta.cs; its users have the
+model working, seerge/g-helper#5161). Unlike the mice it is read with output reports
+and the input queue:
+
+    request   output report 0xCC, 64 bytes: CC 12 07 ...  (CC 12 08 asks charging)
+    reply     from the input queue, echoing 12 07 in bytes 1-2 (byte 0 = report id),
+              the level in byte 6 (byte 5 is the sleep timer); the charging reply
+              answers 1 in byte 5
+    error     FF AA in bytes 1-2, or in bytes 5-6, is a firmware NAK
+
+The collection is the one with a 0xFF00 usage (G-Helper checks the report descriptor
+for a usage of that page). A level is only taken from a reply that carried the echo,
+0..100; when no reply comes the headset is still shown, without a level.
 """
 from __future__ import annotations
 
@@ -52,6 +67,19 @@ READ_ATTEMPTS = 8                    # other reports on the collection are skipp
 WRITE_ATTEMPTS = 3
 
 PERCENT, STEPS = 1, 25               # scale of the battery byte
+
+# the ROG Pelta headset (#199, docstring): output/input reports, not feature reports
+PELTA_PID = 0x1B84
+PELTA_NAME = "ROG Pelta"
+PELTA_REPORT_ID = 0xCC
+PELTA_CMD_BATTERY = 0x07             # CC 12 07: the level reply
+PELTA_CMD_CHARGING = 0x08            # CC 12 08: the charging reply
+PELTA_PACKET_LENGTH = 64
+PELTA_BATTERY_BYTE = 6               # G-Helper: response[6], 0..100
+PELTA_CHARGING_BYTE = 5              # its charging reply: response[5] == 1
+PELTA_ERROR = (0xFF, 0xAA)           # firmware NAK in bytes 1-2, or 5-6
+PELTA_EVENT_READS = 4                # event frames the reply may sit behind
+PELTA_READ_TIMEOUT_MS = 300
 
 # pid -> (name, scale). Wired and wireless pids of one mouse share the name, so they
 # share one icon.
@@ -108,6 +136,38 @@ def has_echo(r: List[int]) -> bool:
 
 def is_error(r: List[int]) -> bool:
     return _offset(r, ERROR) is not None
+
+
+def parse_pelta_reply(r, command: int) -> Optional[int]:
+    """The number from a ROG Pelta reply to `command` (0x07 battery, 0x08
+    charging), or None when this is not one.
+
+    G-Helper's AsusHeadset.cs reads the echo 12 07 in bytes 1-2 of its buffer (byte
+    0 holds the report id), the level in byte 6, and answers the charging command
+    with byte 5 == 1; FF AA in bytes 1-2 or 5-6 is a firmware NAK. The echo pins
+    down whether byte 0 is a report id here; a reply without one is accepted too,
+    with the same positions applied to the bytes after it."""
+    if not r:
+        return None
+    if len(r) >= 3 and r[1] == 0x12 and r[2] == command:
+        skip = 0
+    elif len(r) >= 2 and r[0] == 0x12 and r[1] == command:
+        skip = 1
+    else:
+        return None
+
+    def at(n):
+        i = n - skip
+        return r[i] if 0 <= i < len(r) else None
+
+    if (at(1), at(2)) == PELTA_ERROR or (at(5), at(6)) == PELTA_ERROR:
+        return None
+    if command == PELTA_CMD_BATTERY:
+        level = at(PELTA_BATTERY_BYTE)
+        if level is None or not 0 <= level <= 100:
+            return None
+        return level
+    return 1 if at(PELTA_CHARGING_BYTE) == 1 else 0
 
 
 def parse_reply(r: List[int], scale: int) -> Optional[Reading]:
@@ -186,6 +246,71 @@ class AsusProvider(Provider):
             except Exception:
                 pass
 
+    def _pelta_exchange(self, dev, command: int) -> Optional[List[int]]:
+        """Write CC 12 <command> as a 64-byte output report and read until its
+        echo comes back (G-Helper skips up to three event frames; a NAK frame is
+        returned and parsed as no reading). None when nothing came."""
+        packet = [PELTA_REPORT_ID, 0x12, command] + [0x00] * (PELTA_PACKET_LENGTH - 3)
+        try:
+            sent = dev.write(packet)
+        except (OSError, IOError, ValueError) as e:
+            self._diag.append(f"    write {command:02x}: {e}")
+            return None
+        if sent != len(packet):
+            self._diag.append(f"    write {command:02x} returned {sent} of {len(packet)} bytes")
+            return None
+        for _ in range(PELTA_EVENT_READS):
+            try:
+                r = list(dev.read(PELTA_PACKET_LENGTH, PELTA_READ_TIMEOUT_MS) or [])
+            except (OSError, IOError, ValueError) as e:
+                self._diag.append(f"    read {command:02x}: {e}")
+                return None
+            if not r:
+                continue
+            if ((len(r) >= 3 and r[1] == 0x12 and r[2] == command)
+                    or (len(r) >= 2 and r[0] == 0x12 and r[1] == command)
+                    or (len(r) >= 3 and (r[1], r[2]) == PELTA_ERROR)):
+                return r
+            self._diag.append(f"    event frame skipped: {hexdump(r, 16)}")
+        self._diag.append(f"    no reply to {command:02x}")
+        return None
+
+    def _read_pelta(self, path) -> Optional[Tuple[Optional[int], bool]]:
+        """The Pelta's two exchanges (docstring): (level, charging), level None
+        when no battery reply came. None only when the device cannot be opened."""
+        dev = hid.device()
+        try:
+            dev.open_path(path)
+        except (OSError, IOError) as e:
+            self._diag.append(f"    open: {e}")
+            return None
+        try:
+            # stale reports (button or volume events) are left behind first
+            for _ in range(PELTA_PACKET_LENGTH):
+                try:
+                    if not dev.read(PELTA_PACKET_LENGTH, 1):
+                        break
+                except (OSError, IOError, ValueError):
+                    break
+            level = None
+            charging = False
+            r = self._pelta_exchange(dev, PELTA_CMD_BATTERY)
+            if r is not None:
+                self._diag.append(f"    battery reply: {hexdump(r, 16)}")
+                level = parse_pelta_reply(r, PELTA_CMD_BATTERY)
+                if level is None:
+                    self._diag.append("    not a battery reading (NAK, or out of range)")
+            if level is not None:
+                c = self._pelta_exchange(dev, PELTA_CMD_CHARGING)
+                if c is not None:
+                    charging = parse_pelta_reply(c, PELTA_CMD_CHARGING) == 1
+            return level, charging
+        finally:
+            try:
+                dev.close()
+            except Exception:
+                pass
+
     def poll(self) -> List[DeviceStatus]:
         self._diag = []
         if hid is None:
@@ -218,6 +343,26 @@ class AsusProvider(Provider):
         for name, (level, charging, text) in found.items():
             key = "asus:" + name.lower().replace(" ", "-")
             out.append(DeviceStatus(key, name, level, charging, True, "asus", text, kind="mouse"))
+
+        # the ROG Pelta headset (#199, docstring): its own collection rule; the
+        # headset keeps its icon when no reply comes, like the other headsets
+        pelta = [d for d in infos if d["product_id"] == PELTA_PID]
+        if pelta:
+            level = None
+            charging = False
+            cands = [d for d in pelta if d.get("usage_page", 0) == 0xFF00]
+            if not cands:
+                self._diag.append(f"[ASUS] {PELTA_NAME} pid={PELTA_PID:04x}: "
+                                  "no 0xFF00 vendor collection")
+            for d in cands:
+                self._diag.append(f"[ASUS] {PELTA_NAME} pid={PELTA_PID:04x} usage="
+                                  f"{d.get('usage_page', 0):04x}:{d.get('usage', 0):04x}")
+                res = self._read_pelta(d["path"])
+                if res is not None:
+                    level, charging = res
+                    break
+            out.append(DeviceStatus("asus:rog-pelta", PELTA_NAME, level, charging,
+                                    True, "asus", "", kind="headset"))
         return out
 
     def diagnostics(self) -> List[str]:

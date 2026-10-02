@@ -135,7 +135,7 @@ PROVIDER_LABELS = {
     "8bitdo": "8BitDo controllers",
     "am_infinity": "AM Infinity 8K (Angry Miao)",
     "astro": "Astro A50",
-    "asus": "ASUS ROG / TUF mice",
+    "asus": "ASUS ROG / TUF mice and headsets",
     "audeze": "Audeze Maxwell",
     "barracuda": "Razer Barracuda Pro",
     "corsair": "Corsair headsets",

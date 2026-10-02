@@ -6,6 +6,11 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- ASUS ROG Pelta headset (0B05:1B84): level and charging on its 2.4 GHz receiver, from
+  G-Helper's implementation ([#199](https://github.com/HeyOkay/HaloBattery/issues/199)),
+  where the model is confirmed by its users. Unverified here - no Pelta was on hand.
+
 ## [1.13.0] - 2026-09-29
 
 A new Windows 11 style tray menu and a batch of tray features: turn device types off,

@@ -92,6 +92,12 @@ The AJAZZ Control Center project's AJ-series exchange: a zero-payload `0xF7` sta
 
 The battery command G-Helper uses: output report 0 `12 07` (65 bytes) on the vendor collection of interface 0, answered by a report echoing `12 07` with the battery in byte 5 (a percentage, or a level 0-4 on older models such as the Chakram and Keris Wireless) and charging in byte 10. 0 without charging is standby, not empty, so it shows nothing; `ff aa` (command not known) and an all-zero reply are not read as a level. Receiver and cable share one icon. The OMNI receiver and models with other layouts are not included. **Unverified** - no ASUS mouse was on hand
 
+### ASUS ROG Pelta
+
+**Connection:** 2.4 GHz receiver (0B05:1B84)
+
+The newer ROG headset generation, from G-Helper's `app/Peripherals/Headset` (`AsusHeadset.cs` / `Pelta.cs`; the model is confirmed by its users in [seerge/g-helper#5161](https://github.com/seerge/g-helper/issues/5161)). Unlike the older headsets it is read with output reports and the input queue: on the collection with a `0xFF00` usage, the packet `CC 12 07` (64 bytes; report id `0xCC` first) asks the battery and its reply echoes `12 07` in bytes 1-2 with the level in byte 6 (byte 5 is the sleep timer); a second packet `CC 12 08` answers charging with byte 5 == 1. `FF AA` in bytes 1-2 or 5-6 is a firmware NAK, and a reply without the echo is not read as a level. The headset keeps its icon, without a level, when nothing answers. **Unverified** - no Pelta was on hand; the packets, the collection rule and the offsets come from G-Helper
+
 ### Corsair Dark Core RGB Pro SE
 
 **Connection:** 2.4 GHz dongle (1B1C:1B7F)

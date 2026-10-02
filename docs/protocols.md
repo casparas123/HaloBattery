@@ -92,6 +92,12 @@ The AJAZZ Control Center project's AJ-series exchange: a zero-payload `0xF7` sta
 
 The battery command G-Helper uses: output report 0 `12 07` (65 bytes) on the vendor collection of interface 0, answered by a report echoing `12 07` with the battery in byte 5 (a percentage, or a level 0-4 on older models such as the Chakram and Keris Wireless) and charging in byte 10. 0 without charging is standby, not empty, so it shows nothing; `ff aa` (command not known) and an all-zero reply are not read as a level. Receiver and cable share one icon. The OMNI receiver and models with other layouts are not included. **Unverified** - no ASUS mouse was on hand
 
+### ASUS ROG Strix Go 2.4
+
+**Connection:** 2.4 GHz receiver (0B05:18D6, on its MI_03 collections)
+
+A feature-report exchange, from @vancinis's G-Helper work (`app/Peripherals/Headset/` on the `feat/rog-strix-go-24-support` branch; tested on their own headset, [seerge/g-helper#5158](https://github.com/seerge/g-helper/issues/5158)): the collection is the first of the receiver's whose feature report is at least 64 bytes (G-Helper opens it by that length, not by interface or usage page), and on it the packet `FF 08 00 FD 04 12 F1 03 52 01` (report id `0xFF` first) goes out as a feature report; 35 ms later the feature report is read back: `FF 1B 05 FE 12 04 1F 14 01 03 05 60 0E 40 12 01 00 17 25 05 20 B4 00 0A FD` carries the level at byte 13 (`0x40` = 64%). `FF AA` at bytes 1-2 is "packet not known", an all-zero run there is "headset off or asleep" (nothing is shown then), and a level of 0 or above 100 is refused rather than shown. No charging state is reported - G-Helper has not identified that byte either. **Unverified here** - the port is the reference's own tested code, and the reporter's run in [#190](https://github.com/HeyOkay/HaloBattery/issues/190) is the confirmation
+
 ### Corsair Dark Core RGB Pro SE
 
 **Connection:** 2.4 GHz dongle (1B1C:1B7F)

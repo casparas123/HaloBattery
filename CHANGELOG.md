@@ -6,6 +6,11 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- ASUS ROG Strix Go 2.4 (0B05:18D6): the headset's feature-report exchange, from
+  @vancinis's G-Helper work ([#190](https://github.com/HeyOkay/HaloBattery/issues/190)).
+  No charging state. Unverified until the reporter's run.
+
 ## [1.13.0] - 2026-09-29
 
 A new Windows 11 style tray menu and a batch of tray features: turn device types off,

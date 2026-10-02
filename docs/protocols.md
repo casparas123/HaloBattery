@@ -122,6 +122,12 @@ The same feature report exchange as the WLmouse and G-Wolves mice (`00 00 02 02 
 
 The same protocol as the M7 Ultra on MCHOSE's newer vendor id, which the reference driver treats identically: the diagnostics in [#4](https://github.com/HeyOkay/HaloBattery/issues/4) show the same interface shape (collections 0xFF0B:0x104 and 0xFF01:0x01 on interface 2). The status read is documented on the shorter 0x11 report, so both report ids are tried, and the mouse is named from the receiver's own product string. Icon of its own, so it and an M7 Ultra stay two devices. **Unverified** — no A7 V2 Ultra was on hand, so a level out of range is refused rather than shown
 
+### MCHOSE K99 V3, V7
+
+**Connection:** 2.4 GHz receivers (3837:3033, 3837:1016)
+
+The newer 0x3837 devices (the K99 V3 keyboard and the V7 mouse, [#189](https://github.com/HeyOkay/HaloBattery/issues/189)) do not answer the feature channels above. The current M HUB bundle reads their battery on a third channel: a 63-byte request on *output* report 0x55, `65 01` followed by zeros, answered by an input report 0x55 that starts with `65` and carries the level in byte 1 and the state in byte 2 - 2 discharging, 3 charging, 4 full, 26 asleep, the same decode the bundle's own charge-status listener applies (3 and 4 both mean on the cable). The collections come from the reporter's dump (0xFF70:0x0071 and 0xFF31:0x0074 on the K99 V3, 0xFF01:0x0001 and 0xFF60:0x0061 on the V7), tried in order. Each product id of the family keeps an icon of its own - the K99 V3 and the V7 are both 0x3837, and a vendor-only key drew them as one icon. **Unverified** - no such device was on hand; the frame is the vendor's own and the reporter's run is the confirmation
+
 ### MCHOSE G7
 
 **Connection:** USB (A8A5:2255, chip 'YJX-CHIP')

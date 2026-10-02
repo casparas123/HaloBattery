@@ -51,6 +51,19 @@ than by model list, which is what this provider does as well. The diagnostics in
 0xFF01:0x01 on interface 2) have exactly that shape, and the reference documents the status
 read on the *short* 0x11 report, so both report ids are tried before a poll gives up.
 
+The devices that driver snapshot does not cover - the K99 V3 keyboard and the V7
+mouse in issue #189, both 0x3837 - answer neither report id. The current M HUB
+bundle reads their battery on a third channel: a 63-byte request on *output* report
+0x55, ``65 01`` followed by zeros, answered by an input report 0x55 starting ``65``
+whose byte 1 is the level and byte 2 the state - 2 discharging, 3 charging, 4 full,
+26 asleep. The bundle's own charge-status listener decodes the same frame and treats
+3 and 4 alike (both mean on the cable), so this does too; 26 is no reading, which
+leaves the last value on the greyed icon. The ask is byte for byte the bundle's
+battery getter for its non-audio devices, and the collection comes from the
+reporter's dump (the K99 V3 offers 0xFF70:0x0071 and 0xFF31:0x0074, the V7
+0xFF01:0x0001 and 0xFF60:0x0061), so the frame goes to the first vendor collection
+that answers. Unverified until #189's reporter runs it.
+
 Not verified: the 0x3837 family (the device in issue #4 is not here), other models, and the
 meaning of the second level/charging pair in the 0x5253 reply (it has matched the first pair
 in every reading so far).
@@ -68,7 +81,8 @@ from .base import DeviceStatus, Provider, hexdump, log
 # 0x5253 is the family measured here and keeps the plain icon key; 0x3837 is the newer
 # MCHOSE vendor id the reference driver treats identically (issue #4's A7 V2 Ultra).
 MEASURED_VID = 0x5253
-MCHOSE_VIDS = (MEASURED_VID, 0x3837)
+NEW_VID = 0x3837
+MCHOSE_VIDS = (MEASURED_VID, NEW_VID)
 
 # model ids seen in the 0x06 reply (the receiver's own PID does not identify the mouse:
 # 0x1020 is used by the M7 Ultra and by the L7 Pro)
@@ -94,6 +108,24 @@ SHORT_LEN = 20                # payload bytes on 0x11, 64 on 0x12 (the frame add
 LONG_LEN = 64
 CMD_STATUS = 0x06
 CMD_BOND = 0x03
+
+# The newer 0x3837 devices (#189, docstring): battery on *output* report 0x55.
+STATUS_REPORT = 0x55
+STATUS_ASK = bytes([0x65, 0x01])       # then zeros, up to the report length
+STATUS_ASK_LEN = 63
+STATUS_MARK = 0x65
+STATE_DISCHARGE = 2
+STATE_CHARGING = 3
+STATE_FULL = 4
+STATE_ASLEEP = 26
+STATUS_READS = 6                       # non-blocking reads, ~0.4 s in total
+STATUS_READ_GAP = 0.06
+
+# MCHOSE's own keyboard names: the keyboard array of the M HUB bundle's device lists
+# plus the series its keyboard checks match on. A device of this provider whose name
+# matches one keeps the keyboard pictogram; everything else stays the historic mouse.
+KEYBOARD_WORDS = ("ace 6", "g75", "jet 75", "zero 75", "mix 87", "k87", "k99",
+                  "g87", "g98", "gx87", "ut98", "z75", "x75", "kx75")
 
 # The status read is documented on the short report and was also captured there on the M7
 # Ultra, so it is tried first (cheaper: 21 bytes on the wire instead of 65); the long
@@ -168,15 +200,52 @@ def parse_g7(resp) -> Optional[Tuple[int, bool]]:
     return level, bool(r[G7_CHARGE_BYTE])
 
 
-def device_key(vid: int, pid: int) -> str:
-    """One icon per device: the dongle and the cable of the same mouse share a key.
+def kind_of(name: str) -> str:
+    """The pictogram kind for a device of this provider: keyboard for MCHOSE's own
+    keyboard names, the historic "mouse" otherwise (which is what every family this
+    provider read before #189 is)."""
+    n = (name or "").lower()
+    return "keyboard" if any(w in n for w in KEYBOARD_WORDS) else "mouse"
 
-    Only the family measured here (0x5253) keeps the plain "mchose" key it has always
-    used, so an existing icon does not move. Anything else gets a key of its own - the
-    G7's 0xA8A5, and the newer 0x3837 receivers (the A7 V2 Ultra in issue #4) - which is
-    what keeps two MCHOSE devices on one machine off a single shared icon.
+
+def parse_status_055(resp) -> Optional[Tuple[int, bool]]:
+    """(level, charging) from the report-0x55 answer, or None if it is not one.
+
+    Windows hidapi keeps the report id in the buffer and WebHID strips it, so both
+    shapes are accepted. Byte 2 is the state: 2 discharging, 3 charging, 4 full,
+    26 asleep - the last one is no reading, so the icon keeps its greyed-out value."""
+    if not resp:
+        return None
+    r = bytes(resp)
+    if r[0] == STATUS_REPORT:
+        r = r[1:]
+    if len(r) < 3 or r[0] != STATUS_MARK:
+        return None
+    level = r[1]
+    if level > 100:
+        return None
+    state = r[2]
+    if state == STATE_DISCHARGE:
+        return level, False
+    if state in (STATE_CHARGING, STATE_FULL):
+        return level, True
+    return None
+
+
+def device_key(vid: int, pid: int) -> str:
+    """One icon per device, stable across polls.
+
+    The family measured here (0x5253) keeps the plain "mchose" key it has always used, so
+    an existing icon does not move, and the G7 keeps its vendor id's key. The newer
+    0x3837 family gets one key per product id: one machine can hold two of them - the
+    K99 V3 keyboard and the V7 mouse of #189 are both 0x3837, and a vendor-only key
+    drew the two as a single icon carrying whichever reading the merge preferred.
     """
-    return "mchose" if vid == MEASURED_VID else f"mchose:{vid:04x}"
+    if vid == MEASURED_VID:
+        return "mchose"
+    if vid == NEW_VID:
+        return f"mchose:{vid:04x}:{pid:04x}"
+    return f"mchose:{vid:04x}"
 
 
 class MchoseProvider(Provider):
@@ -188,7 +257,55 @@ class MchoseProvider(Provider):
         self._names: Dict[str, str] = {}
         self._models: Dict[str, int] = {}
 
-    def _read_collection(self, path: bytes) -> Optional[Tuple[int, int, int, int]]:
+    def _ask_055(self, path: bytes) -> Optional[Tuple[int, bool]]:
+        """The newer channel (#189): one 63-byte request on output report 0x55, then
+        its answer. The bundle allows the device 2 s; this waits ~0.4 s, because a
+        device that does not answer at once is asleep rather than slow."""
+        dev = hid.device()
+        try:
+            dev.open_path(path)
+        except (OSError, IOError) as e:
+            self._diag.append(f"    open: {e}")
+            return None
+        try:
+            try:
+                dev.set_nonblocking(True)
+            except Exception:                       # pragma: no cover
+                pass
+            frame = bytes([STATUS_REPORT]) + STATUS_ASK.ljust(STATUS_ASK_LEN, b"\x00")
+            try:
+                dev.write(frame)
+            except (OSError, ValueError) as e:
+                self._diag.append(f"    write on report {STATUS_REPORT:#04x}: {e}")
+                return None
+            for _ in range(STATUS_READS):
+                time.sleep(STATUS_READ_GAP)
+                try:
+                    resp = dev.read(64)
+                except (OSError, ValueError):
+                    continue
+                got = parse_status_055(resp)
+                if got:
+                    self._diag.append(f"    answered on report {STATUS_REPORT:#04x}: "
+                                      f"{hexdump(resp, 8)}")
+                    return got
+            self._diag.append(f"    no answer on report {STATUS_REPORT:#04x}")
+            return None
+        finally:
+            try:
+                dev.close()
+            except Exception:
+                pass
+
+    def _read_collection(self, path: bytes,
+                         newer: bool = False) -> Optional[Tuple[int, int, int, int]]:
+        """Read one collection: the newer report-0x55 channel first for the 0x3837
+        family (a device of that family built before the change still answers the
+        feature channels, which stay as its fallback), the feature channels otherwise."""
+        if newer:
+            got = self._ask_055(path)
+            if got:
+                return got[0], 1 if got[1] else 0, 0, 0
         dev = hid.device()
         try:
             dev.open_path(path)
@@ -319,7 +436,7 @@ class MchoseProvider(Provider):
                     if got_g7:
                         found.setdefault(key, []).append((got_g7[0], got_g7[1], pid, 0))
                 else:
-                    got = self._read_collection(d["path"])
+                    got = self._read_collection(d["path"], newer=(vid == NEW_VID))
                     if got:
                         self._models[key] = got[2]
                         found.setdefault(key, []).append((got[0], bool(got[1]), pid, got[2]))
@@ -337,7 +454,7 @@ class MchoseProvider(Provider):
                               + f": {level}%{' (charging)' if charge else ''}")
             self._last[key] = (level, charge, time.time())
             out.append(DeviceStatus(key, self._display_name(key), level, charge, True,
-                                    "mchose", kind="mouse"))
+                                    "mchose", kind=kind_of(self._display_name(key))))
 
         # silent: a receiver cannot tell a switched-off mouse from one that went to sleep
         # a few seconds ago, so keep the last value greyed out for a while
@@ -346,7 +463,7 @@ class MchoseProvider(Provider):
             if key in found or now - last[2] >= ASLEEP_KEEP:
                 continue
             out.append(DeviceStatus(key, self._display_name(key), last[0], last[1],
-                                    False, "mchose", kind="mouse"))
+                                    False, "mchose", kind=kind_of(self._display_name(key))))
         return out
 
     def _display_name(self, key: str) -> str:

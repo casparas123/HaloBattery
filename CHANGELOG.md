@@ -6,6 +6,12 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- MCHOSE: the newer 0x3837 devices (the K99 V3 keyboard and the V7 mouse,
+  [#189](https://github.com/HeyOkay/HaloBattery/issues/189)) - their battery arrives on
+  output report 0x55 as a `65 <level> <state>` frame, byte for byte the channel the
+  current M HUB bundle uses. Unverified until the reporter's run.
+
 ## [1.13.0] - 2026-09-29
 
 A new Windows 11 style tray menu and a batch of tray features: turn device types off,

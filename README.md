@@ -39,6 +39,7 @@ Levels are read over USB/HID (a dongle, a receiver or a cable), from Xbox-style 
 | [Logitech G502 LIGHTSPEED, G502 X PLUS](docs/protocols.md#logitech-g502-lightspeed-g502-x-plus) | Lightspeed receiver | yes |
 | [Logitech (more HID++ 2.0 devices and G-series headsets)](docs/protocols.md#logitech-more-hid-20-devices-and-g-series-headsets) | Lightspeed, Unifying or Bolt receiver | likely |
 | [MCHOSE A7 V2 Ultra](docs/protocols.md#mchose-a7-v2-ultra) | 2.4 GHz receiver | no |
+| [MCHOSE K99 V3, V7](docs/protocols.md#mchose-k99-v3-v7) | 2.4 GHz receiver | no |
 | [MCHOSE G7](docs/protocols.md#mchose-g7) | USB (chip 'YJX-CHIP') | yes |
 | [MCHOSE M7 Ultra](docs/protocols.md#mchose-m7-ultra) | 2.4 GHz receiver | yes |
 | [Nintendo Switch Pro Controller, Joy-Con (L) / (R)](docs/protocols.md#nintendo-switch-pro-controller-joy-con-l--r) | Bluetooth | no |

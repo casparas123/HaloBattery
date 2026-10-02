@@ -6,6 +6,17 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- FlyDigi Vader 5 Pro: the level and charging state read through the pad's own
+  vendor channel (the 0xFFA0 collection), because XInput calls its 2.4 GHz dongle
+  "wired" and Windows.Gaming.Input's report is the constant 1000/1000 placeholder
+  (#191). Unverified on hardware until the reporters' run.
+
+### Fixed
+- The constant remain=full=1000 battery report Windows.Gaming.Input hands out for
+  some pads ("full", synthesized) no longer shows as 100%: the Vader 4 Pro's report
+  said 100% while the controller's battery light was flashing low (#191).
+
 ## [1.13.0] - 2026-09-29
 
 A new Windows 11 style tray menu and a batch of tray features: turn device types off,

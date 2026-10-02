@@ -6,6 +6,14 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **ASUS ROG Strix Go 2.4** (`0B05:18D6`, [#190](https://github.com/HeyOkay/HaloBattery/issues/190)):
+  the headset's own feature-report exchange, from @vancinis's G-Helper work. The level is
+  the pack voltage in the reply (bytes 11-12), shown in Armoury Crate's quarter steps
+  (100 / 75 / 50 / 25 / 10); byte 13 is a constant, not a level. Byte 9 says whether the
+  headset is charging. Tested by @musicjoywu on his own headset through several charge
+  cycles.
+
 ### Changed
 - **A tidier repository and a shorter README**: the app's modules moved into the `halo/`
   package (`halo_battery.pyw` stays the entry point), the .bat helpers into `scripts/`

@@ -199,5 +199,139 @@ class PollTest(ProviderTest):
         self.assertEqual(mouse.opened, 0)
 
 
+# -------------------------------------------------------- the ROG Strix Go 2.4 (#190)
+
+def headset_reply(level=0x40, status=0x60):
+    """G-Helper's example reply, byte for byte (StrixGo24.cs): level at byte 13."""
+    r = [0xFF, 0x1B, 0x05, 0xFE, 0x12, 0x04, 0x1F, 0x14, 0x01, 0x03, 0x05,
+         status, 0x0E, level, 0x12, 0x01, 0x00, 0x17, 0x25, 0x05, 0x20, 0xB4,
+         0x00, 0x0A, 0xFD]
+    return r + [0] * (64 - len(r))
+
+
+class FakeHeadset:
+    """A dongle answering the headset exchange with feature reports."""
+
+    def __init__(self, mode="answer", level=0x40):
+        self.mode, self.level = mode, level
+        self.sent, self.opened, self.reads = [], 0, 0
+
+    def on_send(self, data):
+        self.sent.append(list(data))
+
+    def on_get(self):
+        self.reads += 1
+        if self.mode == "silent":
+            return []
+        if self.mode == "error":
+            # the marker at bytes 1-2, with a plausible-looking byte 13 behind it:
+            # an error frame must be refused whatever follows it
+            return [0xFF, 0xFF, 0xAA] + [0] * 10 + [0x64] + [0] * (64 - 14)
+        if self.mode == "zeros":
+            # all-zero bytes 1-3 are "off or asleep" even when byte 13 is not zero
+            return [0xFF] + [0] * 12 + [0x64] + [0] * (64 - 14)
+        if self.mode == "slow" and self.reads == 1:
+            return []
+        return headset_reply(self.level)
+
+
+class HeadsetTest(unittest.TestCase):
+    def setUp(self):
+        self._saved = (A.hid, A.hidlist, A.feature_length)
+        self.hs = FakeHeadset()
+
+    def tearDown(self):
+        A.hid, A.hidlist, A.feature_length = self._saved
+
+    def headset_entries(self):
+        # the MI_03 collections from #190's dump
+        return [
+            {"product_id": A.HEADSET_PID, "interface_number": 3, "usage_page": 0xFF00,
+             "usage": 1, "path": b"mi03-ff00", "product_string": "Hid Interface"},
+            {"product_id": A.HEADSET_PID, "interface_number": 3, "usage_page": 0x000C,
+             "usage": 1, "path": b"mi03-000c", "product_string": "Hid Interface"},
+            {"product_id": A.HEADSET_PID, "interface_number": 3, "usage_page": 0xFFC0,
+             "usage": 1, "path": b"mi03-ffc0", "product_string": "Hid Interface"},
+        ]
+
+    def poll(self, lengths=None, hs=None):
+        hs = hs if hs is not None else self.hs
+        entries = self.headset_entries()
+        lengths = lengths if lengths is not None else {b'mi03-ff00': 64, b'mi03-000c': 4,
+                                                       b'mi03-ffc0': 64}
+        self.opened = None
+        test = self
+        A.hidlist = types.SimpleNamespace(enumerate=lambda vid=0: list(entries))
+        A.feature_length = lambda path: lengths.get(path)
+
+        class FakeDevice:
+            def open_path(self, path):
+                test.opened = path
+                hs.opened += 1
+
+            def send_feature_report(self, data):
+                hs.on_send(data)
+                return len(data)
+
+            def get_feature_report(self, rid, n):
+                return hs.on_get()
+
+            def close(self):
+                pass
+
+        A.hid = types.SimpleNamespace(device=lambda: FakeDevice())
+        return A.AsusProvider().poll()
+
+    def test_the_request_is_the_reference_packet(self):
+        found = self.poll()
+        self.assertEqual(1, len(found))
+        self.assertEqual([0xFF, 0x08, 0x00, 0xFD, 0x04, 0x12, 0xF1, 0x03, 0x52, 0x01]
+                         + [0x00] * 54, self.hs.sent[0])
+        self.assertEqual(64, len(self.hs.sent[0]))
+
+    def test_the_level_is_byte_13_of_the_reference_reply(self):
+        found = self.poll()
+        d = found[0]
+        self.assertEqual("asus:rog-strix-go-2.4", d.key)
+        self.assertEqual("ROG Strix Go 2.4", d.name)
+        self.assertEqual(64, d.level)
+        self.assertFalse(d.charging)          # no charging state is claimed
+        self.assertEqual("headset", d.kind)
+
+    def test_the_collection_is_the_first_with_a_64_byte_feature_report(self):
+        self.poll()
+        self.assertEqual(b"mi03-ff00", self.opened)
+        self.poll(lengths={b'mi03-ff00': 32, b'mi03-000c': 4, b'mi03-ffc0': 64})
+        self.assertEqual(b"mi03-ffc0", self.opened)     # ff00 too short: skipped
+
+    def test_no_64_byte_collection_sends_nothing(self):
+        found = self.poll(lengths={b'mi03-ff00': 32, b'mi03-000c': 4, b'mi03-ffc0': 8})
+        self.assertEqual([], found)
+        self.assertEqual([], self.hs.sent)
+
+    def test_error_zeros_and_silence_give_no_icon(self):
+        for mode in ("error", "zeros", "silent"):
+            with self.subTest(mode=mode):
+                hs = FakeHeadset(mode=mode)
+                self.assertEqual([], self.poll(hs=hs))
+
+    def test_level_zero_and_above_100_are_refused(self):
+        self.assertEqual([], self.poll(hs=FakeHeadset(level=0)))
+        self.assertEqual([], self.poll(hs=FakeHeadset(level=101)))
+
+    def test_a_reply_without_the_report_id_is_accepted(self):
+        class Ridless(FakeHeadset):
+            def on_get(self):
+                return headset_reply(self.level)[1:]
+        found = self.poll(hs=Ridless())
+        self.assertEqual([d.level for d in found], [0x40])
+
+    def test_a_timeout_is_retried(self):
+        hs = FakeHeadset(mode="slow")
+        found = self.poll(hs=hs)
+        self.assertEqual([d.level for d in found], [0x40])
+        self.assertEqual(2, len(hs.sent))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -201,19 +201,23 @@ class PollTest(ProviderTest):
 
 # -------------------------------------------------------- the ROG Strix Go 2.4 (#190)
 
-def headset_reply(level=0x40, status=0x60):
-    """G-Helper's example reply, byte for byte (StrixGo24.cs): level at byte 13."""
-    r = [0xFF, 0x1B, 0x05, 0xFE, 0x12, 0x04, 0x1F, 0x14, 0x01, 0x03, 0x05,
-         status, 0x0E, level, 0x12, 0x01, 0x00, 0x17, 0x25, 0x05, 0x20, 0xB4,
-         0x00, 0x0A, 0xFD]
+def headset_reply(lsb=0x3B, msb=0x0F, charging=False):
+    """The reporter's live frame (#190), byte for byte: the battery voltage at
+    bytes 11-12 (LSB first; MSB 0x0F = the 75 % step Armoury Crate shows), byte 9
+    the charging state, and byte 13 the constant 0x40 the first port read as the
+    level."""
+    r = [0xFF, 0x1B, 0x05, 0xFE, 0x12, 0x04, 0x1F, 0x14, 0x01,
+         0x0A if charging else 0x03, 0x05, lsb, msb, 0x40, 0x12, 0x01,
+         0x00, 0x17, 0x25, 0x05, 0x20, 0xB4, 0x00, 0x0A, 0xFD]
     return r + [0] * (64 - len(r))
 
 
 class FakeHeadset:
     """A dongle answering the headset exchange with feature reports."""
 
-    def __init__(self, mode="answer", level=0x40):
-        self.mode, self.level = mode, level
+    def __init__(self, mode="answer", lsb=0x3B, msb=0x0F, charging=False, reply=None):
+        self.mode, self.lsb, self.msb = mode, lsb, msb
+        self.charging, self.reply = charging, reply
         self.sent, self.opened, self.reads = [], 0, 0
 
     def on_send(self, data):
@@ -232,7 +236,9 @@ class FakeHeadset:
             return [0xFF] + [0] * 12 + [0x64] + [0] * (64 - 14)
         if self.mode == "slow" and self.reads == 1:
             return []
-        return headset_reply(self.level)
+        if self.reply is not None:
+            return list(self.reply)
+        return headset_reply(self.lsb, self.msb, self.charging)
 
 
 class HeadsetTest(unittest.TestCase):
@@ -254,9 +260,10 @@ class HeadsetTest(unittest.TestCase):
              "usage": 1, "path": b"mi03-ffc0", "product_string": "Hid Interface"},
         ]
 
-    def poll(self, lengths=None, hs=None):
+    def poll(self, lengths=None, hs=None, entries=None):
         hs = hs if hs is not None else self.hs
-        entries = self.headset_entries()
+        if entries is None:
+            entries = self.headset_entries()
         lengths = lengths if lengths is not None else {b'mi03-ff00': 64, b'mi03-000c': 4,
                                                        b'mi03-ffc0': 64}
         self.opened = None
@@ -280,7 +287,8 @@ class HeadsetTest(unittest.TestCase):
                 pass
 
         A.hid = types.SimpleNamespace(device=lambda: FakeDevice())
-        return A.AsusProvider().poll()
+        self.provider = A.AsusProvider()
+        return self.provider.poll()
 
     def test_the_request_is_the_reference_packet(self):
         found = self.poll()
@@ -289,14 +297,48 @@ class HeadsetTest(unittest.TestCase):
                          + [0x00] * 54, self.hs.sent[0])
         self.assertEqual(64, len(self.hs.sent[0]))
 
-    def test_the_level_is_byte_13_of_the_reference_reply(self):
+    def test_the_level_is_the_voltage_step_not_the_constant_byte_13(self):
         found = self.poll()
         d = found[0]
         self.assertEqual("asus:rog-strix-go-2.4", d.key)
         self.assertEqual("ROG Strix Go 2.4", d.name)
-        self.assertEqual(64, d.level)
-        self.assertFalse(d.charging)          # no charging state is claimed
+        self.assertEqual(75, d.level)         # 0x0F3B = 3899 mV -> the 75 % step
+        self.assertFalse(d.charging)          # byte 9 is 0x03: on battery
         self.assertEqual("headset", d.kind)
+        self.assertIn("-> 75%", "\n".join(self.provider.diagnostics()))
+
+    def test_each_voltage_band_maps_to_its_armoury_step(self):
+        # the reference's map (#6067): MSB 0x10 / >= 4100 mV -> 100, MSB 0x0F /
+        # >= 3850 -> 75, >= 3700 -> 50, MSB 0x0E / >= 3500 -> 25, lower -> 10
+        for lsb, msb, level in ((0x68, 0x10, 100),   # 4200 mV
+                                (0x00, 0x0F, 75),    # 3840 mV, the MSB guard alone
+                                (0xA6, 0x0E, 50),    # 3750 mV: the voltage arm
+                                (0x10, 0x0E, 25),    # 3600 mV, the 0x0E guard
+                                (0x48, 0x0D, 10)):   # 3400 mV: the critical step
+            with self.subTest(msb=msb, lsb=lsb):
+                found = self.poll(hs=FakeHeadset(lsb=lsb, msb=msb))
+                self.assertEqual([level], [d.level for d in found])
+
+    def test_charging_comes_from_byte_9(self):
+        found = self.poll(hs=FakeHeadset(charging=True))
+        self.assertEqual((found[0].level, found[0].charging), (75, True))
+        self.assertIn("-> 75% charging", "\n".join(self.provider.diagnostics()))
+
+    def test_the_wired_id_always_charges_and_shares_the_icon(self):
+        entries = [{"product_id": A.HEADSET_WIRED_PID, "interface_number": 3,
+                    "usage_page": 0xFF00, "usage": 1, "path": b"mi03-ff00",
+                    "product_string": "Hid Interface"}]
+        found = self.poll(entries=entries)
+        d = found[0]
+        self.assertEqual((d.key, d.name, d.charging),
+                         ("asus:rog-strix-go-2.4", "ROG Strix Go 2.4", True))
+
+    def test_a_frame_without_the_live_header_is_not_read(self):
+        # the reference's disconnect signal: byte 1 != 0x1B means the headset is gone
+        frame = headset_reply()
+        frame[1] = 0x60
+        self.assertEqual([], self.poll(hs=FakeHeadset(reply=frame)))
+        self.assertEqual([], self.poll(hs=FakeHeadset(reply=headset_reply()[:12])))
 
     def test_the_collection_is_the_first_with_a_64_byte_feature_report(self):
         self.poll()
@@ -315,21 +357,17 @@ class HeadsetTest(unittest.TestCase):
                 hs = FakeHeadset(mode=mode)
                 self.assertEqual([], self.poll(hs=hs))
 
-    def test_level_zero_and_above_100_are_refused(self):
-        self.assertEqual([], self.poll(hs=FakeHeadset(level=0)))
-        self.assertEqual([], self.poll(hs=FakeHeadset(level=101)))
-
     def test_a_reply_without_the_report_id_is_accepted(self):
         class Ridless(FakeHeadset):
             def on_get(self):
-                return headset_reply(self.level)[1:]
+                return headset_reply(self.lsb, self.msb, self.charging)[1:]
         found = self.poll(hs=Ridless())
-        self.assertEqual([d.level for d in found], [0x40])
+        self.assertEqual([d.level for d in found], [75])
 
     def test_a_timeout_is_retried(self):
         hs = FakeHeadset(mode="slow")
         found = self.poll(hs=hs)
-        self.assertEqual([d.level for d in found], [0x40])
+        self.assertEqual([d.level for d in found], [75])
         self.assertEqual(2, len(hs.sent))
 
 

@@ -309,9 +309,12 @@ class HeadsetTest(unittest.TestCase):
 
     def test_each_voltage_band_maps_to_its_armoury_step(self):
         # the reference's map (#6067): MSB 0x10 / >= 4100 mV -> 100, MSB 0x0F /
-        # >= 3850 -> 75, >= 3700 -> 50, MSB 0x0E / >= 3500 -> 25, lower -> 10
+        # >= 3800 -> 75, >= 3700 -> 50, MSB 0x0E / >= 3500 -> 25, lower -> 10;
+        # the 75 floor is the reporter's own measurement (#190, 2026-10-18)
         for lsb, msb, level in ((0x68, 0x10, 100),   # 4200 mV
                                 (0x00, 0x0F, 75),    # 3840 mV, the MSB guard alone
+                                (0xF7, 0x0E, 75),    # 3831 mV on battery: Armoury 75 %
+                                (0x9F, 0x0E, 50),    # 3743 mV on battery: Armoury 50 %
                                 (0xA6, 0x0E, 50),    # 3750 mV: the voltage arm
                                 (0x10, 0x0E, 25),    # 3600 mV, the 0x0E guard
                                 (0x48, 0x0D, 10)):   # 3400 mV: the critical step

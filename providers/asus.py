@@ -33,7 +33,7 @@ little-endian battery voltage at reply bytes 11-12 (LSB first). The reporter's
 frame carries MSB 0x0F and Armoury Crate shows 75 % - the pair this file maps:
 
     request   feature report 0xFF, 64 bytes: FF 08 00 FD 04 12 F1 03 52 01 00 ...
-    reply     feature report: FF 1B ... volt lsb at 11, msb at 12 (>= 3850 mV -> 75 %)
+    reply     feature report: FF 1B ... volt lsb at 11, msb at 12 (>= 3800 mV -> 75 %)
     charging  byte 9 = 0x0A while charging, 0x03 on battery; the wired id always charges
     error     FF AA at bytes 1-2: the packet is not known to the firmware
     zeros     bytes 1-3 all zero, or byte 1 not 0x1B: off, asleep or disconnected
@@ -41,9 +41,12 @@ frame carries MSB 0x0F and Armoury Crate shows 75 % - the pair this file maps:
 The collection is picked as G-Helper picks it: the first of the receiver's
 collections whose feature report is at least 64 bytes long (HidP_GetCaps), not by
 interface number or usage page. The voltage steps and the charging byte are the
-reference's readings of this model; on the reporter's hardware the 75 % band and
-the on-battery 0x03 are confirmed, the rest stays as the reference has it, and
-only frames from a live headset (header 0x1B) are read at all.
+reference's readings of this model, with the 75 % floor moved from 3850 to 3800 mV
+on the reporter's own measurements (3743 mV on battery with Armoury Crate at 50 %,
+3831 mV on battery at 75 %). Armoury Crate's panel holds its last number across a
+plug or unplug until the level settles (100 % kept after unplugging at 4077 mV,
+50 % kept while charging at 3897 mV); this provider shows the live frame instead.
+Only frames from a live headset (header 0x1B) are read at all.
 """
 from __future__ import annotations
 
@@ -87,7 +90,7 @@ HEADSET_PACKET_LENGTH = 64
 # (berkaykrc's G-Helper #6067 corrected the earlier byte-13 read)
 HEADSET_VOLTAGE_LSB = 11
 HEADSET_VOLTAGE_MSB = 12
-HEADSET_LEVEL_STEPS = ((0x10, 4100, 100), (0x0F, 3850, 75), (None, 3700, 50),
+HEADSET_LEVEL_STEPS = ((0x10, 4100, 100), (0x0F, 3800, 75), (None, 3700, 50),
                        (0x0E, 3500, 25))
 HEADSET_LEVEL_LOW = 10
 HEADSET_CHARGING_BYTE = 9

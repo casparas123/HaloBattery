@@ -323,6 +323,27 @@ class BragiPollTest(unittest.TestCase):
         self.assertEqual(bus.opened, [])
         self.assertEqual(bus.dongles[b"c1"].reads, 0)
 
+    def test_the_k65_plus_receiver_reads_its_level(self):
+        # #154: the K65 PLUS dongle (1b1c:2b07) runs the same routed exchange as
+        # the Dark Core's - level property 0x0F on the paired device's route - and
+        # this test mirrors OpenLinkHub's K65 Plus dongle handler (cmdBatteryLevel
+        # {0x02, 0x0F}, the value a little-endian uint16 at reply bytes 3-4). The
+        # diagnostics in #154 list ff42:0001 on interface 1 and its notice
+        # channel on interface 2.
+        e = [entry(0x2B07, b"k65-answers", 1, 0xFF42, 0x0001,
+                   "Corsair K65 PLUS Wireless Receiver"),
+             entry(0x2B07, b"k65-notice", 2, 0xFF42, 0x0002,
+                   "Corsair K65 PLUS Wireless Receiver")]
+        out, bus = self.poll(e, {b"k65-answers": FakeDongle(bragi_reply(950)),
+                                 b"k65-notice": FakeDongle(bragi_reply(0))})
+        self.assertEqual(len(out), 1)
+        st = out[0]
+        self.assertEqual((st.key, st.level, st.kind), ("corsair:2b07", 95, "keyboard"))
+        self.assertEqual(bus.opened, [b"k65-answers"])
+        w = bus.dongles[b"k65-answers"].writes[0]
+        self.assertEqual((w[0], w[1], w[2], w[3], len(w)),
+                         (0x00, 0x09, 0x02, 0x0F, C.BRAGI_MSG_SIZE + 1))
+
     def test_the_virtuoso_se_receiver_reads_level_and_charge(self):
         # the #204 exchange: the session (firmware query + two heartbeats), the
         # level asked twice, then the charge property - every accepted write bare,
@@ -409,6 +430,7 @@ class BragiPollTest(unittest.TestCase):
                                   0x0A97: "Corsair HS80 Max Wireless"})
         self.assertEqual(C.BRAGI_PIDS, {
             0x1B7F: "Corsair Dark Core RGB Pro SE",
+            0x2B07: "Corsair K65 PLUS Wireless",
             0x0A40: "Corsair Virtuoso RGB Wireless SE",
             0x0A3E: "Corsair Virtuoso RGB Wireless SE",
             0x0A3D: "Corsair Virtuoso RGB Wireless SE",
@@ -421,6 +443,8 @@ class BragiPollTest(unittest.TestCase):
         self.assertEqual(C.BRAGI_KEYS[0x0A40], C.BRAGI_KEYS[0x0A3D])
         self.assertEqual(C.BRAGI_KEYS[0x0A64], C.BRAGI_KEYS[0x0A62])
         self.assertEqual(C.BRAGI_SESSION_PIDS, {0x0A40})
+        self.assertEqual(C.BRAGI_KEYS[0x2B07], "corsair:2b07")
+        self.assertEqual(C.BRAGI_KINDS, {0x1B7F: "mouse", 0x2B07: "keyboard"})
         self.assertNotIn(0x1B7F, C.PIDS)
         self.assertNotIn(0x0A40, C.PIDS)
 

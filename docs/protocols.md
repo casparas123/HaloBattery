@@ -150,6 +150,12 @@ The battery command G-Helper uses: output report 0 `12 07` (65 bytes) on the ven
 
 The newer routed exchange that ckb-next calls "bragi" and OpenLinkHub "slipstream": 64-byte frames behind report id 0, route `0x09` asks the mouse behind the receiver (the receiver itself is `0x08`), command `0x02` "get property", property `0x0F` battery. The answer `01 02 00 <value:2 LE> ...` carries the level in tenths of a percent (`26 02` = 550 = 55 %). Frames that are not exactly that shape - the receiver's device records, its notices - are not levels. The request and the answer were captured from the reporter's dongle in #56 and the exchange is confirmed on hardware: KKiruano's test build run showed the same level SignalRGB does. Because the answer echoes the command and not the property, a second app on the same dongle (iCUE, SignalRGB) can put an answer for another property on the channel; the provider asks twice and takes only two equal answers, waits in a time window (traffic frames end a read early) and holds a per-dongle budget. No charging state is reported. The wired id 1B1C:1B7E is left out.
 
+### Corsair K65 PLUS Wireless
+
+**Connection:** 2.4 GHz receiver (`1B1C:2B07`)
+
+The keyboard's dongle runs the same routed exchange as the Dark Core RGB Pro SE above: route `0x09` asks the paired keyboard for property `0x0F` on the vendor collection (`ff42:0001`; its `ff42:0002` sibling only streams notices), and the answer `01 02 00 <value:2 LE> ...` carries the level in tenths of a percent. That is OpenLinkHub's own K65 Plus dongle handler byte for byte (`cmdBatteryLevel {0x02, 0x0F}`, the value a little-endian uint16 from the reply's bytes 3-4), written on the 65-byte report-id-0 frame this receiver takes. No charge property is read - the reference reports none. **Unverified** - the exchange is mirrored from OpenLinkHub's implementation for this dongle, and no K65 PLUS has run against a build here yet; the reporter's test run in [#154](https://github.com/HeyOkay/HaloBattery/issues/154) settles it
+
 ### G-Wolves HSK Pro ACE and the other models with a receiver of their own
 
 **Connection:** the model's own receiver (e.g. 33E4:5803 for the HSK Pro ACE, #105) or USB cable

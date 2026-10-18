@@ -58,6 +58,15 @@ notes only writes need software mode). Those four ran on HeadsetControl's author
 hardware (#568/#570 discussion) and have not answered a build here; the 0a40 is
 measured. The Dark Core's wired id 1b1c:1b7e stays out - nothing can prove it
 answers.
+
+The K65 PLUS Wireless keyboard's receiver (1b1c:2b07, #154) runs the same routed
+exchange as the Dark Core's dongle: route 0x09 asks the paired keyboard for property
+0x0F on the ff42:0001 collection, and the answer carries the level in tenths in bytes
+3-4. OpenLinkHub's own K65 Plus dongle handler (src/devices/k65plusWdongle) sends
+``cmdBatteryLevel {0x02, 0x0F}`` on the 65-byte report-id-0 frame and reads the value
+as a little-endian uint16 from the reply's bytes 3-4, so this id mirrors that; no
+charge property is read, because that handler reports none. Unverified until a
+reporter's run.
 """
 from __future__ import annotations
 
@@ -111,15 +120,20 @@ def make_request(endpoint: int, sub: int, command: int) -> List[int]:
 # dongle is read.
 BRAGI_PIDS = {
     0x1B7F: "Corsair Dark Core RGB Pro SE",
+    0x2B07: "Corsair K65 PLUS Wireless",
     0x0A40: "Corsair Virtuoso RGB Wireless SE",
     0x0A3E: "Corsair Virtuoso RGB Wireless SE",
     0x0A3D: "Corsair Virtuoso RGB Wireless SE",
     0x0A64: "Corsair Virtuoso RGB Wireless XT",
     0x0A62: "Corsair Virtuoso RGB Wireless XT",
 }
+# the pictogram each family member draws: the Dark Core is a mouse, the K65 PLUS a
+# keyboard; the Virtuoso ids are headsets
+BRAGI_KINDS = {0x1B7F: "mouse", 0x2B07: "keyboard"}
 # one icon per product: a headset's receiver and cable ids share the key
 BRAGI_KEYS = {
     0x1B7F: "corsair:1b7f",
+    0x2B07: "corsair:2b07",
     0x0A40: "corsair:virtuoso-se",
     0x0A3E: "corsair:virtuoso-se",
     0x0A3D: "corsair:virtuoso-se",
@@ -531,7 +545,7 @@ class CorsairProvider(Provider):
                     continue
                 level, charging = got
                 key = BRAGI_KEYS[pid]
-                kind = "mouse" if pid == 0x1B7F else "headset"
+                kind = BRAGI_KINDS.get(pid, "headset")
                 kept = found.get(key)
                 # a receiver and a cable of one headset are one icon; when both
                 # answer, the one that reports charging wins (the cable state)

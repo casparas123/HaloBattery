@@ -7,7 +7,7 @@ and the project follows [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
-- Corsair K65 PLUS Wireless keyboard (`1B1C:2B07` receiver): the level on its 2.4 GHz dongle, read with the same routed exchange as the Dark Core RGB Pro SE - OpenLinkHub's own K65 Plus dongle handler asks property `0x0F` and takes the value in tenths from the reply. **Unverified** until the reporter's test build run in [#154](https://github.com/HeyOkay/HaloBattery/issues/154)
+- Corsair K65 PLUS Wireless keyboard (`1B1C:2B07` receiver): the level on its 2.4 GHz dongle, read with the same routed exchange as the Dark Core RGB Pro SE - OpenLinkHub's own K65 Plus dongle handler asks property `0x0F` and takes the value in tenths from the reply. Confirmed on @paulklemm's own unit ([#154](https://github.com/HeyOkay/HaloBattery/issues/154))
 
 ### Changed
 - **A tidier repository and a shorter README**: the app's modules moved into the `halo/`

@@ -65,8 +65,8 @@ exchange as the Dark Core's dongle: route 0x09 asks the paired keyboard for prop
 3-4. OpenLinkHub's own K65 Plus dongle handler (src/devices/k65plusWdongle) sends
 ``cmdBatteryLevel {0x02, 0x0F}`` on the 65-byte report-id-0 frame and reads the value
 as a little-endian uint16 from the reply's bytes 3-4, so this id mirrors that; no
-charge property is read, because that handler reports none. Unverified until a
-reporter's run.
+charge property is read, because that handler reports none. Confirmed on the
+reporter's own unit (#154): his test build run showed 100 % (`01 02 00 e8 03`).
 """
 from __future__ import annotations
 

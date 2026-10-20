@@ -129,11 +129,13 @@ KNOWN = {
     0x025A: ("Razer BlackWidow V3 Pro", 0x3F),
     0x025C: ("Razer BlackWidow V3 Pro", 0x9F),
     # The Pro Type Ultra's 2.4 GHz receiver (#196): level and icon confirmed on the
-    # reporter's own unit. His diagnostics show the working transaction id is 0x1F -
-    # the receiver answers 0x9F (the newer wireless keyboards' id) with "not
-    # supported"; 0x9F stays in TRANSACTION_IDS as a fallback. Its wired id (0x0277)
-    # is not listed - the only source for it is an open OpenRazer pull request (#2739).
-    0x027B: ("Razer Pro Type Ultra", 0x1F),
+    # reporter's own unit. His careful retest (Oct 14) is the deciding one: the
+    # receiver answers 0x9F (status 02), while 0x1F - the first guess from the
+    # earlier diagnostics - comes back 04 even with the keyboard awake. 0x9F is the
+    # preferred id; 0x1F stays reachable through TRANSACTION_IDS. Its wired id
+    # (0x0277) is not listed - the only source for it is an open OpenRazer pull
+    # request (#2739).
+    0x027B: ("Razer Pro Type Ultra", 0x9F),
 }
 
 # The keyboards above take the commands on one USB interface: OpenRazer sends them with
@@ -499,7 +501,13 @@ class RazerProvider(Provider):
                         # cleared it (#196).
                         self._cache[gkey] = _Cand(good[0], good[1])
                         return timeout_hit
-                    break              # not our collection: walk on, do not cache it
+                    # Not our collection (it has never answered OK): try its OTHER
+                    # transaction ids before the walk moves on. A 04 is one quick
+                    # reply from the receiver, and on the Pro Type Ultra's unit the
+                    # preferred id came back 04 while the next one read (#196) -
+                    # ending the list here made the TRANSACTION_IDS fallback
+                    # unreachable.
+                    continue
                 if status == STATUS_FOREIGN:
                     # Another app's replies arrive here, so this is the collection that
                     # takes the Razer commands. The other transaction ids and interfaces

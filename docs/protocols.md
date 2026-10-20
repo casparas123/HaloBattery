@@ -315,12 +315,7 @@ The same exchange as the DeathStalker V2 Pro TKL above, with the ids and interfa
 
 **Connection:** 2.4 GHz receiver (1532:027B)
 
-The standard Razer keyboard commands (see the BlackWidow V3 Pro above), read with
-transaction id `0x1F` - what the reporter's diagnostics in #196 show this receiver
-answering, while `0x9F` (the other wireless keyboards' id) answers "not supported" and
-is kept as a fallback only. Confirmed on the reporter's own unit (#196): the level and
-its own tray icon, next to a Razer Cobra Pro. The wired id (`0x0277`) is not read - its
-only external source is an open OpenRazer pull request (#2739)
+The standard Razer keyboard commands (see the BlackWidow V3 Pro above), read with transaction id `0x9F` - the reporter's careful retest in #196 shows this receiver answering `0x9F` with status 02 while `0x1F` comes back 04 even with the keyboard awake; `0x1F` stays reachable as a fallback. A collection that has never answered OK now tries its other transaction ids before the walk moves on, so a wrong first guess cannot hide a device (a `04` is one quick reply from the receiver, not a wait). Confirmed on the reporter's own unit (#196): the level and its own tray icon next to a Razer Cobra Pro, through sleep and wake. The wired id (`0x0277`) is not read - its only external source is an open OpenRazer pull request (#2739)
 
 ## Controllers
 

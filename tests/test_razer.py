@@ -235,10 +235,10 @@ class TableTest(unittest.TestCase):
         self.assertIn(R.KNOWN[0x025C][1], R.TRANSACTION_IDS)
 
     def test_the_pro_type_ultra_receiver_is_known(self):
-        # #196: the reporter's diagnostics show the receiver answering 0x1F and
-        # rejecting 0x9F ("not supported"), so 0x1F is the preferred id - 0x9F stays
-        # reachable through TRANSACTION_IDS.
-        self.assertEqual(R.KNOWN[0x027B], ("Razer Pro Type Ultra", 0x1F))
+        # #196: the reporter's careful retest shows the receiver answering 0x9F
+        # (status 02) while 0x1F comes back 04 even with the keyboard awake, so 0x9F
+        # is the preferred id - 0x1F stays reachable through TRANSACTION_IDS.
+        self.assertEqual(R.KNOWN[0x027B], ("Razer Pro Type Ultra", 0x9F))
 
     def test_the_pro_type_ultra_wired_id_stays_out(self):
         # 0x0277's only source is an open OpenRazer pull request (#2739); until a
@@ -287,16 +287,28 @@ class PollRazerTest(PollTest):
         self.assertEqual(mouse.tids, [])
 
     def test_pro_type_ultra_answers_on_its_wireless_tid(self):
-        # #196: the reporter's receiver answered with 0x1F while 0x9F came back "not
-        # supported"; the fake refuses every other transaction id, so the preferred
-        # one must go out first. (The collection is not pinned here: the fake
-        # answers on any path.)
+        # #196: the reporter's receiver reads with 0x9F and answers 0x1F with 04;
+        # the fake refuses every other transaction id, so the preferred one must go
+        # out first. (The collection is not pinned here: the fake answers on any
+        # path.)
         e = entry(0x027B, b"kbd", "Razer Pro Type Ultra", iface=3, page=0x0059)
-        kbd = FakeMouse(tid=0x1F, raw_level=0xB5, charging=1)      # 0xB5 -> 71%
+        kbd = FakeMouse(tid=0x9F, raw_level=0xB5, charging=1)      # 0xB5 -> 71%
         out = self.poll([e], {b"kbd": kbd})
         self.assertEqual([(s.name, s.level, s.charging) for s in out],
                          [("Razer Pro Type Ultra", round(0xB5 / 255 * 100), True)])
-        self.assertEqual(kbd.tids[0], 0x1F)
+        self.assertEqual(kbd.tids[0], 0x9F)
+
+    def test_a_timeout_on_the_preferred_id_still_tries_the_next_one(self):
+        # #196, the second half: a 04 from a collection that has never answered OK
+        # must not end that collection's transaction-id list. The reporter's
+        # receiver answered the preferred id with 04 and read on another; before
+        # the fix the walk left the collection and the fallback ids were never sent.
+        e = entry(0x00A8, b"if0", "Razer Naga V2 Pro")
+        mouse = TimeoutOnThePreferredId(0x1F, 0x9F, raw_level=0x80)   # 0x80 -> 50%
+        out = self.poll([e], {b"if0": mouse})
+        self.assertEqual([(s.name, s.level) for s in out], [("Razer Naga V2 Pro", 50)])
+        self.assertEqual(mouse.tids[0], 0x1F)      # the preferred id goes first
+        self.assertIn(0x9F, mouse.tids)            # then the walk goes on
 
 
 # ------------------------------------------------------------------ receiver + cable
@@ -307,6 +319,23 @@ class AsleepMouse(FakeMouse):
         out = [0x00] + [0] * 90
         out[1] = R.STATUS_TIMEOUT
         return out
+
+
+class TimeoutOnThePreferredId(FakeMouse):
+    """A receiver that answers 04 to one transaction id and normally to `tid` - the
+    Pro Type Ultra's shape on the reporter's unit (#196): the preferred id came back
+    04 while the next one read."""
+
+    def __init__(self, preferred, tid, raw_level=0xB5, charging=0):
+        super().__init__(tid, raw_level, charging)
+        self.preferred = preferred
+
+    def reply(self):
+        if self.request[1] == self.preferred:
+            out = [0x00] + [0] * 90
+            out[1] = R.STATUS_TIMEOUT
+            return out
+        return super().reply()
 
 
 class CableTest(PollTest):

@@ -8,11 +8,12 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 - Razer Pro Type Ultra (`0x027B`): battery level on its 2.4 GHz receiver, confirmed on
-  @dawn-shao's own unit (#196). His later diagnostics fixed two things on the way:
-  the keyboard's transaction id is `0x1F` (the `0x9F` guess came from the newer
-  wireless keyboards), and the provider no longer pins a collection that has never
-  answered - a wrong collection's timeout could shadow the real one, so a sleeping
-  keyboard stayed missing until the app was restarted.
+  @dawn-shao's own unit (#196). His retests fixed two things on the way: the keyboard
+  reads with transaction id `0x9F` (`0x1F` comes back `04` even when it is awake), and
+  the provider no longer pins a collection that has never answered - a wrong
+  collection's timeout could shadow the real one, so a sleeping keyboard stayed missing
+  until the app was restarted. A collection that has never answered now also tries its
+  remaining transaction ids before the walk moves on.
 
 ### Changed
 - **A tidier repository and a shorter README**: the app's modules moved into the `halo/`

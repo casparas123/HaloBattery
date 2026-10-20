@@ -274,6 +274,24 @@ class FlowProviderTest(unittest.TestCase):
 
 
 class FlowPollTest(FlowProviderTest):
+    def test_an_apple_keyboard_with_the_same_id_is_never_written(self):
+        # 05AC:024F is also Apple's wired Aluminium Keyboard id, and that keyboard has
+        # no FF02:0002 collection. It must not be written to at all (#169 review,
+        # @ahmedkhursheed23).
+        shape = [(0, 0x0001, 0x0006), (1, 0x0001, 0x0002), (1, 0x000C, 0x0001),
+                 (1, 0x0001, 0x0080)]
+        entries = [{"product_id": F.FLOW_PID, "vendor_id": F.FLOW_VID,
+                    "interface_number": i, "usage_page": p, "usage": u,
+                    "path": b"apple-%d-%04x-%04x" % (n, p, u),
+                    "product_string": "Apple Keyboard"}
+                   for n, (i, p, u) in enumerate(shape)]
+        kbd = FakeFlow()
+        found = self.poll({F.FLOW_VID: entries}, {e["path"]: kbd for e in entries})
+        self.assertEqual([], found)
+        self.assertEqual([], kbd.writes)                  # nothing was sent
+        self.assertEqual(0, kbd.opened)
+        self.assertIn("no FF02:0002 control collection", self.diag())
+
     def test_the_lite84_is_read(self):
         kbd, tables, devices = self.one_flow(level=57, charging=1, mv=3790)
         found = self.poll(tables, devices)

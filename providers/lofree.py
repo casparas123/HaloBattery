@@ -262,26 +262,29 @@ class LofreeProvider(Provider):
     def _flow_pick(self, infos: List[dict]) -> Optional[dict]:
         """The collection to open for the Flow Lite84.
 
-        The family's control collection (0xFF02:0x0002) first; a collection whose
-        output report cannot carry the 17-byte frame is skipped even when it has the
-        right usage, because Windows refuses that write and no reply comes, which is
-        indistinguishable from a keyboard that is off. The length is only known when
-        Windows says so, and an unknown length never disqualifies a collection.
+        The family's control collection (0xFF02:0x0002) is REQUIRED: the dongle shares
+        Apple's vendor and product id (05AC:024F), which Apple also uses for its wired
+        Aluminium Keyboard, and that keyboard has no such collection - without this rule
+        the frame went to its first collection on every poll (#169 review,
+        @ahmedkhursheed23). Within the collection, one whose output report cannot carry
+        the 17-byte frame is skipped: Windows refuses that write and no reply comes,
+        which is indistinguishable from a keyboard that is off. The length is only known
+        when Windows says so, and an unknown length never disqualifies a collection.
         """
         control = [d for d in infos
                    if (d.get("usage_page"), d.get("usage")) == FLOW_CONTROL_USAGE]
-        for d in control + infos:
+        if not control:
+            self._diag.append("  no FF02:0002 control collection; nothing is written")
+            return None
+        # A control collection exists, so this is a Flow dongle: try it first, then the
+        # rest (a Windows-reported length is a hint, and an unknown length is allowed).
+        for d in control + [x for x in infos if x not in control]:
             if flow_output_length(d["path"]) in (None, FLOW_LEN):
-                if not control:
-                    self._diag.append("  no control collection; using "
-                                      f"iface={d.get('interface_number')} "
-                                      f"{d.get('usage_page', 0):04x}:{d.get('usage', 0):04x} "
-                                      f"(output={flow_output_length(d['path'])})")
                 return d
             self._diag.append(f"  {d.get('usage_page', 0):04x}:{d.get('usage', 0):04x} "
                               f"output={flow_output_length(d['path'])} cannot take a "
                               f"{FLOW_LEN}-byte frame; skipped")
-        return control[0] if control else (infos[0] if infos else None)
+        return None
 
     def _flow_command(self, dev, cmd: int) -> Optional[List[int]]:
         """One request, then reads until its reply - or nothing."""

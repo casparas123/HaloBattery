@@ -402,7 +402,11 @@ class HeadsetTest(unittest.TestCase):
 
     def test_other_mchose_devices_get_a_key_of_their_own(self):
         self.assertEqual(M.device_key(0x5253, 0x1020), "mchose")
-        self.assertEqual(M.device_key(0x3837, 0x3033), "mchose:3837:3033")
+        self.assertEqual(M.device_key(0x3837, 0x3033), "mchose:3837")
+        # Keys that existed before this PR must not move: custom names, hidden icons and
+        # battery history live on them (#215 review, @ahmedkhursheed23).
+        self.assertEqual(M.device_key(0xA8A5, 0x2255), "mchose:a8a5")    # G7
+        self.assertEqual(M.device_key(0x3837, 0x100B), "mchose:3837")    # A7 V2 Ultra
 
 if __name__ == "__main__":
     unittest.main()

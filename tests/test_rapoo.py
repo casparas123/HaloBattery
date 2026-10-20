@@ -38,8 +38,10 @@ class FakeCollection:
     def __init__(self, frames=()):
         self.frames = list(frames)
         self.opened = 0
+        self.reads = 0
 
     def read(self):
+        self.reads += 1
         if self.frames:
             f = self.frames.pop(0)
             return f if f is not None else []
@@ -321,6 +323,20 @@ class PollTest(unittest.TestCase):
         self.order.clear()
         self.poll(entries, silent)
         self.assertEqual(len(self.order), 1)       # then only the first candidate
+
+    def test_a_full_scan_is_cheaper_after_its_first_collection(self):
+        # A silent device used to cost READ_ATTEMPTS x 250 ms on every swept collection
+        # (9 s). The extra candidates get SWEEP_ATTEMPTS now (#215 review).
+        entries = receiver_entries()
+        silent = {e["path"]: FakeCollection() for e in entries}
+        self.poll(entries, silent)
+        opened = self.order[:]
+        self.assertGreater(len(opened), 1)
+        self.assertEqual(silent[opened[0]].reads, R.READ_ATTEMPTS)
+        for path in opened[1:]:
+            self.assertEqual(silent[path].reads, R.SWEEP_ATTEMPTS)
+            self.assertLess(R.SWEEP_ATTEMPTS * R.READ_TIMEOUT_MS,
+                            R.READ_ATTEMPTS * R.READ_TIMEOUT_MS)
 
     def test_a_quiet_device_is_fully_rescanned_occasionally(self):
         entries = receiver_entries()

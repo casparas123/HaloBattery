@@ -96,6 +96,9 @@ BD_STATE_INDEX = 7
 BD_LEVEL_INDEX = 8
 
 READ_ATTEMPTS = 12                    # ~3 s per collection: the push comes every ~1-3 s
+SWEEP_ATTEMPTS = 4                    # ~1 s for the extra candidates of a full scan: a
+                                      # silent device then costs 3 s + 1 s + 1 s, not 9 s
+                                      # (#215 review, @ahmedkhursheed23)
 READ_TIMEOUT_MS = 250
 MAX_CANDIDATES = 3                    # the dumps show this many vendor collections and up
 QUIET_RESCAN_EVERY = 5                # a silent device is fully re-scanned occasionally
@@ -188,7 +191,7 @@ class RapooProvider(Provider):
         self._quiet: Dict[int, int] = {}
         self._meta: Dict[str, Tuple[str, str]] = {}            # key -> (name, kind)
 
-    def _listen(self, path: bytes) -> Optional[Reading]:
+    def _listen(self, path: bytes, attempts: int = READ_ATTEMPTS) -> Optional[Reading]:
         """Read what the device pushes; nothing is ever sent."""
         dev = hid.device()
         try:
@@ -197,7 +200,7 @@ class RapooProvider(Provider):
             self._diag.append(f"    open: {e}")
             return None
         try:
-            for _ in range(READ_ATTEMPTS):
+            for _ in range(attempts):
                 r = dev.read(64, READ_TIMEOUT_MS)
                 if not r:
                     continue              # quiet until the next push
@@ -207,7 +210,8 @@ class RapooProvider(Provider):
                 if reading is not None:
                     return reading
                 time.sleep(0.02)
-            self._diag.append("    nothing in ~3 s (device off, or another collection)")
+            self._diag.append(f"    nothing in ~{attempts * READ_TIMEOUT_MS / 1000:.1f} s "
+                              "(device off, or another collection)")
             return None
         except (OSError, IOError, ValueError) as e:
             self._diag.append(f"    read error: {e}")
@@ -246,10 +250,14 @@ class RapooProvider(Provider):
                 quiet == 0 or quiet % QUIET_RESCAN_EVERY == 0)
             budget = order[:MAX_CANDIDATES] if deep else order[:1]
             got = None
-            for d in budget:
+            for n, d in enumerate(budget):
                 self._diag.append(f"  listening on iface={d.get('interface_number')} "
                                   f"{d.get('usage_page', 0):04x}:{d.get('usage', 0):04x}")
-                got = self._listen(d["path"])
+                # The first candidate is the one that carries the pushes, and it gets the
+                # full window (one push period); the extra candidates of a full scan only
+                # a short one - they are a fallback for a device that moved.
+                got = self._listen(d["path"],
+                                   READ_ATTEMPTS if n == 0 else SWEEP_ATTEMPTS)
                 if got is not None:
                     self._chosen[pid] = d["path"]
                     break

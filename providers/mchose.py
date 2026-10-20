@@ -79,9 +79,10 @@ two devices over one product - the headset itself (3837:600A, C-Media strings) a
 
 Not verified: the 0x3837 family (the device in issue #4 is not here), other models, and the
 meaning of the second level/charging pair in the 0x5253 reply (it has matched the first pair
-in every reading so far), and the V9 Turbo+ itself - the audio exchange is from M HUB's own
-driver and a sister-model community project, but the headset has not run against this
-provider yet.
+in every reading so far). The V9 Turbo+ is confirmed on @IsonanDough's hardware (#193): the
+level showed 100 %, matching M HUB. Its charging state cannot be read on any of its
+channels - on its cable it answers neither read, and on its dock it reports as on battery -
+so a charging headset keeps its last level greyed out and no charging state is invented.
 """
 from __future__ import annotations
 
@@ -338,22 +339,21 @@ def parse_status_55(resp) -> Optional[Tuple[Optional[int], bool]]:
 def device_key(vid: int, pid: int) -> str:
     """One icon per device: the dongle and the cable of the same product share a key.
 
-    Only the family measured here (0x5253) keeps the plain "mchose" key it has always
-    used, so an existing icon does not move, and the first-generation A5 Pro Max (0x2023)
-    keeps one key for all three identities of the mouse. Anything else gets a key of its
-    own - the G7's 0xA8A5 and, per id, the newer 0x3837 receivers (the A7 V2 Ultra in
-    issue #4) - which is
-    what keeps two MCHOSE devices on one machine off a single shared icon. The V9
-    Turbo+ presents as two devices over one product (the headset 0x600A and its dongle
-    0x6008), so both sides of that pair deliberately share their key.
+    The keys main has always produced are kept: 0x5253 is plain "mchose", everything
+    else "mchose:{vid}" - the G7's 0xA8A5 and the 0x3837 receivers included - because
+    custom names, hidden icons and battery history live on them (#215 review,
+    @ahmedkhursheed23). The first-generation A5 Pro Max (0x2023) and its three
+    identities share their vendor id, so they stay on one key too.
+
+    The V9 Turbo+ is the one pair that needs a key of its own: the headset (0x600A) and
+    its dongle (0x6008) are one product, and both sides deliberately map to the same
+    per-product key so they share an icon.
     """
     if vid == MEASURED_VID:
         return "mchose"
-    if vid == A5_VID:
-        return f"mchose:{vid:04x}"
     if pid in HEADSET_PAIR:
         return f"mchose:{vid:04x}:{HEADSET_PAIR[pid]:04x}"
-    return f"mchose:{vid:04x}:{pid:04x}"
+    return f"mchose:{vid:04x}"
 
 
 class MchoseProvider(Provider):

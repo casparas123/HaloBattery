@@ -15,8 +15,9 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 - The constant remain=full=1000 battery report Windows.Gaming.Input hands out for
-  some pads ("full", synthesized) no longer shows as 100%: the Vader 4 Pro's report
-  said 100% while the controller's battery light was flashing low (#191).
+  FlyDigi pads ("full", synthesized) no longer shows as 100%: the Vader 4 Pro's report
+  said 100% while the controller's battery light was flashing low (#191). Other
+  vendors' 1000/1000 report is left alone - it can be a genuinely full pack.
 
 ### Changed
 - **A tidier repository and a shorter README**: the app's modules moved into the `halo/`

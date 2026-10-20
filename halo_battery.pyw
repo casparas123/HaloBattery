@@ -222,7 +222,7 @@ def make_providers(jbl_listen_first: float = 0.0) -> list:
             AsusProvider(), GWolvesProvider(), LofreeProvider(), AstroProvider(), CorsairProvider(),
             LamzuProvider(), AmInfinityProvider(),
             SteelSeriesEliteProvider(), LogitechCenturionProvider(), HyperXCloud3SProvider(), NzxtProvider(),
-            SteamProvider(), TurtleBeachProvider]
+            SteamProvider(), TurtleBeachProvider()]
 
 
 # ---------------------------------------------------------------- config

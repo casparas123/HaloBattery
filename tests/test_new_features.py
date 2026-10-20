@@ -58,6 +58,14 @@ class DeviceTypeTests(HideRenameTestCase):
     def test_every_provider_has_a_label(self):
         self.assertEqual({p.name for p in hb.make_providers()}, set(hb.PROVIDER_LABELS))
 
+    def test_every_provider_is_an_instance_not_a_class(self):
+        # A class passes the label test above - .name is a class attribute too - but
+        # App calls .poll() on every entry, and a class there dies with "poll()
+        # missing 1 required positional argument" on every poll while the app only
+        # logs it, so the device never shows (#194). Keep every entry instantiated.
+        for p in hb.make_providers():
+            self.assertNotIsInstance(p, type, f"{p!r} needs ()")
+
     def test_disabled_provider_is_not_polled(self):
         app = poll_app({"disabled_providers": ["razer"]})
         res = app.poll_once()

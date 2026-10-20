@@ -86,6 +86,7 @@ except ImportError:              # pragma: no cover
 
 from . import hidlist
 from .base import DeviceStatus, Provider, hexdump, log
+from .pulsar import output_length
 
 VID = 0x249A
 PID = 0x5C2F
@@ -95,6 +96,8 @@ NAME = "AJAZZ AJ179 V2 MAX"
 KEY = f"ajazz:{PID:04x}"
 
 REPORT_SIZE = 32                 # both directions; hidapi adds the report id on Windows
+OUTPUT_LEN = REPORT_SIZE + 1     # what OutputReportByteLength reports for the vendor
+                                 # channel (33, the report id included - #74's dump)
 READ_SIZE = REPORT_SIZE + 1
 READ_TIMEOUT_MS = 250
 READ_ATTEMPTS = 5                # ~1.2 s; the reply comes within milliseconds when awake
@@ -158,15 +161,25 @@ def parse_reply(frame) -> Optional[Tuple[int, str, Optional[bool]]]:
 
 
 def candidates(ifaces: List[dict]) -> List[dict]:
-    """The collections to try, best first: vendor pages, then the rest.
+    """The collections to try, best first.
 
-    The dump carries no usage for the vendor channel (mi_02), so this is a
-    preference order, not a filter; the collection that takes the write is
-    remembered and tried first from then on. The mouse collection is never
-    opened - the OS owns the pointer stream.
+    The dump carries no usage for the vendor channel (mi_02), but it is the only
+    collection with an output report - 33 bytes both ways - so the read-only
+    OutputReportByteLength probe ranks it first. Without it a cold start wrote the
+    ask to the keyboard and consumer collections first, which must refuse it
+    (#246 review, @ahmedkhursheed23). A collection Windows will not classify keeps
+    the old vendor-page preference, and one that reports a length it cannot take is
+    tried last. This is a preference order, not a filter; the collection that takes
+    the write is remembered and tried first from then on. The mouse collection is
+    never opened - the OS owns the pointer stream.
     """
     def rank(d: dict) -> tuple:
-        return (0 if d.get("usage_page", 0) >= VENDOR_PAGE else 1,)
+        length = output_length(d["path"])
+        if length == OUTPUT_LEN:
+            return (0,)
+        if length is None:
+            return (1, 0 if d.get("usage_page", 0) >= VENDOR_PAGE else 1)
+        return (2,)
 
     seen = set()
     out = []

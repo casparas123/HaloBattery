@@ -120,19 +120,21 @@ WIRED_ANSWER_PATH = wired_entries()[4]["path"]
 
 class PollTest(unittest.TestCase):
     def setUp(self):
-        self._saved = (A.hid, A.hidlist, A.time)
+        self._saved = (A.hid, A.hidlist, A.time, A.output_length)
         self.now = [1000.0]
         A.time = types.SimpleNamespace(time=lambda: self.now[0], sleep=lambda s: None)
+        A.output_length = lambda path: None          # unknown unless a test says so
         self.provider = A.AjazzProvider()
         self.order = []
 
     def tearDown(self):
-        A.hid, A.hidlist, A.time = self._saved
+        A.hid, A.hidlist, A.time, A.output_length = self._saved
 
-    def poll(self, entries, cols, wired=()):
+    def poll(self, entries, cols, wired=(), lengths=None):
         A.hid = types.SimpleNamespace(device=fake_device_class(cols, self.order))
         A.hidlist = types.SimpleNamespace(
             enumerate=lambda vid=0: list(wired) if vid == A.WIRED_VID else list(entries))
+        A.output_length = lambda path: (lengths or {}).get(path)
         return self.provider.poll()
 
     def cols(self, entries, replies=(CAPTURED75,), answer=VENDOR_PATH):
@@ -339,6 +341,19 @@ class PollTest(unittest.TestCase):
         usages = [(d["usage_page"], d["usage"]) for d in cand]
         self.assertNotIn((0x0001, 0x0002), usages)
         self.assertEqual(len({d["path"] for d in cand}), len(cand))
+
+    def test_the_output_length_probe_puts_the_answering_channel_first(self):
+        # The receiver's answering collection carries no usage in the dump (mi_02).
+        # Without the probe the ask was written to the consumer collection first, and
+        # those collections must not be written to at all (#246 review).
+        entries = receiver_entries()
+        cols = self.cols(entries)
+        found = self.poll(entries, cols,
+                          lengths={VENDOR_PATH: A.OUTPUT_LEN,
+                                   entries[1]["path"]: 0})
+        self.assertEqual([s.level for s in found], [75])
+        self.assertEqual(self.order[0], VENDOR_PATH)
+        self.assertEqual(cols[entries[1]["path"]].sent, [])   # never written to
 
     def test_vendor_pages_rank_first(self):
         entries = receiver_entries() + [{"product_id": A.PID, "interface_number": 1,

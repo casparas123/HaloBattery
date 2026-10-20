@@ -340,6 +340,26 @@ class PollTest(unittest.TestCase):
         self.poll(entries, cols)                             # and not again
         self.assertEqual(self.order, [STATUS_PATH])
 
+    def test_a_never_seen_mouse_sweeps_once_a_minute(self):
+        # A mouse that is off from app start never teaches a collection, so there is
+        # nothing to listen to alone - and the full sweep on every poll is ~5.5 s
+        # with two receivers (#181 review, @ahmedkhursheed23). One sweep a minute
+        # keeps first detection inside a poll while the quiet case stays cheap.
+        entries = receiver_entries()
+        cols = self.cols(entries, replies=(), answer=STATUS_PATH)   # nothing answers
+        self.assertEqual([], self.poll(entries, cols))              # the first sweep
+        self.assertIn(STATUS_PATH, self.order)
+        self.order.clear()
+        self.now[0] += I.DETECT_RETRY - 1
+        self.assertEqual([], self.poll(entries, cols))              # no sweep, no listen
+        self.assertEqual(self.order, [])
+        self.now[0] += 2
+        self.assertEqual([], self.poll(entries, cols))              # one sweep again
+        self.assertIn(STATUS_PATH, self.order)
+        self.order.clear()
+        self.assertEqual([], self.poll(entries, cols))              # and quiet again
+        self.assertEqual(self.order, [])
+
     def test_a_heartbeat_without_a_level_refreshes_the_clock(self):
         entries = receiver_entries()
         cols = self.cols(entries)

@@ -96,6 +96,9 @@ MAX_CANDIDATES = 4
 ONLINE_FRESH = 90                   # s: how long one observed frame keeps the
                                     # icon lit even if a poll misses the next one
 ASLEEP_KEEP = 300                   # s: then greyed, then gone
+DETECT_RETRY = 60                   # s: while no collection has ever answered, sweep at
+                                    # most this often - a mouse switched on just after
+                                    # the app starts must not wait RESWEEP_AFTER for it
 RESWEEP_AFTER = 600                 # s: a known collection quiet this long gets the
                                     # other candidates swept again - at most once
                                     # per window, so an off mouse does not sweep
@@ -232,7 +235,7 @@ class InphicProvider(Provider):
         # mouse that is off overnight would sweep every collection each time
         # (review by @ahmedkhursheed23).
         if chosen is None:
-            sweep = True
+            sweep = since_sweep >= DETECT_RETRY   # never seen: sweep, but not every poll
         elif not known:
             sweep = since_sweep >= RESWEEP_AFTER
         else:

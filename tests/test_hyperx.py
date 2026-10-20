@@ -38,6 +38,7 @@ class FakeDongle:
     def __init__(self, replies=()):
         self.replies = list(replies)
         self.written = []
+        self.reads = 0
         self.prepares = 0
         self.prepare_fails = False
 
@@ -55,6 +56,7 @@ class FakeDongle:
         return len(data)
 
     def read(self, size, timeout=None):
+        self.reads += 1
         return self.replies.pop(0) if self.replies else []
 
     def close(self):
@@ -104,6 +106,14 @@ class KingstonTests(unittest.TestCase):
         self.assertEqual(H.KINGSTON_CMD_LEVEL, sent[0][15])
         self.assertEqual(H.KINGSTON_CMD_CHARGING, sent[1][15])
         self.assertEqual([0x00] * 45, sent[0][17:])
+
+    def test_a_failed_write_is_not_followed_by_a_read(self):
+        # hidapi returns -1 from write() on failure. The reply wait after it (100 ms
+        # + 1 s here) is guaranteed to be dead time (review of #198).
+        self.dongle.write = lambda data: -1
+        self.assertEqual([], self.run_with([]))
+        self.assertEqual(0, self.dongle.reads)
+        self.assertTrue(any("write failed" in line for line in self.provider.diagnostics()))
 
     def test_prepare_read_before_every_write(self):
         self.run_with([kingston_reply(H.KINGSTON_CMD_LEVEL),
@@ -189,6 +199,11 @@ class OldRevisionTests(unittest.TestCase):
                          [("hyperx:0696", 66, True)])
         self.assertEqual(H.make_request(H.CMD_LEVEL), self.dongle.written[0])
         self.assertEqual(52, len(self.dongle.written[0]))
+
+    def test_a_failed_write_is_not_followed_by_a_read(self):
+        self.dongle.write = lambda data: -1
+        self.assertEqual([], H.HyperXProvider().poll())
+        self.assertEqual(0, self.dongle.reads)
 
 
 if __name__ == "__main__":

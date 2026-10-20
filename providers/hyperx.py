@@ -169,7 +169,10 @@ class HyperXProvider(Provider):
             self._diag.append(f"  open: {e}")
             return None
         try:
-            dev.write(make_request(cmd))
+            w = dev.write(make_request(cmd))
+            if w is not None and w < 0:
+                self._diag.append(f"  cmd {cmd:02x}: write failed")
+                return None
             time.sleep(WRITE_TIMEOUT)
             r = dev.read(REPLY_LEN, READ_TIMEOUT_MS)
             if not r:
@@ -221,7 +224,10 @@ class HyperXProvider(Provider):
                 dev.get_input_report(KINGSTON_REPORT_ID, KINGSTON_PACKET_LEN)
             except (OSError, IOError, ValueError):
                 pass                  # the references ignore a failed prepare read
-            dev.write(kingston_request(cmd))
+            w = dev.write(kingston_request(cmd))
+            if w is not None and w < 0:
+                self._diag.append(f"  cmd {cmd:02x}: write failed")
+                return None
             time.sleep(KINGSTON_WRITE_PAUSE)
             r = dev.read(KINGSTON_READ_LEN, KINGSTON_READ_TIMEOUT_MS)
             if r:

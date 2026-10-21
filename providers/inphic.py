@@ -245,11 +245,23 @@ class InphicProvider(Provider):
             self._swept[pid] = now
         if chosen is not None:
             order = sorted(order, key=lambda d: d["path"] != chosen)
+        if sweep:
+            budget = order[:MAX_CANDIDATES]
+        elif chosen is not None:
+            budget = order[:1]        # the known collection alone is enough
+        else:
+            # Nothing learned yet and the sweep is on its back-off: listen on the
+            # family's status collection anyway. It is a single collection, and it is
+            # the one that answered on every device seen so far - while a poll that
+            # listened nowhere left the diagnostics empty, so a report could not even
+            # show whether anything was tried (#228).
+            budget = [d for d in order
+                      if (d.get("usage_page"), d.get("usage")) == STATUS_USAGE][:1]
+            if not budget:
+                self._diag.append("  detection back-off; the next sweep comes later")
         got = None
-        for d in order[:MAX_CANDIDATES]:
+        for d in budget:
             is_chosen = d["path"] == chosen
-            if not sweep and not is_chosen:
-                break                 # the known collection alone is enough
             # The vendor app's own collection gets the full window while looking
             # for it; the rest only get a short listen before moving on.
             patience = (d.get("usage_page"), d.get("usage")) == STATUS_USAGE

@@ -307,6 +307,21 @@ class HeadsetTest(unittest.TestCase):
         self.assertEqual("headset", d.kind)
         self.assertIn("-> 75%", "\n".join(self.provider.diagnostics()))
 
+    def test_the_25_step_is_confirmed_on_his_unit(self):
+        # 3665 mV on battery = 25 %, matching Armoury Crate (#190, 2026-10-21)
+        out = self.poll(hs=FakeHeadset(lsb=0x51, msb=0x0E))
+        self.assertEqual([25], [d.level for d in out])
+
+    def test_the_charger_lift_is_removed_below_the_cv_plateau(self):
+        # The reporter's charging frames (#190): the charger lifted the pack by ~160 mV
+        # and the live table read 75 % where Armoury Crate showed 25 %.
+        for lsb, msb, level in ((0xF4, 0x0E, 25),    # 3828 mV charging -> 3668 after the lift
+                                (0x39, 0x0F, 50),    # 3897 mV charging -> 3737 after the lift
+                                (0x36, 0x10, 100)):  # 4150 mV: the plateau, the raw value
+            with self.subTest(lsb=lsb, msb=msb):
+                out = self.poll(hs=FakeHeadset(lsb=lsb, msb=msb, charging=True))
+                self.assertEqual([level], [d.level for d in out])
+
     def test_each_voltage_band_maps_to_its_armoury_step(self):
         # the reference's map (#6067): MSB 0x10 / >= 4100 mV -> 100, MSB 0x0F /
         # >= 3800 -> 75, >= 3700 -> 50, MSB 0x0E / >= 3500 -> 25, lower -> 10;
@@ -323,9 +338,12 @@ class HeadsetTest(unittest.TestCase):
                 self.assertEqual([level], [d.level for d in found])
 
     def test_charging_comes_from_byte_9(self):
+        # The default frame is 3899 mV; while charging the 160 mV charger lift is removed
+        # first (3739 mV -> the 50 % step) - the number Armoury Crate showed in his
+        # charging runs (#190).
         found = self.poll(hs=FakeHeadset(charging=True))
-        self.assertEqual((found[0].level, found[0].charging), (75, True))
-        self.assertIn("-> 75% charging", "\n".join(self.provider.diagnostics()))
+        self.assertEqual((found[0].level, found[0].charging), (50, True))
+        self.assertIn("-> 50% charging", "\n".join(self.provider.diagnostics()))
 
     def test_the_wired_id_always_charges_and_shares_the_icon(self):
         entries = [{"product_id": A.HEADSET_WIRED_PID, "interface_number": 3,

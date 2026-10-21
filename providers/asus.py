@@ -95,6 +95,12 @@ HEADSET_LEVEL_STEPS = ((0x10, 4100, 100), (0x0F, 3800, 75), (None, 3700, 50),
 HEADSET_LEVEL_LOW = 10
 HEADSET_CHARGING_BYTE = 9
 HEADSET_CHARGING_VALUE = 0x0A
+# The charger lifts the pack's voltage by about 160 mV (the reporter's own pairs: 3743
+# -> 3897 mV and 3665 -> 3828 mV within a minute of plugging in), so the live table read
+# one step high while charging (#190). Below the CV plateau the lift is removed before
+# the table; at or above it the pack is essentially full and the raw value is right.
+HEADSET_CHARGING_LIFT_MV = 160
+HEADSET_CHARGING_FULL_MV = 4100
 HEADSET_HEADER = 0x1B          # reply byte 1 of a live frame; anything else = gone
 HEADSET_SLEEP = 0.035                # G-Helper waits 35 ms between send and read
 HEADSET_ATTEMPTS = 3                 # its retry count on a read timeout
@@ -164,7 +170,9 @@ def parse_headset_reply(r) -> Optional[Tuple[int, bool]]:
     port read while Armoury Crate showed a different number (#190). The level is
     the Armoury Crate quarter step of the battery voltage at reply bytes 11-12,
     16-bit little-endian (LSB first, byte 12's high part as the reference's guard);
-    byte 9 is 0x0A while charging and 0x03 on battery. hidapi keeps the report id
+    byte 9 is 0x0A while charging and 0x03 on battery; while charging, the charger's
+    ~160 mV lift is removed before the table (see HEADSET_CHARGING_LIFT_MV), so
+    plugging the cable no longer jumps the level up a step. hidapi keeps the report id
     of a numbered feature report in front as well; a reply without it is accepted
     too, with the same positions applied to the bytes after it."""
     if not r or len(r) < 4:
@@ -186,6 +194,9 @@ def parse_headset_reply(r) -> Optional[Tuple[int, bool]]:
         return None
     mv = (msb << 8) | lsb
     charging = at(HEADSET_CHARGING_BYTE) == HEADSET_CHARGING_VALUE
+    if charging and mv < HEADSET_CHARGING_FULL_MV:
+        mv = max(0, mv - HEADSET_CHARGING_LIFT_MV)
+        msb = mv >> 8
     for nibble, ceil_mv, level in HEADSET_LEVEL_STEPS:
         if (nibble is not None and msb >= nibble) or mv >= ceil_mv:
             return level, charging

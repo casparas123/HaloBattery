@@ -11,8 +11,9 @@ and the project follows [Semantic Versioning](https://semver.org/).
   the headset's own feature-report exchange, from @vancinis's G-Helper work. The level is
   the pack voltage in the reply (bytes 11-12), shown in Armoury Crate's quarter steps
   (100 / 75 / 50 / 25 / 10); byte 13 is a constant, not a level. Byte 9 says whether the
-  headset is charging. Tested by @musicjoywu on his own headset through several charge
-  cycles.
+  headset is charging, and while charging the charger's ~160 mV lift is removed before
+  the steps - plugging the cable no longer jumps the level (his 25 % -> 75 % case).
+  Tested by @musicjoywu on his own headset through several charge cycles.
 
 ### Changed
 - **A tidier repository and a shorter README**: the app's modules moved into the `halo/`

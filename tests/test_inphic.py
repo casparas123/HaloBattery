@@ -37,6 +37,11 @@ LEVEL80 = [0x03, 0x90, 0x40, 0x01, 0x50] + [0x00] * 95
 CHARGING = [0x03, 0x93, 0x40, 0x03, 0x00] + [0x00] * 95
 FULL = [0x03, 0x99, 0x40, 0x02, 0x00] + [0x00] * 95
 
+# the X3 Max's own announcement, byte for byte from #228's diagnostics: model 0x4E,
+# command 0x40, sub 0x01, level 0x1E = 30 % (the report is five bytes)
+AS_X3MAX_30 = [0x03, 0x4E, 0x40, 0x01, 0x1E]
+AS_X3MAX_CHARGING = [0x03, 0x4E, 0x40, 0x03, 0x1E]
+
 # the Attack Shark X11/R1 frame a reporter's probe caught on 1d57:fa60 (#163)
 AS_31 = [0x03, 0x55, 0x40, 0x01, 0x1F] + [0x00] * 95
 # the R1's own push from its receiver's probe run (#69) - the X6/R1
@@ -119,6 +124,13 @@ class ParseTest(unittest.TestCase):
 
     def test_the_full_frame_shows_100_and_charging(self):
         self.assertEqual(I.parse_frame(FULL, INPHIC), (100, True))
+
+    def test_the_x3_max_frame_reads_with_its_model_code(self):
+        # #228: the X3 Max announces the X11 shape under its own model code (0x4E) -
+        # nothing else in the five-byte report differs.
+        self.assertEqual(I.parse_frame(AS_X3MAX_30, ATTACK), (30, False))
+        self.assertEqual(I.parse_frame(AS_X3MAX_CHARGING, ATTACK), (None, True))
+        self.assertIsNone(I.parse_frame(AS_X3MAX_30, INPHIC))   # not an Inphic code
 
     def test_the_attack_shark_frame_reads_with_its_own_models(self):
         # 0x55 is the Attack Shark X11/R1 code the reporter's probe caught
@@ -208,7 +220,7 @@ class PollTest(unittest.TestCase):
         out = self.poll(entries, cols)
         self.assertEqual([(s.key, s.name, s.level, s.charging, s.source, s.kind)
                           for s in out],
-                         [("inphic:fa60", "Attack Shark X11 / R1", 31, False,
+                         [("inphic:fa60", "Attack Shark X11 / R1 / X3 Max", 31, False,
                            "inphic", "mouse")])
         self.assertEqual(self.provider._chosen.get(0xFA60), AS_STATUS_PATH)
 
@@ -218,8 +230,15 @@ class PollTest(unittest.TestCase):
         out = self.poll(entries, cols)
         self.assertEqual([(s.key, s.name, s.level, s.charging, s.source, s.kind)
                           for s in out],
-                         [("inphic:fa60", "Attack Shark X11 / R1", 90, False,
+                         [("inphic:fa60", "Attack Shark X11 / R1 / X3 Max", 90, False,
                            "inphic", "mouse")])
+
+    def test_the_x3_max_receiver_reads_its_own_frame(self):
+        entries = receiver_entries(pid=0xFA60, prefix=b"as")
+        cols = self.cols(entries, replies=(AS_X3MAX_30,), answer=AS_STATUS_PATH)
+        out = self.poll(entries, cols)
+        self.assertEqual([(s.key, s.name, s.level, s.charging) for s in out],
+                         [("inphic:fa60", "Attack Shark X11 / R1 / X3 Max", 30, False)])
 
     def test_both_receivers_present_read_side_by_side(self):
         entries = receiver_entries() + receiver_entries(pid=0xFA60, prefix=b"as")

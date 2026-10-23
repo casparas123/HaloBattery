@@ -174,13 +174,15 @@ The same 17-byte frames as the Pulsar / ATK / VXE row, on the vendor collection 
 
 The mouse announces its level and charging state by itself - nothing is ever sent to it. The frame map was decoded from the vendor's own Windows app (INPHIC HUB, the driver [linked in #160](https://github.com/HeyOkay/HaloBattery/issues/160)): it enumerates 1d57:fa65 with hidapi, reads the collection `000a:0000` (keeping `ff00:0001` for its writes) and parses a report whose first byte is the report id `03`, then the model code (`0x95` / `0x90` / `0x93` / `0x99`), the command byte `0x40`, the sub-command and the level - `03 95 40 01 4b` is 75 %, `... 40 03` is charging (the app runs a 30 ms animation and keeps its last level), `... 40 02` is full (the app shows 100 %). A level outside 1..100 is refused, never shown. **Verified on hardware** in the reporter's runs of the test builds ([#160](https://github.com/HeyOkay/HaloBattery/issues/160)): the level shows, and the charging state is confirmed as well - the reporter watched the ring breathe green on the cable and return to normal after unplugging
 
-### Attack Shark X11 / R1
+### Attack Shark X11 / R1 / X3 Max
 
 **Connection:** 2.4 GHz dongle (1D57:FA60)
 
-The same ODM family as the Inphic row above, in two generations - both announce their frames by themselves on the `000a:0000` collection, and nothing is ever sent to either. Each receiver of the family only reads the model bytes proven on it.
+The same ODM family as the Inphic row above, in two generations - both announce their frames by themselves on the `000a:0000` collection, and nothing is ever sent to either. Each receiver of the family only reads the model bytes proven on it (`0x55`, `0x10`, and the X3 Max's `0x4E`).
 
 The **X11** speaks the same shape as the Inphic row: `03 55 40 <sub> <level>`. Its reporter's probe caught the `0x55` model byte announcing `03 55 40 01 1f` (31 %), and it is **confirmed on hardware** in his runs of the test build ([#163](https://github.com/HeyOkay/HaloBattery/issues/163)): the icon shows the level, and the charging state too - his diagnostics caught the mouse announcing `03 55 40 03 1e` while on the cable, and the tray read "30 %, charging".
+
+The **X3 Max** announces the X11 shape under its own model code: its reporter's diagnostics in [#228](https://github.com/HeyOkay/HaloBattery/issues/228) caught `03 4e 40 01 1e` = 30 %, on the same receiver and collection.
 
 The **X6/R1 generation** announces `03 10 40 <stage> <level/10>`: the level arrives in steps of ten, byte 3 is the DPI stage (not a sub-command), and the frames carry no charging state. The shape is decoded from blak0p's attack-shark-linux protocol documents (validated live on an X6 dongle: idle `03 10 40 01 0a` = 100 %) and was caught on the R1's own receiver by its reporter's probe in [#69](https://github.com/HeyOkay/HaloBattery/issues/69) (`03 10 40 01 09` = 90 %). The dongle's config ACK (`03 10 50 ...`) and its DPI-button report (`03 10 10 ...`) share the shape and are excluded by the `0x40` command byte. **Confirmed on hardware**: its reporter's run of the test build shows the level in the tray - 90 %, matching the probe's frame - and the same reading stays while it charges, exactly as these frames (no charging state) imply. Credit: [@SyedAounHaiderNaqvi](https://github.com/SyedAounHaiderNaqvi).
 

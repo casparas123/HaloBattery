@@ -12,8 +12,9 @@ and the project follows [Semantic Versioning](https://semver.org/).
   frame map is mirrored from the vendor's own INPHIC HUB driver
   ([#160](https://github.com/HeyOkay/HaloBattery/issues/160)). Confirmed on
   hardware in the reporter's runs, the charging state included.
-- Attack Shark X11 / R1 (1d57:fa60): the same ODM family, in two generations,
-  both read passively on `000a:0000`. The X11 announces the Inphic row's shape
+- Attack Shark X11 / R1 / X3 Max (1d57:fa60): the same ODM family, two generations
+  plus the X3 Max's own model code (`03 4e 40 01 1e` = 30 %, #228), all read
+  passively on `000a:0000`. The X11 announces the Inphic row's shape
   (`03 55 40 01 <level>`); its reporter's probe caught it in
   [#163](https://github.com/HeyOkay/HaloBattery/issues/163), where level and
   charging are both confirmed. The X6/R1 generation announces

@@ -44,7 +44,9 @@ status shapes, so both live here behind the model bytes proven on the units:
   row - is the Attack Shark X11: caught by its reporter's probe in #163
   announcing `03 55 40 01 1f` (31 %) on the same `000a:0000` collection,
   read-only, and fully confirmed in his runs - level and charging state both
-  (his diagnostics caught the `40 03` frame on the cable).
+  (his diagnostics caught the `40 03` frame on the cable). The X3 Max announces
+  the same shape under its own model code (0x4E): its reporter's diagnostics
+  in #228 caught `03 4e 40 01 1e` = 30 %.
 - the `0x10` shape - `03 10 40 <stage> <level/10>` - is the X6/R1 generation:
   decoded in blak0p's attack-shark-linux protocol documents (validated live
   on the dongle: idle `03 10 40 01 0a` = 100 %) and caught on the R1's own
@@ -73,10 +75,12 @@ VID = 0x1D57
 # code its reporter's probe caught announcing 31 % (#163); 0x10 is the X6/R1
 # generation's status event - its reporter's probe caught `03 10 40 01 09`
 # (90 %) on the R1's own receiver (#69), the shape blak0p's X6 protocol
-# documents validated live on the dongle.
+# documents validated live on the dongle. 0x4E is the X3 Max's code - its
+# reporter's diagnostics caught `03 4e 40 01 1e` (30 %) on the same receiver
+# (#228), the X11 shape under a model code of its own.
 PIDS = {
     0xFA65: ("Inphic In9 Pro", (0x95, 0x90, 0x93, 0x99)),
-    0xFA60: ("Attack Shark X11 / R1", (0x55, 0x10)),
+    0xFA60: ("Attack Shark X11 / R1 / X3 Max", (0x55, 0x10, 0x4E)),
 }
 
 REPORT_ID = 0x03                    # hidapi hands it back first on Windows

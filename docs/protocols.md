@@ -132,9 +132,16 @@ The same `b0` exchange as the other Nova headsets, asked for with report id `06`
 
 ### Turtle Beach Stealth 700 Gen 3
 
-**Connection:** 2.4 GHz transmitter (10F5:2250, 10F5:2251 or 10F5:2253), no vendor app needed
+**Connection:** 2.4 GHz transmitter (10F5:2250 or 10F5:2251) or the headset's own USB cable (10F5:2253), no vendor app needed
 
-The same JSON GSI record as the Stealth Pro II above, reached by the route Turtle Beach's own Swarm II uses on this model: the record sits behind the chip's CoAP server, so a plain record ask is not served. The read is @PaulRichez's reverse engineering ([#211](https://github.com/HeyOkay/HaloBattery/pull/211), his write-up: [halobattery-stealth700](https://github.com/PaulRichez/halobattery-stealth700)): a RACE command on the same vendor collection (output report `0x06`, input report `0x07`) enables the CoAP client (`0x9942`, `05 5A 02 00 42 99`), and a CoAP GET /GSI is tunnelled in `0x9902` (`05 5A 0A 00 02 99` + `40 01 00 01 B3` + `GSI` - the RACE length counts the two id bytes plus the payload). The reply payload is the same `{"OR":"GSI","KVP":{...}}` document: `240` the level, `220` the nickname, `250` the charging key (the family's, as above), and the displayed name comes from the transmitter's USB product string ("Stealth 700X Gen 3") - the on-device nickname defaults to "My Headset". **Confirmed on hardware** on his Stealth 700X Gen 3 (100 %, matching Swarm II) through his own build of this provider; the frames are folded in byte for byte and the id sits in KNOWN next to the Stealth Pro II's. The read stops as soon as the record carries a level, and a refused write returns without waiting for replies.
+The same JSON GSI record as the Stealth Pro II above, reached by the route Turtle Beach's own Swarm II uses on this model: the record sits behind the chip's CoAP server, so a plain record ask is not served. The read is @PaulRichez's reverse engineering ([#211](https://github.com/HeyOkay/HaloBattery/pull/211), his write-up: [halobattery-stealth700](https://github.com/PaulRichez/halobattery-stealth700)): a RACE command on the same vendor collection (output report `0x06`, input report `0x07`) enables the CoAP client (`0x9942`, `05 5A 02 00 42 99`), and a CoAP GET /GSI is tunnelled in `0x9902` (`05 5A 0A 00 02 99` + `40 01 00 01 B3` + `GSI` - the RACE length counts the two id bytes plus the payload). The reply payload is the same `{"OR":"GSI","KVP":{...}}` document: `240` the level and `220` the nickname; the displayed name comes from the USB product string ("Stealth 700X Gen 3", "... headset" on the cable) because the on-device nickname defaults to "My Headset".
+
+Two things his own hardware run settled on a 700X Gen 3 (`10F5:2251`), which differ from the Stealth Pro II:
+
+- **`10F5:2253` is the headset itself on its USB cable, not a third transmitter** - it answers the same GET /GSI. The dongle and the cable are one headset on two transports, so they share one icon, as the Pro II's pair does; plugging the cable does not add a second entry.
+- **Charging is not reported on this model.** With the cable in, key `250` stayed `"0"` and nothing else in the record moved, so `250` is not this model's charging flag (it is the Pro II's). The provider reports charging unknown for the 700's ids rather than claiming "on battery".
+
+**Confirmed on hardware** in his run of this provider: 71 %, matching his own implementation, 6-8 replies per read, the product-string name, and one entry with the cable plugged in. The frames are his byte for byte (his correction: the `0x9902` length is `0A 00`, as coded), the read stops as soon as the record carries a level, and a refused write returns without waiting for replies.
 
 ### Turtle Beach Stealth Pro II
 

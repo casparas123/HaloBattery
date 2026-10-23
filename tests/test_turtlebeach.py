@@ -353,16 +353,19 @@ class CoapTests(unittest.TestCase):
     def test_the_gsi_record_reads_100_from_the_tunnel(self):
         res = self.p.poll()
         self.assertEqual([(s.key, s.name, s.level, s.charging, s.online, s.kind) for s in res],
-                         [("turtlebeach:2251", COAP_PRODUCT, 100, False, True, "headset")])
+                         [("turtlebeach:stealth700", COAP_PRODUCT, 100, None, True, "headset")])
 
     def test_the_name_is_the_product_string_not_the_nickname(self):
         # key 220 in the record is "My Headset"; the model name comes from the product string
         self.assertEqual(self.p.poll()[0].name, COAP_PRODUCT)
 
-    def test_the_charging_key_is_read_when_the_record_carries_it(self):
+    def test_charging_is_not_reported_for_the_700_even_when_250_moves(self):
+        # his cable run: 250 stays "0" with the cable in and nothing else changes, so 250
+        # is not this model's charging flag - a "1" must not make the icon claim charging
         cable = COAP_RECORD.replace(b'"250":"0"', b'"250":"1"')
         self.transmitter.queues = {(1, 2): [frame(cable[:40]), frame(cable[40:])]}
-        self.assertEqual([s.charging for s in self.p.poll()], [True])
+        res = self.p.poll()
+        self.assertEqual((res[0].level, res[0].charging), (100, None))
 
     def test_the_record_stops_the_read_loop(self):
         # the record is complete in the first two replies: the rest of the window is not
@@ -380,7 +383,16 @@ class CoapTests(unittest.TestCase):
         self.infos = ifaces(pid=0x229B) + ifaces(pid=0x2251, product=COAP_PRODUCT)
         res = self.p.poll()
         self.assertEqual(sorted(s.key for s in res),
-                         ["turtlebeach:2251", "turtlebeach:stealthpro2"])
+                         ["turtlebeach:stealth700", "turtlebeach:stealthpro2"])
+
+    def test_the_dongle_and_the_cable_are_one_icon(self):
+        # 2253 is the headset on its own USB cable, not a third transmitter (#211): with
+        # both plugged in it must not add a second entry for the same headset
+        self.infos = ifaces(pid=0x2251, product=COAP_PRODUCT) + ifaces(
+            pid=0x2253, product=COAP_PRODUCT + " headset")
+        res = self.p.poll()
+        self.assertEqual([(s.key, s.name, s.level) for s in res],
+                         [("turtlebeach:stealth700", COAP_PRODUCT, 100)])
 
 
 class ParserTests(unittest.TestCase):

@@ -53,15 +53,22 @@ among the changes is 250, so that is the charging flag (230/280/290 move in enum
 steps, transport or power source). A record without 250 counts as not charging.
 
 The Stealth 700 Gen 3 (#211, @PaulRichez's reverse engineering) reaches the same JSON
-record by a different route: its transmitters (10f5:2250 / 2251 / 2253) answer nothing on
-a plain record ask because the record lives behind the chip's CoAP server, so the read is
-the vendor app's own two-step tunnel - enable the CoAP client (RACE id 0x9942,
-``05 5A 02 00 42 99``) and then a CoAP GET /GSI inside RACE id 0x9902
-(``05 5A 0A 00 02 99 40 01 00 01 B3 47 53 49``) - and its payload is the same GSI
-document (240 level, 220 name, 250 charging). Both paths share the parsers below, which is
-why the two models live in one provider with one pid table. The 700 name comes from the
-transmitter's USB product string ("Stealth 700X Gen 3"), not the on-device nickname in
-220, which defaults to "My Headset".
+record by a different route: its transmitter (10f5:2250 / 2251) and the headset's own USB
+cable (10f5:2253 - he checked: it answers the same GET /GSI, and it is the headset, not a
+third transmitter) answer nothing on a plain record ask because the record lives behind
+the chip's CoAP server, so the read is the vendor app's own two-step tunnel - enable the
+CoAP client (RACE id 0x9942, ``05 5A 02 00 42 99``) and then a CoAP GET /GSI inside RACE
+id 0x9902 (``05 5A 0A 00 02 99 40 01 00 01 B3 47 53 49``) - and its payload is the same
+GSI document (240 level, 220 name). Both paths share the parsers below, which is why the
+two models live in one provider with one pid table.
+
+Two differences from the Pro II's ids. The name comes from the USB product string
+("Stealth 700X Gen 3", or "... headset" on the cable), not the on-device nickname in 220,
+which defaults to "My Headset". And **charging is not reported**: on his run the record's
+key 250 stayed "0" with the cable in and nothing else in the record moved, so 250 is not
+the charging flag on this model (it is on the Pro II) - the 700's ids report charging
+unknown rather than claiming "on battery". The dongle and the cable are one headset on two
+transports, so they share one icon, ``STEALTH700_KEY``, as the Pro II's pair does.
 """
 from __future__ import annotations
 
@@ -85,12 +92,16 @@ KNOWN = {
     0x229E: "Turtle Beach Stealth Pro II",
     0x2250: "Turtle Beach Stealth 700 Gen 3",
     0x2251: "Turtle Beach Stealth 700 Gen 3",
-    0x2253: "Turtle Beach Stealth 700 Gen 3",
+    0x2253: "Turtle Beach Stealth 700 Gen 3 headset",
 }
 
-# The Stealth 700 Gen 3 transmitters read through the CoAP tunnel (#211); the Stealth Pro
-# II ids read through the Swarm II SInf/GSI asks. Same record, same parsers.
+# The Stealth 700 Gen 3 reads through the CoAP tunnel (#211): 2250/2251 are its
+# transmitters, 2253 the headset on its own USB cable (its author's hardware run). The
+# Stealth Pro II ids read through the Swarm II SInf/GSI asks. Same record, same parsers.
 COAP_PIDS = frozenset((0x2250, 0x2251, 0x2253))
+# The 700's dongle and cable are one headset (#211, as the Pro II's pair is): one icon,
+# so plugging the cable does not add a second entry.
+STEALTH700_KEY = "turtlebeach:stealth700"
 
 # One icon for the model: the transmitter and the headset on its own cable are the same
 # headset (the rule the Cloud II / Cloud III work set), and either source alone is enough.
@@ -427,7 +438,6 @@ class TurtleBeachProvider(Provider):
             frames: List[bytes] = []
             level = None
             name = None
-            charging = None
             for _ in range(COAP_READS):
                 time.sleep(COAP_POLL_DELAY)
                 try:
@@ -441,12 +451,10 @@ class TurtleBeachProvider(Provider):
                 docs = json_documents(strip_frames(frames))
                 level, name = status_from_documents(docs)
                 if level is not None:
-                    charging = charging_from_documents(docs)
                     break
             if level is None:
                 docs = json_documents(strip_frames(frames))
                 level, name = status_from_documents(docs)
-                charging = charging_from_documents(docs)
             self._diag.append(f"    CoAP /GSI: {len(frames)} replies"
                               + (f"  -> {level}%" if level is not None else ", no level in them")
                               + (f", last: {hexdump(frames[-1])}"
@@ -455,7 +463,9 @@ class TurtleBeachProvider(Provider):
             if record is not None:
                 self._diag.append("    status record: "
                                   + json.dumps(record, separators=(",", ":")))
-            return level, name, charging
+            # charging stays unknown: key 250 does not move on this model (#211's author's
+            # cable run), so it cannot be read as the Pro II's flag
+            return level, name, None
         finally:
             try:
                 dev.close()
@@ -489,7 +499,7 @@ class TurtleBeachProvider(Provider):
                 # the on-device nickname in 220 is "My Headset" out of the box (#211)
                 name = ((ifaces[0].get("product_string") or "").strip()
                         or KNOWN.get(pid) or f"TurtleBeach {pid:04x}")
-                key = f"turtlebeach:{pid:04x}"
+                key = STEALTH700_KEY
             else:
                 name = (KNOWN.get(pid) or (ifaces[0].get("product_string") or
                                            f"TurtleBeach {pid:04x}")).strip()
@@ -520,7 +530,7 @@ class TurtleBeachProvider(Provider):
         if not results:
             return []
         # One icon per headset (#155/#192): the Stealth Pro II's transmitter and its cable
-        # share FAMILY_KEY, and the 700 Gen 3's transmitters each carry their own key. For
+        # share FAMILY_KEY, and the 700 Gen 3's dongle and its cable share STEALTH700_KEY. For
         # a key, the first source (in pid order) that carries a level wins, with its
         # charging state (key 250, module docstring). A None level shows the headset
         # without a percentage - the signal that it was seen but its level could not be
@@ -533,8 +543,11 @@ class TurtleBeachProvider(Provider):
             name = rows[0][0]
             shown = next((lv for _, lv, _ in rows if lv is not None), None)
             charging = next((ch for _, lv, ch in rows if lv is not None), None)
+            # None is "cannot tell" (the 700 does not report charging) - keep it apart from
+            # False, or the icon claims "on battery" for a model that never says
+            chg = None if charging is None else bool(charging)
             if shown is not None:
-                self._last[key] = (shown, bool(charging), time.time())
+                self._last[key] = (shown, chg, time.time())
             elif key in self._last:
                 level, chg, when = self._last[key]
                 if time.time() - when < ASLEEP_KEEP:
@@ -548,7 +561,7 @@ class TurtleBeachProvider(Provider):
             self._diag.append("  -> " + key + (f": {shown}%" if shown is not None
                                                else ": no level from any source")
                               + (", charging" if charging else ""))
-            out.append(DeviceStatus(key, name, shown, bool(charging), True, "turtlebeach",
+            out.append(DeviceStatus(key, name, shown, chg, True, "turtlebeach",
                                     kind="headset"))
         return out
 

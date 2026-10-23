@@ -451,6 +451,10 @@ class TurtleBeachProvider(Provider):
                               + (f"  -> {level}%" if level is not None else ", no level in them")
                               + (f", last: {hexdump(frames[-1])}"
                                  if level is None and frames else ""))
+            record = _status_record(frames)
+            if record is not None:
+                self._diag.append("    status record: "
+                                  + json.dumps(record, separators=(",", ":")))
             return level, name, charging
         finally:
             try:

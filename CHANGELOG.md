@@ -29,6 +29,13 @@ and the project follows [Semantic Versioning](https://semver.org/).
   inferred in these docs and the read loop is bounded: a total read cap, and the
   fallback's budget shortened after a silent opener and record ask.
 
+- Turtle Beach Stealth 700 Gen 3 (10f5:2250 / 2251 / 2253): the same GSI record read
+  through the transmitter's CoAP tunnel - the two RACE frames are @PaulRichez's, from his
+  reverse engineering and his own run on a 700X Gen 3
+  ([#211](https://github.com/HeyOkay/HaloBattery/pull/211)); the ids are folded into the
+  one Turtle Beach provider, so both models share one pid table and one parser, and each
+  of the 700's transmitters keeps a key of its own.
+
 ### Changed
 - **A tidier repository and a shorter README**: the app's modules moved into the `halo/`
   package (`halo_battery.pyw` stays the entry point), the .bat helpers into `scripts/`

@@ -128,10 +128,11 @@ class FakeTransmitter:
         pass
 
 
-def ifaces(pid=0x229B, serial="SN123", usage_page=0xFF13, usage=0x0001):
+def ifaces(pid=0x229B, serial="SN123", usage_page=0xFF13, usage=0x0001,
+           product="Stealth Pro II Xbox"):
     return [{"product_id": pid, "serial_number": serial, "path": PATH,
              "usage_page": usage_page, "usage": usage, "interface_number": 3,
-             "product_string": "Stealth Pro II Xbox"}]
+             "product_string": product}]
 
 
 class TurtleBeachTests(unittest.TestCase):
@@ -315,6 +316,71 @@ class TurtleBeachTests(unittest.TestCase):
         res = self.p.poll()
         self.assertEqual([(s.key, s.level) for s in res],
                          [("turtlebeach:stealthpro2", 86)])
+
+
+# ---- the Stealth 700 Gen 3's CoAP tunnel (#211, @PaulRichez) -------------------
+COAP_PRODUCT = "Stealth 700X Gen 3"
+COAP_RECORD = (b'{"OR":"GSI","KVP":{"200":"1","220":"My Headset","230":"1","240":"100",'
+               b'"250":"0","2e0":"1"}}')
+
+
+class CoapTests(unittest.TestCase):
+    """The 700 Gen 3's read: his two RACE writes, then the same GSI document."""
+
+    def setUp(self):
+        self.transmitter = FakeTransmitter({(1, 2): [frame(COAP_RECORD[:40]),
+                                                     frame(COAP_RECORD[40:])]})
+        self.infos = ifaces(pid=0x2251, product=COAP_PRODUCT)
+        for p in (mock.patch.object(turtlebeach.hid, "device", lambda: self.transmitter),
+                  mock.patch.object(turtlebeach.hidlist, "enumerate", lambda vid: self.infos),
+                  mock.patch.object(turtlebeach.time, "sleep", lambda s: None)):
+            p.start()
+            self.addCleanup(p.stop)
+        self.p = turtlebeach.TurtleBeachProvider()
+
+    def test_the_two_asks_are_his_frames_byte_for_byte(self):
+        self.p.poll()
+        enable, get = self.transmitter.written[0], self.transmitter.written[1]
+        self.assertEqual(enable[:9], bytes.fromhex("060600" "055a02004299"))
+        self.assertEqual(get[:17], bytes.fromhex("060e00" "055a0a00029940010001b3") + b"GSI")
+        self.assertEqual(len(enable), turtlebeach.MSG_SIZE)
+        self.assertEqual(len(get), turtlebeach.MSG_SIZE)
+        # the RACE length counts the id bytes plus the payload
+        self.assertEqual(turtlebeach.race_frame(0x9942), bytes.fromhex("055a02004299"))
+        self.assertEqual(turtlebeach.race_frame(0x9902, turtlebeach.coap_get("GSI")),
+                         bytes.fromhex("055a0a000299") + turtlebeach.coap_get("GSI"))
+
+    def test_the_gsi_record_reads_100_from_the_tunnel(self):
+        res = self.p.poll()
+        self.assertEqual([(s.key, s.name, s.level, s.charging, s.online, s.kind) for s in res],
+                         [("turtlebeach:2251", COAP_PRODUCT, 100, False, True, "headset")])
+
+    def test_the_name_is_the_product_string_not_the_nickname(self):
+        # key 220 in the record is "My Headset"; the model name comes from the product string
+        self.assertEqual(self.p.poll()[0].name, COAP_PRODUCT)
+
+    def test_the_charging_key_is_read_when_the_record_carries_it(self):
+        cable = COAP_RECORD.replace(b'"250":"0"', b'"250":"1"')
+        self.transmitter.queues = {(1, 2): [frame(cable[:40]), frame(cable[40:])]}
+        self.assertEqual([s.charging for s in self.p.poll()], [True])
+
+    def test_the_record_stops_the_read_loop(self):
+        # the record is complete in the first two replies: the rest of the window is not
+        # waited out (#211 review, @ahmedkhursheed23)
+        self.p.poll()
+        self.assertLessEqual(self.transmitter.reads, 12)      # 5 + 5 drains + 2 replies
+
+    def test_a_refused_enable_write_does_not_wait_for_replies(self):
+        self.transmitter.write = lambda data: -1
+        res = self.p.poll()
+        self.assertEqual([(s.level, s.online) for s in res], [(None, True)])
+        self.assertEqual(self.transmitter.reads, 5)           # the drain, then nothing
+
+    def test_the_two_models_keep_their_own_keys(self):
+        self.infos = ifaces(pid=0x229B) + ifaces(pid=0x2251, product=COAP_PRODUCT)
+        res = self.p.poll()
+        self.assertEqual(sorted(s.key for s in res),
+                         ["turtlebeach:2251", "turtlebeach:stealthpro2"])
 
 
 class ParserTests(unittest.TestCase):

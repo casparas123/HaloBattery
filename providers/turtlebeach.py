@@ -51,6 +51,17 @@ diffing: on battery the full record reads {"230":"2","250":"0","280":"1","290":"
 on the cable {"230":"0","250":"1","280":"2","290":"4"} - the only strict 0/1 key
 among the changes is 250, so that is the charging flag (230/280/290 move in enum-like
 steps, transport or power source). A record without 250 counts as not charging.
+
+The Stealth 700 Gen 3 (#211, @PaulRichez's reverse engineering) reaches the same JSON
+record by a different route: its transmitters (10f5:2250 / 2251 / 2253) answer nothing on
+a plain record ask because the record lives behind the chip's CoAP server, so the read is
+the vendor app's own two-step tunnel - enable the CoAP client (RACE id 0x9942,
+``05 5A 02 00 42 99``) and then a CoAP GET /GSI inside RACE id 0x9902
+(``05 5A 0A 00 02 99 40 01 00 01 B3 47 53 49``) - and its payload is the same GSI
+document (240 level, 220 name, 250 charging). Both paths share the parsers below, which is
+why the two models live in one provider with one pid table. The 700 name comes from the
+transmitter's USB product string ("Stealth 700X Gen 3"), not the on-device nickname in
+220, which defaults to "My Headset".
 """
 from __future__ import annotations
 
@@ -72,7 +83,14 @@ TURTLEBEACH_VID = 0x10F5
 KNOWN = {
     0x229B: "Turtle Beach Stealth Pro II",
     0x229E: "Turtle Beach Stealth Pro II",
+    0x2250: "Turtle Beach Stealth 700 Gen 3",
+    0x2251: "Turtle Beach Stealth 700 Gen 3",
+    0x2253: "Turtle Beach Stealth 700 Gen 3",
 }
+
+# The Stealth 700 Gen 3 transmitters read through the CoAP tunnel (#211); the Stealth Pro
+# II ids read through the Swarm II SInf/GSI asks. Same record, same parsers.
+COAP_PIDS = frozenset((0x2250, 0x2251, 0x2253))
 
 # One icon for the model: the transmitter and the headset on its own cable are the same
 # headset (the rule the Cloud II / Cloud III work set), and either source alone is enough.
@@ -83,6 +101,15 @@ VENDOR_USAGE = 0x0001
 
 MSG_SIZE = 62
 REPORT_ID_IN = 0x07
+OUT_REPORT_ID = 0x06
+# The Stealth 700 Gen 3's tunnel (#211, @PaulRichez's write-up): a RACE command is
+# ``05 5A <len16 LE> <id16 LE> <payload>`` with len counting the two id bytes; the CoAP
+# GET carries ``40 01 00 01`` and the path as a Uri-Path option (0xB0 | len).
+RACE_COAP_CLIENT_ENABLE = 0x9942
+RACE_COAP_USB = 0x9902
+COAP_ENABLE_PAUSE = 0.3          # the chip needs a moment after the client is enabled
+COAP_POLL_DELAY = 0.03           # his read loop's cadence
+COAP_READS = 30                  # 30 x 30 ms after the GET (stops early on the record)
 PACKET_DELAY = 0.060      # the cadence of the vendor app's own asks (and HeadsetControl's)
 MAX_READS = 16            # the GSI record arrived within 4-5 replies in the capture
 SINF_READS = 10           # the state dump came as 8 frames within 30 ms in the capture
@@ -127,6 +154,18 @@ ASK_SINF = bytes.fromhex(
 GSI_KEY_LEVEL = "240"
 GSI_KEY_NAME = "220"
 GSI_KEY_CHARGING = "250"             # the charging state (see the module docstring)
+
+
+def race_frame(cmd_id: int, payload: bytes = b"") -> bytes:
+    """A RACE command: ``05 5A <len16 LE> <id16 LE> <payload>``, len counting the ids."""
+    n = len(payload) + 2
+    return bytes([0x05, 0x5A, n & 0xFF, (n >> 8) & 0xFF,
+                  cmd_id & 0xFF, (cmd_id >> 8) & 0xFF]) + payload
+
+
+def coap_get(path: str) -> bytes:
+    """A CoAP GET with the path as a Uri-Path option (0xB0 | len)."""
+    return bytes([0x40, 0x01, 0x00, 0x01, 0xB0 | len(path)]) + path.encode("ascii")
 
 
 def strip_frames(frames) -> bytes:
@@ -265,9 +304,12 @@ class TurtleBeachProvider(Provider):
         self._last: Dict[str, Tuple[int, bool, float]] = {}
 
     # ---- low level -------------------------------------------------------
-    def _read_status(self, path) -> Tuple[Optional[int], Optional[str], Optional[bool]]:
+    def _read_status(self, path, pid: int = 0x229B
+                     ) -> Tuple[Optional[int], Optional[str], Optional[bool]]:
         """Ask the device for the GSI record -> (level, name, charging); any may be
         None (the level and the name are what a read is taken for)."""
+        if pid in COAP_PIDS:
+            return self._read_coap(path)
         dev = hid.device()
         try:
             dev.open_path(path)
@@ -341,6 +383,81 @@ class TurtleBeachProvider(Provider):
             except Exception:
                 pass
 
+    def _read_coap(self, path) -> Tuple[Optional[int], Optional[str], Optional[bool]]:
+        """The Stealth 700 Gen 3's read: CoAP GET /GSI tunnelled in RACE (#211).
+
+        His frames, byte for byte: the client enable, a pause, the tunnelled GET, then the
+        GSI document in the replies. The loop stops as soon as the record carries a level
+        (his review of #211: the full 30-read window was waited out needlessly).
+        """
+        dev = hid.device()
+        try:
+            dev.open_path(path)
+        except (OSError, IOError, ValueError) as e:
+            self._diag.append(f"    open: {e}")
+            return None, None, None
+        try:
+            def send(frame: bytes) -> bool:
+                buf = [OUT_REPORT_ID, len(frame) & 0xFF, (len(frame) >> 8) & 0xFF] + list(frame)
+                buf += [0] * (MSG_SIZE - len(buf))
+                try:
+                    sent = dev.write(buf)
+                except (OSError, ValueError) as e:
+                    self._diag.append(f"    write: {e}")
+                    return False
+                if sent is not None and sent < 0:
+                    self._diag.append(f"    write refused ({sent})")
+                    return False
+                return True
+
+            def drain(n: int) -> None:
+                for _ in range(n):
+                    try:
+                        dev.get_input_report(REPORT_ID_IN, MSG_SIZE)
+                    except (OSError, ValueError):
+                        pass
+
+            drain(5)
+            if not send(race_frame(RACE_COAP_CLIENT_ENABLE)):
+                return None, None, None
+            time.sleep(COAP_ENABLE_PAUSE)
+            drain(5)
+            if not send(race_frame(RACE_COAP_USB, coap_get("GSI"))):
+                return None, None, None
+            frames: List[bytes] = []
+            level = None
+            name = None
+            charging = None
+            for _ in range(COAP_READS):
+                time.sleep(COAP_POLL_DELAY)
+                try:
+                    frame = dev.get_input_report(REPORT_ID_IN, MSG_SIZE)
+                except (OSError, ValueError) as e:
+                    self._diag.append(f"    read: {e}")
+                    break
+                if not frame:
+                    continue
+                frames.append(bytes(frame))
+                docs = json_documents(strip_frames(frames))
+                level, name = status_from_documents(docs)
+                if level is not None:
+                    charging = charging_from_documents(docs)
+                    break
+            if level is None:
+                docs = json_documents(strip_frames(frames))
+                level, name = status_from_documents(docs)
+                charging = charging_from_documents(docs)
+            self._diag.append(f"    CoAP /GSI: {len(frames)} replies"
+                              + (f"  -> {level}%" if level is not None else ", no level in them")
+                              + (f", last: {hexdump(frames[-1])}"
+                                 if level is None and frames else ""))
+            return level, name, charging
+        finally:
+            try:
+                dev.close()
+            except Exception:
+                pass
+
     # ---- high level ------------------------------------------------------
     def poll(self) -> List[DeviceStatus]:
         self._diag = []
@@ -361,10 +478,18 @@ class TurtleBeachProvider(Provider):
                 continue
             groups.setdefault((pid, d.get("serial_number") or ""), []).append(d)
 
-        results: List[Tuple[Optional[int], Optional[bool]]] = []
+        results: List[Tuple[str, str, Optional[int], Optional[bool]]] = []
         for (pid, serial), ifaces in sorted(groups.items()):
-            name = KNOWN.get(pid) or (ifaces[0].get("product_string") or
-                                      f"TurtleBeach {pid:04x}").strip()
+            if pid in COAP_PIDS:
+                # his transmitter's product string names the model ("Stealth 700X Gen 3");
+                # the on-device nickname in 220 is "My Headset" out of the box (#211)
+                name = ((ifaces[0].get("product_string") or "").strip()
+                        or KNOWN.get(pid) or f"TurtleBeach {pid:04x}")
+                key = f"turtlebeach:{pid:04x}"
+            else:
+                name = (KNOWN.get(pid) or (ifaces[0].get("product_string") or
+                                           f"TurtleBeach {pid:04x}")).strip()
+                key = FAMILY_KEY
             self._diag.append(f"[TurtleBeach] {name} pid={pid:04x}, interfaces: {len(ifaces)}")
             # The vendor collection (usage page 0xFF13) is the only one that speaks this
             # protocol; the device's other collections (audio controls, a 000c:0001
@@ -383,36 +508,45 @@ class TurtleBeachProvider(Provider):
                     if len(cands) > 1:
                         self._diag.append(f"  iface={d.get('interface_number')} "
                                           f"usage={d.get('usage_page', 0):04x}:{d.get('usage', 0):04x}")
-                    level, _, charging = self._read_status(d["path"])
+                    level, _, charging = self._read_status(d["path"], pid)
                     if level is not None:
                         break
-            results.append((level, charging))
+            results.append((key, name, level, charging))
 
         if not results:
             return []
-        # One icon for the model (#155/#192): whether the transmitter or the headset's own
-        # cable answers, it is the same headset; the first (in pid order) that carries a
-        # level wins, with its charging state (key 250, module docstring). A None level
-        # shows the headset without a percentage - the signal that it was seen but its
-        # level could not be read.
-        shown = next((lv for lv, _ in results if lv is not None), None)
-        charging = next((ch for lv, ch in results if lv is not None), None)
-        if shown is not None:
-            self._last[FAMILY_KEY] = (shown, bool(charging), time.time())
-        elif FAMILY_KEY in self._last:
-            level, chg, when = self._last[FAMILY_KEY]
-            if time.time() - when < ASLEEP_KEEP:
-                # present but silent (Swarm II holding the channel, the headset between
-                # charge cycles): keep the last level greyed out, as the other providers do
-                self._diag.append(f"  -> {FAMILY_KEY}: no fresh record; keeping {level}% "
-                                  "greyed out")
-                return [DeviceStatus(FAMILY_KEY, "Turtle Beach Stealth Pro II", level,
-                                     chg, False, "turtlebeach", kind="headset")]
-        self._diag.append("  -> " + FAMILY_KEY + (f": {shown}%" if shown is not None
-                                                   else ": no level from any source")
-                          + (", charging" if charging else ""))
-        return [DeviceStatus(FAMILY_KEY, "Turtle Beach Stealth Pro II", shown,
-                             bool(charging), True, "turtlebeach", kind="headset")]
+        # One icon per headset (#155/#192): the Stealth Pro II's transmitter and its cable
+        # share FAMILY_KEY, and the 700 Gen 3's transmitters each carry their own key. For
+        # a key, the first source (in pid order) that carries a level wins, with its
+        # charging state (key 250, module docstring). A None level shows the headset
+        # without a percentage - the signal that it was seen but its level could not be
+        # read - and a present-but-silent one keeps its last level greyed out.
+        grouped: Dict[str, List[Tuple[str, Optional[int], Optional[bool]]]] = {}
+        for key, name, level, charging in results:
+            grouped.setdefault(key, []).append((name, level, charging))
+        out: List[DeviceStatus] = []
+        for key, rows in grouped.items():
+            name = rows[0][0]
+            shown = next((lv for _, lv, _ in rows if lv is not None), None)
+            charging = next((ch for _, lv, ch in rows if lv is not None), None)
+            if shown is not None:
+                self._last[key] = (shown, bool(charging), time.time())
+            elif key in self._last:
+                level, chg, when = self._last[key]
+                if time.time() - when < ASLEEP_KEEP:
+                    # present but silent (Swarm II holding the channel, the headset between
+                    # charge cycles): keep the last level greyed out
+                    self._diag.append(f"  -> {key}: no fresh record; keeping {level}% "
+                                      "greyed out")
+                    out.append(DeviceStatus(key, name, level, chg, False, "turtlebeach",
+                                            kind="headset"))
+                    continue
+            self._diag.append("  -> " + key + (f": {shown}%" if shown is not None
+                                               else ": no level from any source")
+                              + (", charging" if charging else ""))
+            out.append(DeviceStatus(key, name, shown, bool(charging), True, "turtlebeach",
+                                    kind="headset"))
+        return out
 
     def diagnostics(self) -> List[str]:
         return list(self._diag)

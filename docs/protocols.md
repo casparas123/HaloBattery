@@ -130,6 +130,12 @@ A read-only status request `01 b0` (a 64-byte output report, report id `01`) goe
 
 The same `b0` exchange as the other Nova headsets, asked for with report id `06` instead of `00`, as HeadsetControl asks for these base stations: the level is a nine-step code in byte 6 (shown as "about NN%") and the state in byte 15 (`01` off / out of range, `02` cable charging, `08` on battery). A reply with any other state byte, a level code above 8 or fewer than 16 bytes is refused rather than shown. The request goes only to a vendor collection of these two ids; the diagnostics in #41 show `1038:12e5` exposing `ffc0:0001` on interface 4 (plus a second vendor collection `ff00:0001` there), so both are tried and the answering one is remembered. The reply layout is HeadsetControl's - not yet seen on hardware here
 
+### Turtle Beach Stealth 700 Gen 3
+
+**Connection:** 2.4 GHz transmitter (10F5:2250, 10F5:2251 or 10F5:2253), no vendor app needed
+
+The same JSON GSI record as the Stealth Pro II above, reached by the route Turtle Beach's own Swarm II uses on this model: the record sits behind the chip's CoAP server, so a plain record ask is not served. The read is @PaulRichez's reverse engineering ([#211](https://github.com/HeyOkay/HaloBattery/pull/211), his write-up: [halobattery-stealth700](https://github.com/PaulRichez/halobattery-stealth700)): a RACE command on the same vendor collection (output report `0x06`, input report `0x07`) enables the CoAP client (`0x9942`, `05 5A 02 00 42 99`), and a CoAP GET /GSI is tunnelled in `0x9902` (`05 5A 0A 00 02 99` + `40 01 00 01 B3` + `GSI` - the RACE length counts the two id bytes plus the payload). The reply payload is the same `{"OR":"GSI","KVP":{...}}` document: `240` the level, `220` the nickname, `250` the charging key (the family's, as above), and the displayed name comes from the transmitter's USB product string ("Stealth 700X Gen 3") - the on-device nickname defaults to "My Headset". **Confirmed on hardware** on his Stealth 700X Gen 3 (100 %, matching Swarm II) through his own build of this provider; the frames are folded in byte for byte and the id sits in KNOWN next to the Stealth Pro II's. The read stops as soon as the record carries a level, and a refused write returns without waiting for replies.
+
 ### Turtle Beach Stealth Pro II
 
 **Connection:** 2.4 GHz transmitter (the charging dock), or the headset's own USB cable (`10f5:229e`, the same collection)

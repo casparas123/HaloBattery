@@ -197,6 +197,7 @@ class InphicProvider(Provider):
             self._diag.append(f"    open: {e}")
             return None
         try:
+            pending = None
             for _ in range(attempts):
                 r = dev.read(READ_SIZE, READ_TIMEOUT_MS)
                 if not r:
@@ -206,8 +207,18 @@ class InphicProvider(Provider):
                                   + (f"  -> level {got[0]}, "
                                      f"{'charging' if got[1] else 'on battery'}" if got
                                      else "  (not a battery frame)"))
-                if got is not None:
-                    return got
+                if got is None:
+                    continue
+                if got[0] is not None:
+                    # a level frame after a charging one: the level is fresh and the
+                    # cable is still in (#228 follow-up - the first frame used to end
+                    # the read, freezing the level until the cable came out)
+                    return (got[0], True) if pending is not None else got
+                # charging (or full) with no level: the last level stays on screen,
+                # but the rest of the window may still carry one
+                pending = got
+            if pending is not None:
+                return pending
             self._diag.append("    no frame in the window "
                               "(the mouse announces every couple of seconds)")
             return None

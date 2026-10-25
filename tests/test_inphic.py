@@ -257,6 +257,19 @@ class PollTest(unittest.TestCase):
         out = self.poll(entries, cols)
         self.assertEqual([(s.level, s.charging, s.online) for s in out], [(75, False, True)])
 
+    def test_a_charging_frame_does_not_hide_a_level_frame_behind_it(self):
+        # #228 follow-up: on the cable the mouse mixes charging frames with level
+        # frames. The read used to return on the first parsable frame, so a charging
+        # frame that arrived first froze the level at the pre-cable value until the
+        # cable came out.
+        entries = receiver_entries(pid=0xFA60, prefix=b"as")
+        cols = self.cols(entries, replies=(AS_X3MAX_CHARGING, AS_X3MAX_30),
+                         answer=AS_STATUS_PATH)
+        out = self.poll(entries, cols)
+        self.assertEqual([(s.level, s.charging, s.online) for s in out],
+                         [(30, True, True)])
+        self.assertEqual(self.provider._chosen.get(0xFA60), AS_STATUS_PATH)
+
     def test_the_charging_frame_keeps_the_last_level(self):
         entries = receiver_entries()
         cols = self.cols(entries)

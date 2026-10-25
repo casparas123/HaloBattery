@@ -23,7 +23,11 @@ and the project follows [Semantic Versioning](https://semver.org/).
   reporter's probe in [#69](https://github.com/HeyOkay/HaloBattery/issues/69);
   it carries no charging state. Each receiver only reads the model bytes
   proven on it; the R1's run of the test build confirmed it on hardware - the
-  tray showed 90 %, its own ten-step size, unchanged while charging.
+  tray showed 90 %, its own ten-step size, unchanged while charging. The X3
+  Max's cable run showed the charging frame and a level frame arriving in the
+  same window: the reader now keeps listening past a charging frame, so the
+  level is refreshed while charging instead of staying at its pre-cable value
+  ([#228](https://github.com/HeyOkay/HaloBattery/issues/228)).
 
 ### Changed
 - **A tidier repository and a shorter README**: the app's modules moved into the `halo/`

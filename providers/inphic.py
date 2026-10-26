@@ -59,6 +59,7 @@ status shapes, so both live here behind the model bytes proven on the units:
 from __future__ import annotations
 
 import time
+from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
 try:
@@ -87,6 +88,9 @@ REPORT_ID = 0x03                    # hidapi hands it back first on Windows
 CMD_BATTERY = 0x40
 SUB_FULL = 0x02                     # charge complete: the app shows 100 %
 SUB_CHARGING = 0x03                 # on the cable: the app runs its animation
+# Not every model means "full" by 0x02: the X3 Max sends it one minute after plugging
+# in at 67 %, so there it is the charging state and the last level stays (#228).
+FULL_IS_CHARGING_MODELS = (0x4E,)
 X6_EVENT = 0x10                     # the X6/R1 generation's status event; its
                                     # heartbeat level arrives in X6_STEP steps
 X6_STEP = 10
@@ -97,6 +101,7 @@ READ_TIMEOUT_MS = 250
 READ_ATTEMPTS = 5                   # ~1.2 s on the remembered collection
 SWEEP_ATTEMPTS = 2                  # ... and per collection while looking
 MAX_CANDIDATES = 4
+FRAME_HISTORY = 12                  # frames kept per receiver for the diagnostics
 ONLINE_FRESH = 90                   # s: how long one observed frame keeps the
                                     # icon lit even if a poll misses the next one
 ASLEEP_KEEP = 300                   # s: then greyed, then gone
@@ -146,6 +151,10 @@ def parse_frame(frame, models) -> Optional[Tuple[Optional[int], bool]]:
     if f[2] == SUB_CHARGING:
         return None, True
     if f[2] == SUB_FULL:
+        if f[0] in FULL_IS_CHARGING_MODELS:
+            # the X3 Max's cable state, not "full": a 67 % mouse showed 100 % with our
+            # previous mapping (#228, @ThePowerHoster's run)
+            return None, True
         return 100, True
     level = f[3]
     if LEVEL_MIN <= level <= LEVEL_MAX:
@@ -186,10 +195,26 @@ class InphicProvider(Provider):
         self._last: Dict[int, Tuple[Optional[int], float]] = {}    # pid -> (level, when)
         self._charging: Dict[int, bool] = {}
         self._chosen: Dict[int, bytes] = {}                        # pid -> collection path
+        self._hist: Dict[int, List[str]] = {}                      # pid -> recent frames
         self._swept: Dict[int, float] = {}                         # pid -> last sweep
 
+    def _remember(self, pid: int, r, got) -> None:
+        """Keep the last few frames per receiver for the diagnostics file (#228).
+
+        A dump is taken after the fact, so the frame that arrived at plug-in time is
+        gone from the live window by then - the history keeps it.
+        """
+        stamp = datetime.fromtimestamp(time.time()).strftime("%H:%M:%S")
+        line = (f"{stamp} {hexdump(r, 20)}"
+                + (f"  -> level {got[0]}, "
+                   f"{'charging' if got[1] else 'on battery'}" if got
+                   else "  (not a battery frame)"))
+        rows = self._hist.setdefault(pid, [])
+        rows.append(line)
+        del rows[:-FRAME_HISTORY]
+
     def _listen(self, d: dict, attempts: int,
-                models: Tuple[int, ...]) -> Optional[Tuple[Optional[int], bool]]:
+                models: Tuple[int, ...], pid: int) -> Optional[Tuple[Optional[int], bool]]:
         dev = hid.device()
         try:
             dev.open_path(d["path"])
@@ -203,6 +228,7 @@ class InphicProvider(Provider):
                 if not r:
                     continue             # the frames come by themselves
                 got = parse_frame(r, models)
+                self._remember(pid, r, got)
                 self._diag.append(f"    report: {hexdump(r, 20)}"
                                   + (f"  -> level {got[0]}, "
                                      f"{'charging' if got[1] else 'on battery'}" if got
@@ -283,7 +309,7 @@ class InphicProvider(Provider):
             attempts = READ_ATTEMPTS if is_chosen or patience else SWEEP_ATTEMPTS
             self._diag.append(f"  listening on iface={d.get('interface_number')} "
                               f"usage={d.get('usage_page', 0):04x}:{d.get('usage', 0):04x}")
-            got = self._listen(d, attempts, models)
+            got = self._listen(d, attempts, models, pid)
             if got is not None:
                 if chosen != d["path"]:
                     self._chosen[pid] = d["path"]
@@ -329,6 +355,12 @@ class InphicProvider(Provider):
             st = self._poll_pid(pid, name, models, mine)
             if st is not None:
                 out.append(st)
+        if self._hist:
+            self._diag.append("  recent frames (newest last):")
+            for pid in sorted(self._hist):
+                self._diag.append(f"    pid={pid:04x}")
+                for line in self._hist[pid]:
+                    self._diag.append("      " + line)
         return out
 
     def diagnostics(self) -> List[str]:

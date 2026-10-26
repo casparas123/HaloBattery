@@ -26,7 +26,11 @@ and the project follows [Semantic Versioning](https://semver.org/).
   tray showed 90 %, its own ten-step size, unchanged while charging. The X3
   Max's cable run showed the charging frame and a level frame arriving in the
   same window: the reader now keeps listening past a charging frame, so the
-  level is refreshed while charging instead of staying at its pre-cable value
+  level is refreshed while charging instead of staying at its pre-cable value.
+  On the X3 Max the cable frame (`40 02`) is the charging state, not the "full"
+  marker - the reporter's 67 % mouse read 100 % a minute after plugging in - so
+  that model keeps its last level while charging; the diagnostics also keeps the
+  last 12 frames per receiver, so a report taken later still shows them
   ([#228](https://github.com/HeyOkay/HaloBattery/issues/228)).
 
 ### Changed

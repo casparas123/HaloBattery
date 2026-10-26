@@ -41,6 +41,8 @@ FULL = [0x03, 0x99, 0x40, 0x02, 0x00] + [0x00] * 95
 # command 0x40, sub 0x01, level 0x1E = 30 % (the report is five bytes)
 AS_X3MAX_30 = [0x03, 0x4E, 0x40, 0x01, 0x1E]
 AS_X3MAX_CHARGING = [0x03, 0x4E, 0x40, 0x03, 0x1E]
+# #228: on the cable this model sends 0x02, not 0x03 - at 67 %, not at full
+AS_X3MAX_CABLE = [0x03, 0x4E, 0x40, 0x02, 0x43] + [0x00] * 95
 
 # the Attack Shark X11/R1 frame a reporter's probe caught on 1d57:fa60 (#163)
 AS_31 = [0x03, 0x55, 0x40, 0x01, 0x1F] + [0x00] * 95
@@ -121,6 +123,13 @@ class ParseTest(unittest.TestCase):
     def test_the_charging_frame_keeps_the_level_and_shows_charging(self):
         # byte 4 is not a level on a 0x03 frame; the vendor app keeps its last
         self.assertEqual(I.parse_frame(CHARGING, INPHIC), (None, True))
+
+    def test_the_x3_max_cable_frame_is_charging_not_full(self):
+        # his run: one minute after plugging in at 67 % the icon read 100 %
+        self.assertEqual(I.parse_frame(AS_X3MAX_CABLE, ATTACK), (None, True))
+        # the X11 keeps the vendor app's mapping: 0x02 really is full there
+        self.assertEqual(I.parse_frame([0x03, 0x55, 0x40, 0x02, 0x00] + [0x00] * 95, ATTACK),
+                         (100, True))
 
     def test_the_full_frame_shows_100_and_charging(self):
         self.assertEqual(I.parse_frame(FULL, INPHIC), (100, True))
@@ -256,6 +265,25 @@ class PollTest(unittest.TestCase):
         cols[STATUS_PATH].replies = [LEVEL75]
         out = self.poll(entries, cols)
         self.assertEqual([(s.level, s.charging, s.online) for s in out], [(75, False, True)])
+
+    def test_the_x3_max_keeps_its_level_on_the_cable(self):
+        entries = receiver_entries(pid=0xFA60, prefix=b"as")
+        cols = self.cols(entries, replies=(AS_X3MAX_30,), answer=AS_STATUS_PATH)
+        out = self.poll(entries, cols)
+        self.assertEqual([(s.level, s.charging) for s in out], [(30, False)])
+        cols[AS_STATUS_PATH].replies = [AS_X3MAX_CABLE]
+        out = self.poll(entries, cols)
+        self.assertEqual([(s.level, s.charging) for s in out], [(30, True)])
+
+    def test_the_diagnostics_keep_the_recent_frames(self):
+        # a dump taken after the plug-in moment must still show that frame (#228)
+        entries = receiver_entries(pid=0xFA60, prefix=b"as")
+        cols = self.cols(entries, replies=(AS_X3MAX_CABLE,), answer=AS_STATUS_PATH)
+        self.poll(entries, cols)
+        text = "\n".join(self.provider.diagnostics())
+        self.assertIn("recent frames", text)
+        self.assertIn("03 4e 40 02 43", text)
+        self.assertIn("charging", text)
 
     def test_a_charging_frame_does_not_hide_a_level_frame_behind_it(self):
         # #228 follow-up: on the cable the mouse mixes charging frames with level

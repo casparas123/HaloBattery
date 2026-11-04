@@ -21,6 +21,10 @@ permissions:
 
 jobs:
   build:
+    # Test-build tags (…-test1, …-test5) are published by hand with a verified zip and
+    # are not releases. Without this line the `v*` trigger treats a tag like
+    # vgn-dragonfly4k-test1 as a version tag and the tag guard fails the run.
+    if: ${{ github.ref_type != 'tag' || !contains(github.ref_name, '-test') }}
     runs-on: windows-latest
     steps:
       - name: Checkout

@@ -13,9 +13,9 @@ and the project follows [Semantic Versioning](https://semver.org/).
   `0e a1 <level> <state>`), taken from the #287 USBPcap captures. The report must be sent with
   report id 0 in front (`00 | 0e a1 ...`); the first test build omitted it, so the receiver
   ignored the writes and the keyboard sat at "no link". The charging capture also settles the
-  charger state: byte 3 is `0x00` on battery and `0x04` with the cable in. Unverified on
-  hardware until the second test build is run;
-  see [#287](https://github.com/HeyOkay/HaloBattery/issues/287).
+  charger state: byte 3 is `0x00` on battery and `0x04` with the cable in. **Confirmed on
+  hardware by @notisv** (#287): the level matched Bluetooth, Windows and Command Center
+  (`0e a1 5c 00` = 92 %) and the charging state followed the cable.
 
 ## [1.16.0] - 2026-11-04
 

@@ -592,6 +592,31 @@ percentage matched URX HUB. The charging state is **not exposed**: a second prob
 the charging cable in returned byte-identical replies (`08 00 07 4c ...`), so the app shows
 the level only rather than inventing a charger state.
 
+### OnMicro HS6209 2.4 GHz dongle (RAPIQUE mouse)
+
+**Connection:** 2.4 GHz dongle (32C2:0012, "HS6209 2.4G Wireless Receiver")
+
+The receiver exposes a vendor status page on interface 1, `ffb5:0001`, plus a second vendor
+page `ffbc:0088` that the app does not use. The 8-byte status exchange is documented for the
+sibling OnMicro dongle `32c2:0066` by
+[ksanjeev284/acer-popgo-companion](https://github.com/ksanjeev284/acer-popgo-companion):
+
+    request  B5 | 01 00 00 00 00 00 00     report id 0xB5, status command
+    reply    B5 | 01 flags pct a b c d     pct in byte 3, LiPo mV often in bytes 5-6
+
+Byte 3 is the mouse firmware's percentage, which that project found could freeze for long
+periods. Bytes 5-6 sometimes carry the battery voltage in mV (little endian), and the
+voltage estimate is preferred when it lands in 3.0-4.3 V. No charging bit exists on this
+channel: the status byte stays `01` with the cable in or out and the charge LED is local to
+the mouse, so the app reports the charger as unknown.
+
+Source: [acer-popgo-companion](https://github.com/ksanjeev284/acer-popgo-companion)
+(`docs/PROTOCOL_MAP.md`, `mouse_device.py`, MIT).
+
+**Not yet confirmed on hardware** for PID `0012`: the frame was documented on `32c2:0066`, and
+this receiver's product firmware may differ. The provider logs the raw reply on every poll, so
+the first report from a real receiver decides whether the layout transfers.
+
 ### Logitech (more HID++ 2.0 devices and G-series headsets)
 
 **Connection:** Lightspeed, Unifying or Bolt receiver

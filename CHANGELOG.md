@@ -8,6 +8,11 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **OnMicro HS6209 2.4 GHz receivers** (`32c2:0012`, the RAPIQUE mouse): reads the mouse's
+  battery through the vendor status page `ffb5:0001`, preferring the LiPo voltage estimate
+  when the packet carries one. The frame is mirrored from a public reverse-engineering
+  project for the sibling `32c2:0066` dongle and is **not yet confirmed on hardware** for
+  this PID; the charging state is not exposed, so only the level is shown.
 - **Preferences → Icon style → Outline / Filled**: switch all device pictograms
   immediately and keep the choice after restarting. Filled artwork uses lighter
   body silhouettes and compensated small details while preserving the battery ring.

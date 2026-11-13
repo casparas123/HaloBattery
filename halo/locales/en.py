@@ -82,6 +82,7 @@ MESSAGES = {
     "provider.jbl": "JBL Quantum",
     "provider.keychron": "Keychron",
     "provider.urx": "URX Core75",
+    "provider.onmicro": "OnMicro HS6209 (2.4 GHz)",
     "provider.lamzu": "LAMZU mice",
     "provider.lamzu_sw": "Lamzu Tachi (8K receiver)",
     "provider.lofree": "Lofree keyboards, AULA V9 mice",

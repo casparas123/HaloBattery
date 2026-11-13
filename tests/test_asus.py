@@ -72,6 +72,12 @@ class FakeBus:
                 self.m.on_write(data)
                 return len(data)
 
+            def send_feature_report(self, data):
+                return self.m.on_feature_write(data)
+
+            def get_feature_report(self, rid, n):
+                return self.m.on_feature_read()
+
             def read(self, n, timeout=None):
                 return self.m.on_read()
 
@@ -197,6 +203,81 @@ class PollTest(ProviderTest):
         mouse = FakeMouse()
         self.assertEqual(self.poll(e, {b"if0-ff01": mouse}), [])
         self.assertEqual(mouse.opened, 0)
+
+
+# ------------------------------------------------------ the ROG Delta S Wireless (#219)
+def delta_entries(usage_page=0xFF00, path=b"delta-ff00"):
+    return [{"product_id": A.DELTA_S_PID, "interface_number": 4, "usage_page": usage_page,
+             "usage": 1, "path": path, "product_string": "ROG DELTA S WIRELESS"}]
+
+
+class FakeDelta:
+    """mode: "feature" (the older ASUS headset reply), "cc" (the newer output
+    report), "nak" (the newer shape's FF AA)."""
+
+    def __init__(self, mode="feature", level=55, charging=0):
+        self.mode, self.level, self.charging = mode, level, charging
+        self.writes = []
+        self.feature_writes = []
+        self.queue = []
+        self.opened = 0
+
+    def on_feature_write(self, data):
+        self.feature_writes.append(list(data))
+        self.queue = []
+        if self.mode == "feature":
+            r = [0xFF, 0x1B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                 0x0A if self.charging else 0x03, 0x00, 0x41, 0x0F] + [0] * 51
+            self.queue.append(r)
+        return len(data)
+
+    def on_feature_read(self):
+        return self.queue.pop(0) if self.queue else []
+
+    def on_write(self, data):
+        self.writes.append(list(data))
+        if self.mode == "nak":
+            self.queue.append([0xCC, 0xFF, 0xAA] + [0] * 61)
+            return
+        if self.mode != "cc":
+            return
+        command = data[2]
+        if command == A.DELTA_CC_BATTERY:
+            self.queue.append([0xCC, 0x12, command, 0, 0, 5, self.level] + [0] * 57)
+        else:
+            self.queue.append([0xCC, 0x12, command, 0, 0, self.charging] + [0] * 59)
+
+    def on_read(self):
+        return self.queue.pop(0) if self.queue else []
+
+
+class DeltaSTest(ProviderTest):
+    def test_reads_the_older_feature_family(self):
+        res = self.poll(delta_entries(), {b"delta-ff00": FakeDelta(mode="feature")})
+        self.assertEqual([(r.key, r.name, r.level, r.charging, r.kind) for r in res],
+                         [("asus:rog-delta-s-wireless", "ROG Delta S Wireless",
+                           75, False, "headset")])
+
+    def test_reads_the_newer_output_report_family(self):
+        pad = FakeDelta(mode="cc", level=55, charging=1)
+        res = self.poll(delta_entries(), {b"delta-ff00": pad})
+        self.assertEqual([(r.name, r.level, r.charging) for r in res],
+                         [("ROG Delta S Wireless", 55, True)])
+        self.assertEqual([w[:3] for w in pad.writes],
+                         [[0xCC, 0x12, 0x07], [0xCC, 0x12, 0x08]])
+
+    def test_a_nak_keeps_the_icon_without_a_level(self):
+        res = self.poll(delta_entries(), {b"delta-ff00": FakeDelta(mode="nak")})
+        self.assertEqual([(r.name, r.level) for r in res],
+                         [("ROG Delta S Wireless", None)])
+
+    def test_only_the_ff00_collection_is_opened(self):
+        entries = delta_entries(usage_page=0xFFC0, path=b"delta-ffc0") + \
+            delta_entries()
+        wrong, right = FakeDelta(), FakeDelta(mode="cc", level=90)
+        res = self.poll(entries, {b"delta-ffc0": wrong, b"delta-ff00": right})
+        self.assertEqual([r.level for r in res], [90])
+        self.assertEqual((wrong.opened, right.opened), (0, 2))
 
 
 if __name__ == "__main__":

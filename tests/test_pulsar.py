@@ -325,6 +325,14 @@ class PulsarTest(unittest.TestCase):
                          (d.key, d.name, d.level))
         self.assertTrue(d.charging)
 
+    def test_the_xunfox_h2_receiver_is_read(self):
+        # #237: 3554:fc00 'Compx 2.4G Receiver' exposes the same ff02:0002 channel
+        bus = self.one_receiver(vid=0x3554, pid=0xFC00, replies=[reply(72, 0, 3900)])
+        [d] = P.PulsarProvider().poll()
+        self.assertEqual(("pulsar:3554fc00", "Xunfox H2 (2.4 GHz)", 72),
+                         (d.key, d.name, d.level))
+        self.assertEqual([(0xFF02, 0x0002)], bus.written())
+
     def test_the_vendor_control_collection_is_the_one_that_gets_the_request(self):
         bus = self.one_receiver(replies=[reply(64)])
         P.PulsarProvider().poll()

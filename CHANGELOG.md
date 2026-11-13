@@ -11,6 +11,10 @@ and the project follows [Semantic Versioning](https://semver.org/).
 - **Preferences → Icon style → Outline / Filled**: switch all device pictograms
   immediately and keep the choice after restarting. Filled artwork uses lighter
   body silhouettes and compensated small details while preserving the battery ring.
+- Xunfox H2 (`3554:fc00`): its Compx receiver exposes the same `ff02:0002` channel
+  and is read with the 17-byte `0x08 0x04` power frame used by the VXE/Pulsar
+  receivers ([#237](https://github.com/HeyOkay/HaloBattery/issues/237)).
+  **Unverified** on hardware - a test build is with the reporter.
 
 ### Fixed
 

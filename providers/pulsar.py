@@ -144,6 +144,7 @@ PIDS: Dict[int, Dict[int, str]] = {
         0xF55E: "Redragon M991 (wired)",
         0xFA09: "Compx 2.4 GHz keyboard",
         0xF523: "Teevolution Terra Pro (2.4 GHz)",
+        0xFC00: "Xunfox H2 (2.4 GHz)",
     },
     0x1B1C: {
         0x2B2A: "Corsair Sabre v2 Pro Ultralight",

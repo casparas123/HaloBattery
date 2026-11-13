@@ -8,6 +8,13 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Razer BlackShark V2 HyperSpeed** (`1532:0565` receiver, `1532:056E` cable): the
+  headset's MediaTek channel - report id 2 on `0xFF14`, a sequence, domain and XOR
+  checksum, with `0x21` for the level and `0x2A` for the charging state. The cable is
+  read first because the dongle goes quiet while it is plugged in. Protocol from
+  justik13/razer-blackshark-v2-hyperspeed-webhid, with read-only implementations in
+  blackshark-battery and openrazer PR #2974. **Unverified** until the reporters of
+  #85 and #86 run the test build.
 - **Preferences → Icon style → Outline / Filled**: switch all device pictograms
   immediately and keep the choice after restarting. Filled artwork uses lighter
   body silhouettes and compensated small details while preserving the battery ring.

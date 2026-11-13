@@ -177,7 +177,7 @@ The same `b0` exchange as the other Nova headsets, asked for with report id `06`
 
 **Connection:** 2.4 GHz receiver (3151:5007)
 
-The AJAZZ Control Center project's AJ-series exchange: a zero-payload `0xF7` status poll brings the receiver's 2.4G telemetry up, then the charge reads from status report `0x05` (`05 00 00 64 01 01 01 02`, charge at byte 3 on Windows). A zero charge or junk bytes are shown as no level rather than a wrong value, and no charging state is reported. **Unverified** - no AM Infinity was on hand; the exchange is confirmed on the reference project's own unit, so the layout stands until the reporter of #72 confirms it
+The receiver mirrors the mouse's charge into a feature report after the vendor's status poll (`00 F7 ...` on feature report 0). [TsFreddie/powermiao8k](https://github.com/TsFreddie/powermiao8k), the device-specific Linux driver, waits 50 ms and then reads feature report **`0xF7`**: main charge at byte 2, the dock's spare cell at byte 10, values above 100 treated as unknown. The AJAZZ AJ159 APEX shares this USB id and answers a different report, `0x05` (`05 00 00 64 01 01 01 02`, charge at byte 3 on Windows), documented by the AJAZZ Control Center project; that layout stays as a fallback so either firmware behind the shared id works. A zero charge or junk bytes are shown as no level rather than a wrong value, and neither report carries a charging state. **Unverified** - no AM Infinity was on hand; the 0xF7 layout is documented by the device-specific driver and 0x05 confirmed by its reference project on the AJAZZ sibling, so the layouts stand until the reporter of #72 confirms one on the AM Infinity.
 
 ### ASUS ROG Gladius III Aimpoint and other ROG / TUF wireless mice
 

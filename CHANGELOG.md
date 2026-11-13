@@ -16,6 +16,13 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 - Keep the colored Xbox logo centered inside the battery ring on both taskbar
   themes, and refresh the icon and charging previews with the current renderer.
+- **AM Infinity 8K** (`3151:5007`): read the battery from the receiver's report
+  `0xF7` - main charge in byte 2 and the dock's spare cell in byte 10, as
+  [TsFreddie/powermiao8k](https://github.com/TsFreddie/powermiao8k) documents -
+  and keep the AJAZZ sibling's `0x05` report as a fallback. The previous build
+  only asked for `0x05`, which the AM firmware does not answer, so the icon
+  never appeared. The charging state remains unknown; neither report carries one.
+  **Still unverified** until the reporter of #72 runs the test build.
 
 ## [1.17.0] - 2026-11-12
 

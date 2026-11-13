@@ -231,6 +231,7 @@ MOUSE_MODELS = {
     0x1872: ("SteelSeries Rival 3 Wireless Gen 2", parse_rival3),
     0x1838: ("SteelSeries Aerox 3 Wireless", parse_aerox3),
     0x1878: ("SteelSeries Aerox 3 Wireless CS2 Dragon Lore", parse_aerox3),
+    0x1890: ("SteelSeries Aerox 3 Wireless Gen 2", parse_aerox3),
     # Aerox 5 Wireless and Aerox 9 Wireless (2.4 GHz mode): rivalcfg builds their wireless
     # profiles exactly like the Aerox 3 Wireless one - the wired battery command 0x92 with
     # the wireless flag 0x40 (so 0xD2), a 64-byte readback, charging in bit 7 and the level
@@ -249,6 +250,7 @@ MOUSE_MODELS = {
 MOUSE_EXCHANGE = {
     0x1838: (AEROX_REQUEST, AEROX_ECHO),
     0x1878: (AEROX_REQUEST, AEROX_ECHO),
+    0x1890: (AEROX_REQUEST, AEROX_ECHO),   # Aerox 3 Wireless Gen 2 (#258)
     0x1852: (AEROX_REQUEST, AEROX_ECHO),
     0x185C: (AEROX_REQUEST, AEROX_ECHO),
     0x1860: (AEROX_REQUEST, AEROX_ECHO),

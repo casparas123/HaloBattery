@@ -110,6 +110,16 @@ class AeroxTest(unittest.TestCase):
             self.assertEqual([(r.name, r.level) for r in res], [(name, 50)], hex(pid))
             self.assertTrue(all(w[:2] == [0x00, 0xD2] for w in rx.writes), hex(pid))
 
+    def test_aerox_3_wireless_gen2_258(self):
+        # #258: the Gen 2 receiver is 1038:1890, same ffc0 collection and d2 query
+        self.assertEqual(S.MOUSE_MODELS[0x1890],
+                         ("SteelSeries Aerox 3 Wireless Gen 2", S.parse_aerox3))
+        self.assertEqual(S.MOUSE_EXCHANGE[0x1890], (S.AEROX_REQUEST, S.AEROX_ECHO))
+        res, rx = self.poll(0x1890, 0x0B)
+        self.assertEqual([(r.name, r.level) for r in res],
+                         [("SteelSeries Aerox 3 Wireless Gen 2", 50)])
+        self.assertEqual(rx.writes[0][:2], [0x00, 0xD2])
+
     def test_rivalcfg_level_formula_for_all_steps(self):
         # rivalcfg: level = ((data[1] & ~0x80) - 1) * 5, charging = data[1] & 0x80
         for step in range(1, 22):

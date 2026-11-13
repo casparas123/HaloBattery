@@ -11,6 +11,10 @@ and the project follows [Semantic Versioning](https://semver.org/).
 - **Preferences → Icon style → Outline / Filled**: switch all device pictograms
   immediately and keep the choice after restarting. Filled artwork uses lighter
   body silhouettes and compensated small details while preserving the battery ring.
+- SteelSeries Aerox 3 Wireless Gen 2 (`1038:1890`): the receiver exposes the same
+  `ffc0:0001` collection and answers the same `00 d2` query as the original
+  ([#258](https://github.com/HeyOkay/HaloBattery/issues/258)). **Unverified** on
+  hardware - a test build is with the reporter.
 
 ### Fixed
 

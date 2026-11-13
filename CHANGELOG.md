@@ -17,6 +17,10 @@ and the project follows [Semantic Versioning](https://semver.org/).
   placeholder that showed a permanent 100 %. Requires one controller in both XInput
   and Windows.Gaming.Input. The other editions use GameSir Connect's id table and
   are unverified.
+- **GameSir Cyclone 2** (`3537:100b`): the same `fff0:0040` gamepad-state report
+  (GameSir Connect's `proxyC2.parseGamepadState()`), so the same reader is used.
+  **Unverified** on hardware - from the reporter's diagnostics in
+  [#221](https://github.com/HeyOkay/HaloBattery/issues/221).
 
 ### Fixed
 

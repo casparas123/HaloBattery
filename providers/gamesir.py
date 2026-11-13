@@ -41,6 +41,13 @@ LEVEL_BYTE = 36
 STATUS_REQUEST = bytes([0x0F, 0x0B])     # "read current profile": read-only
 
 MODEL = "GameSir G7 Pro 8K"
+# GameSir Connect's other pads on the same fff0:0040 gamepad-state report (proxyC2's
+# parseGamepadState reads charge/level from bytes 35-36 just as proxyG7ProCE does).
+# The Cyclone 2's receiver is 3537:100b (#221); its own app shows 85 % while Windows
+# reports the 1000/1000 placeholder.
+OTHER_MODELS: Dict[int, str] = {
+    0x100B: "GameSir Cyclone 2",
+}
 # GameSir Connect's G7ProCE modes: pid -> edition. Each pair is cable, dongle.
 EDITIONS: Dict[int, str] = {
     0x10B7: "", 0x10B9: "", 0x10CB: "", 0x10CC: "", 0x10CD: "", 0x10CE: "",
@@ -59,7 +66,7 @@ class Reading(NamedTuple):
 
 
 def is_supported(pid: int) -> bool:
-    return pid in EDITIONS
+    return pid in EDITIONS or pid in OTHER_MODELS
 
 
 def parse_state(frame, pid: int = 0) -> Optional[Reading]:
@@ -69,8 +76,11 @@ def parse_state(frame, pid: int = 0) -> Optional[Reading]:
         return None
     # GameSir Connect only tests the charge state against 1; any other value is
     # "not charging" there, so the level is kept and no charging state is invented.
-    edition = EDITIONS.get(pid, "")
-    name = f"{MODEL} {edition}" if edition else MODEL
+    if pid in OTHER_MODELS:
+        name = OTHER_MODELS[pid]
+    else:
+        edition = EDITIONS.get(pid, "")
+        name = f"{MODEL} {edition}" if edition else MODEL
     return Reading(frame[LEVEL_BYTE], frame[CHARGE_BYTE] == 1, "", name)
 
 

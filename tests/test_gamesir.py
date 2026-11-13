@@ -74,6 +74,11 @@ class GameSirTests(unittest.TestCase):
         self.assertEqual(G.parse_state(state(), 0x10B9).name, "GameSir G7 Pro 8K")
         self.assertEqual(G.parse_state(state(), 0x10FE).name, "GameSir G7 Pro 8K Golden Apple")
 
+    def test_cyclone2_uses_the_same_state_report(self):
+        self.assertTrue(G.is_supported(0x100B))
+        r = G.parse_state(state(85, 1), 0x100B)
+        self.assertEqual((r.level, r.charging, r.name), (85, True, "GameSir Cyclone 2"))
+
     def test_every_id_of_gamesir_connect(self):
         self.assertEqual(set(G.EDITIONS), {4279, 4281, 4299, 4300, 4301, 4302, 4293, 4294,
                                            4295, 4296, 4297, 4298, 4349, 4350})
@@ -168,6 +173,13 @@ class GameSirXInputTests(unittest.TestCase):
     def test_charging_comes_from_the_pad(self):
         rows, _ = self.poll([report(pid=CABLE)], reading=AIMLABS._replace(level=96, charging=True))
         self.assertEqual((rows[0].level, rows[0].charging), (96, True))
+
+    def test_cyclone2_is_paired_and_named_from_its_own_reading(self):
+        cyclone = G.Reading(85, False, "", "GameSir Cyclone 2")
+        rows, calls = self.poll([report(pid=0x100B)], reading=cyclone)
+        self.assertEqual(calls, 1)
+        self.assertEqual([(r.name, r.level) for r in rows],
+                         [("GameSir Cyclone 2", 85)])
 
     def test_no_reading_shows_no_level_rather_than_the_placeholder(self):
         rows, calls = self.poll([report()], reading=None)

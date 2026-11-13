@@ -64,6 +64,11 @@ NAMED_VIDS = frozenset(vid for vid, _word, _name in NAMED)
 # replace the flydigi module with a stub that only has read_connected().
 FLYDIGI_VID = flydigi.VENDOR_VID
 BEITONG_IDS = (beitong.VENDOR_VID, beitong.PRODUCT_PID)
+# GameSir Nova 2 Lite on its 2.4 GHz receiver, in Xbox mode. Windows.Gaming.Input
+# reports remain=full=1000 for it while GameSir's own app read 42 % and then 15 % over
+# that same dongle (#142). GameSir read the real level through its closed helper DLL,
+# not through any HID message the app can ask for, so this placeholder is not a level.
+GAMESIR_NOVA2_IDS = (0x3537, 0x1098)
 # The Vader 4 Pro enumerates under Microsoft's Xbox 360 id with FlyDigi's product
 # string, so its Windows.Gaming.Input report can only be recognised by that string.
 VADER4_IDS = (0x045E, 0x028E)
@@ -378,7 +383,8 @@ class XInputProvider(Provider):
                     res = None  # The dongle's wired fallback would invent 100% as well.
             if (rep is not None and rep.placeholder and not rep.charging
                     and (rep.vid == FLYDIGI_VID
-                         or (vader4 and (rep.vid, rep.pid) == VADER4_IDS))):
+                         or (vader4 and (rep.vid, rep.pid) == VADER4_IDS)
+                         or (rep.vid, rep.pid) == GAMESIR_NOVA2_IDS)):
                 # remain=full=1000 is Windows' placeholder on a FlyDigi pad, not a
                 # measurement: it said 100% for a Vader 4 Pro whose battery light was
                 # flashing low (#191). Other vendors' 1000/1000 can be a genuinely full

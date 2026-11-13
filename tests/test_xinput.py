@@ -139,5 +139,28 @@ class XboxBluetoothTest(ProviderTest):
         self.assertEqual(hb.dedupe_controllers(res, bt), [])          # on: Windows' value only
 
 
+class GamesirNova2Test(ProviderTest):
+    """#142: the Nova 2 Lite's 2.4 GHz receiver under Xbox mode."""
+
+    PAD = {"vendor_id": 0x3537, "product_id": 0x1098,
+           "product_string": "XBOX 360 For Windows", "interface_number": 2,
+           "usage_page": 0xFF7A, "usage": 0x0001,
+           "path": b"\\\\?\\HID#VID_3537&PID_1098&MI_02#8&1&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}"}
+
+    def test_placeholder_is_not_shown_as_a_level(self):
+        p, res = self.poll({0: (X.TYPE_WIRED, 3)}, [wgi_report(0x3537, 0x1098, 1000, 1000)],
+                           [self.PAD])
+        self.assertEqual(len(res), 1)
+        st = res[0]
+        self.assertIsNone(st.level)              # not Windows' 1000/1000 placeholder
+        self.assertFalse(st.charging)            # and not XInput's "wired means charging"
+        self.assertEqual(st.ui_message, "state.unreported")
+
+    def test_a_real_reading_on_the_same_receiver_is_kept(self):
+        _, res = self.poll({0: (X.TYPE_WIRED, 3)}, [wgi_report(0x3537, 0x1098, 690, 1000)],
+                           [self.PAD])
+        self.assertEqual([(r.level, r.charging) for r in res], [(69, False)])
+
+
 if __name__ == "__main__":
     unittest.main()

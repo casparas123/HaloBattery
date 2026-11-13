@@ -14,6 +14,12 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **GameSir Nova 2 Lite (2.4 GHz receiver, Xbox mode)**: Windows reports a placeholder
+  `remain=full=1000` for this receiver, which showed as a frozen 100 % (and, through
+  XInput's "wired" type, as charging). The placeholder is now recognised for
+  `3537:1098` and the icon says the level is not reported instead of inventing one.
+  The real level is read by GameSir's own closed helper DLL, so it is still unavailable
+  to the app (#142).
 - Keep the colored Xbox logo centered inside the battery ring on both taskbar
   themes, and refresh the icon and charging previews with the current renderer.
 

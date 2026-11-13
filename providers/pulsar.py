@@ -155,6 +155,7 @@ PIDS: Dict[int, Dict[int, str]] = {
         0x1085: "ATK VXE R1 SE+ (2.4 GHz)",
         0x101A: "ATK X1 Pro (2.4 GHz)",
         0x101B: "ATK Fire X 8K (2.4 GHz dongle)",
+        0x1040: "VXE MAD R Major+ (8K receiver)",
     },
     0x3770: {
         0x0300: "Hitscan Hyperlight (8K receiver)",

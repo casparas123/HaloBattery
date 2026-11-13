@@ -11,6 +11,10 @@ and the project follows [Semantic Versioning](https://semver.org/).
 - **Preferences → Icon style → Outline / Filled**: switch all device pictograms
   immediately and keep the choice after restarting. Filled artwork uses lighter
   body silhouettes and compensated small details while preserving the battery ring.
+- VXE MAD R Major+ (`373b:1040`, "MAD 8K DONGLE"): same Compx `ff02:0002`
+  exchange as the VXE/ATK receivers
+  ([#241](https://github.com/HeyOkay/HaloBattery/issues/241)). **Unverified** on
+  hardware - a test build is with the reporter.
 
 ### Fixed
 

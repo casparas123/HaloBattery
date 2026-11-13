@@ -273,6 +273,14 @@ class PulsarTest(unittest.TestCase):
         self.assertEqual(71, d.level)
         self.assertEqual([(0xFF02, 0x0002)], bus.written())
 
+    def test_the_vxe_madr_8k_receiver_is_read(self):
+        # #241: 373b:1040 'MAD 8K DONGLE' publishes the same ff02:0002 channel
+        bus = self.one_receiver(vid=0x373B, pid=0x1040, replies=[reply(81, 0, 3950)])
+        [d] = P.PulsarProvider().poll()
+        self.assertEqual(("pulsar:373b1040", "VXE MAD R Major+ (8K receiver)", 81),
+                         (d.key, d.name, d.level))
+        self.assertEqual([(0xFF02, 0x0002)], bus.written())
+
     def test_the_aula_f75_keyboard_is_read_and_keeps_its_keyboard_icon(self):
         # #247: the F75's receiver publishes a keyboard collection and the same
         # ff02:0002 control collection, so the same frame is asked - only the

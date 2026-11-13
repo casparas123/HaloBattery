@@ -8,6 +8,11 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Razer BlackShark V3 Pro** (`1532:0576` wired, `1532:0577` receiver): routed to
+  the existing V3 session, which speaks the razerkraken exchange OpenRazer's PR #2794
+  documents for all four V3 ids. The rate limit stays: query at connect, after a link-up
+  push, or after five minutes of silence, because frequent polling resets the headset's
+  radio link. **Unverified** on the Pro until the reporter of #98 runs the test build.
 - **Preferences → Icon style → Outline / Filled**: switch all device pictograms
   immediately and keep the choice after restarting. Filled artwork uses lighter
   body silhouettes and compensated small details while preserving the battery ring.

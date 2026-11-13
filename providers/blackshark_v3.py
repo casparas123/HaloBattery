@@ -1,4 +1,9 @@
-"""Razer BlackShark V3, 2.4 GHz dongle 1532:057A (#292).
+"""Razer BlackShark V3 and V3 Pro, 2.4 GHz dongle or USB-C cable.
+
+Ids: V3 wired 1532:0579, V3 dongle 1532:057A, V3 Pro wired 1532:0576,
+V3 Pro dongle 1532:0577. All four share this razerkraken exchange per
+OpenRazer PR #2794; the Pro only adds classes for ANC/EQ on top, which the
+battery/charging path here does not touch.
 
 Not the 2023 model's "PA" protocol: the dongle takes those frames on ff14:0001 and never
 answers them, and it refuses the 90-byte feature reports of the other Razer devices.
@@ -52,6 +57,7 @@ import hid
 from .base import hexdump
 
 PID = 0x057A
+PIDS = (0x0579, 0x057A, 0x0576, 0x0577)   # V3 wired/dongle, V3 Pro wired/dongle
 USAGE_PAGE = 0xFF14
 USAGE = 0x0001
 

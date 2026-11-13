@@ -234,5 +234,25 @@ class PollTest(Base):
         self.assertIn("  no ff14:0001 collection among 3", self.p.diagnostics())
 
 
+class ProIdsTest(Base):
+    """The V3 Pro ids ride the same razerkraken exchange as the V3 (#98)."""
+
+    def setUp(self):
+        super().setUp()
+        self.entries = [dict(e, product_id=0x0577, product_string="BlackShark V3 Pro HID")
+                        for e in ENTRIES]
+        self.p = R.RazerProvider()
+
+    def test_the_pro_dongle_is_read_and_named(self):
+        self.assertEqual([(s.key, s.name, s.level, s.online) for s in self.p.poll()],
+                         [("razer:0577:", "Razer BlackShark V3 Pro", 97, True)])
+
+
+class ProPidsTest(unittest.TestCase):
+    def test_every_v3_id_is_claimed(self):
+        for pid in (0x0576, 0x0577, 0x0579, 0x057A):
+            self.assertIn(pid, V.PIDS)
+
+
 if __name__ == "__main__":
     unittest.main()

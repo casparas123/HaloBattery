@@ -111,6 +111,20 @@ The adapter is a Bluetooth relay rather than a vendor dongle, and its settings l
 
 Its receiver publishes two collections and neither answers the standard Razer mouse request this app sends. The headset speaks the "PA" protocol instead: 64-byte vendor frames, `P`,`A` out and `P`,`I` back, battery command `0x21` with the level in the reply's data byte, charging `0x2A`. Decoded from a USBPcap capture of Razer Synapse on a real unit (it read 34%), then confirmed on hardware with @phl23's own Barracuda Pro: the level tracks (27% at the test), charging follows the charger, and a switched-off headset reports "no link" rather than a stale value. Over Bluetooth Windows reports the level itself.
 
+### Razer BlackShark V3 and V3 Pro
+
+**Connection:** V3 wired `1532:0579` / dongle `1532:057A`; V3 Pro wired `1532:0576` / dongle `1532:0577`
+
+The razerkraken exchange OpenRazer's PR #2794 documents for all four ids: 64-byte frames on usage page `0xFF14` (report id 2), with the direction in byte 9 (`0x00` for the wake frames, `0x80` for a query), the class in byte 10 (`0x21` battery, `0x2A` charging, `0x20` link-up push), a request/reply/push marker in byte 11, the argument count in byte 12, the first value in byte 13 and an XOR checksum in byte 62.
+
+    OUT 02 00 60 .. 04 .. 00 02         wake 1
+    OUT 02 00 60 .. 04 .. 00 2A         wake 2
+    OUT 02 00 60 .. 04 .. 80 2A         charging query (also wake 3)
+    OUT 02 00 60 .. 04 .. 80 21         battery query
+    IN  02 02 60 .. 05 .. 80 21 01 01 61  97 %
+
+The three wake frames go out once at connect, as Synapse and OpenRazer send them. **This headset must not be polled often**: OpenRazer's ~2 s polling kept resetting its radio link and could power-cycle the headset, so the provider keeps the collection open, caches the pushes, queries at connect, after a link-up push, and otherwise only after 5 minutes of silence. Confirmed on a `057A` dongle (#292); the V3 Pro ids use the same exchange per the PR's test matrix, **unverified here** until the reporter of #98 runs the test build.
+
 ### Razer BlackShark V2 Pro (2020)
 
 **Connection:** 2.4 GHz receiver (1532:0528)

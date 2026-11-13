@@ -16,6 +16,10 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 - Keep the colored Xbox logo centered inside the battery ring on both taskbar
   themes, and refresh the icon and charging previews with the current renderer.
+- Keychron Link-KM (`3434:d026`, Nape Pro / M6): use the Keychron Launcher's
+  `a7 31` exchange — a 32-byte output report on `ff60:0061`, answered with the
+  level in byte 2 — instead of the `b3 06` request that this receiver does not
+  answer on any exposed collection ([#270](https://github.com/HeyOkay/HaloBattery/issues/270)).
 
 ## [1.17.0] - 2026-11-12
 

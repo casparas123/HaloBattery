@@ -263,6 +263,8 @@ Claimed from [#304](https://github.com/HeyOkay/HaloBattery/issues/304)'s collect
 
 The same feature report exchange as the WLmouse and G-Wolves mice (`00 00 02 02 00 83` out, `a1 00 02 02 00 83 <charging> <battery %>` back), on the vendor collection `ffff:0000` of interface 2 only; protocol from Sheroune/lamzu-battery-monitory (MIT). Confirmed on a Maya X on its 8K dongle
 
+The **LAMZU 8K Dongle V2** (`37B0:002E`, #153) lists the same `ffff:0000` collection on interface 2 in the reporter's diagnostics, and LAMZU's newer dongles answer the same Aurora exchange (`anany1702/lamzu-ctl` reads VID `37B0` with it), so the provider claims it too. The paired mouse is not identified, so the tray shows the dongle's own name. **Unverified** on hardware — a test build is with the reporter of #153.
+
 ### MCHOSE A5 Pro Max
 
 **Connection:** 1K receiver (2023:F013), 4K receiver (2023:F015) or USB cable (2023:F019)

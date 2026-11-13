@@ -45,6 +45,17 @@ WIRED = 0x001C
 PIDS = {DONGLE: "dongle", WIRED: "cable"}
 NAME = "LAMZU Maya X"
 
+# The 8K Dongle V2 (LAMZU's "Aurora V2") is a different vendor id. Its collections match
+# the Maya X dongle's - the vendor collection 0xFFFF on interface 2 - and LAMZU's newer
+# dongles answer the same feature exchange (anany1702/lamzu-ctl reads VID 0x37B0 with it).
+# The dongle in #153 reports ffff:0000 on interface 2, so it is read the same way.
+# The paired mouse is not identified, so the tray shows the dongle's own name.
+# Unverified on hardware.
+V2_VID = 0x37B0
+V2_DONGLE = 0x002E
+V2_PIDS = {V2_DONGLE: "8K dongle V2"}
+V2_NAME = "LAMZU 8K Dongle V2"
+
 INTERFACE = 2                    # the vendor collection is on interface 2 ...
 USAGE_PAGE = 0xFFFF              # ... with usage page 0xFFFF
 
@@ -68,6 +79,7 @@ class LamzuProvider(Provider):
     def __init__(self):
         self._diag: List[str] = []
         self._last: Optional[Tuple[int, bool, float]] = None
+        self._last_name = NAME
 
     def _read(self, path: bytes) -> Optional[Reading]:
         dev = hid.device()
@@ -104,24 +116,26 @@ class LamzuProvider(Provider):
         self._diag = []
         if hid is None:
             return []
-        try:
-            infos = hidlist.enumerate(LAMZU_VID)
-        except Exception as e:  # pragma: no cover
-            log.warning("hid.enumerate(lamzu): %s", e)
-            return []
-        groups: Dict[int, List[dict]] = {}
-        for d in infos:
-            if d["product_id"] in PIDS:
-                groups.setdefault(d["product_id"], []).append(d)
+        groups: Dict[Tuple[int, int], List[dict]] = {}
+        for vid, table in ((LAMZU_VID, PIDS), (V2_VID, V2_PIDS)):
+            try:
+                infos = hidlist.enumerate(vid)
+            except Exception as e:  # pragma: no cover
+                log.warning("hid.enumerate(lamzu %04x): %s", vid, e)
+                continue
+            for d in infos:
+                if d["product_id"] in table:
+                    groups.setdefault((vid, d["product_id"]), []).append(d)
         if not groups:
             return []
 
-        readings: List[Reading] = []
+        readings: List[Tuple[Reading, str]] = []
         # the cable first: it charges, and the dongle has nothing to add then
-        for pid in sorted(groups, key=lambda p: p != WIRED):
-            self._diag.append(f"[Lamzu] pid={pid:04x} ({PIDS[pid]}) "
-                              f"'{(groups[pid][0].get('product_string') or '').strip()}'")
-            d = vendor_collection(groups[pid])
+        for vid, pid in sorted(groups, key=lambda k: k != (LAMZU_VID, WIRED)):
+            name = NAME if vid == LAMZU_VID else V2_NAME
+            self._diag.append(f"[Lamzu] {vid:04x}:{pid:04x} "
+                              f"'{(groups[(vid, pid)][0].get('product_string') or '').strip()}'")
+            d = vendor_collection(groups[(vid, pid)])
             if d is None:
                 self._diag.append(f"  no interface {INTERFACE} collection with usage page "
                                   f"{USAGE_PAGE:04x}: nothing sent")
@@ -130,16 +144,17 @@ class LamzuProvider(Provider):
                               f"{d.get('usage_page', 0):04x}:{d.get('usage', 0):04x}")
             res = self._read(d["path"])
             if res is not None:
-                readings.append(res)
+                readings.append((res, name))
                 break
 
         key = "lamzu"
         if readings:
-            batt, chg = readings[0]
+            (batt, chg), name = readings[0]
             self._last = (batt, chg, time.time())
-            return [DeviceStatus(key, NAME, batt, chg, True, "lamzu", kind="mouse")]
+            self._last_name = name
+            return [DeviceStatus(key, name, batt, chg, True, "lamzu", kind="mouse")]
         if self._last and time.time() - self._last[2] < ASLEEP_KEEP:
-            return [DeviceStatus(key, NAME, self._last[0], self._last[1], False, "lamzu",
+            return [DeviceStatus(key, self._last_name, self._last[0], self._last[1], False, "lamzu",
                                  kind="mouse")]
         return []
 

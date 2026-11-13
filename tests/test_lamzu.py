@@ -61,6 +61,17 @@ def maya_x_entries(pid=L.DONGLE, prefix=b"dongle"):
             for n, (i, p, u) in enumerate(shape)]
 
 
+def v2_entries(pid=L.V2_DONGLE, prefix=b"v2"):
+    """The collections of the LAMZU 8K Dongle V2 reported in #153, same shape as the
+    Maya X dongle: the vendor collection 0xFFFF is on interface 2."""
+    shape = [(0, 0x0001, 0x02), (1, 0x000C, 0x01), (1, 0x0001, 0x06), (1, 0x0001, 0x80),
+             (1, 0xFFA0, 0x01), (1, 0xFFFF, 0x01), (2, 0xFFFF, 0x00)]
+    return [{"product_id": pid, "interface_number": i, "usage_page": p, "usage": u,
+             "path": prefix + b"-%d-%04x-%d" % (i, p, n),
+             "product_string": "LAMZU 8K Dongle V2 Dongle"}
+            for n, (i, p, u) in enumerate(shape)]
+
+
 class PollTest(unittest.TestCase):
     def setUp(self):
         self._saved = (L.hid, L.hidlist, L.time)
@@ -129,6 +140,22 @@ class PollTest(unittest.TestCase):
         cols = self.cols(e)
         self.assertEqual(self.poll(e, cols), [])
         self.assertEqual(cols[e[0]["path"]].opened, 0)
+
+
+class V2Test(PollTest):
+    def test_v2_dongle_is_read_and_named(self):
+        entries = v2_entries()
+        cols = self.cols(entries)
+        res = self.poll(entries, cols)
+        self.assertEqual([(r.key, r.name, r.level, r.charging, r.online, r.kind) for r in res],
+                         [("lamzu", "LAMZU 8K Dongle V2", 81, False, True, "mouse")])
+        sent = cols[entries[6]["path"]].sent
+        self.assertEqual(sent, [[0x00, 0x00, 0x00, 0x02, 0x02, 0x00, 0x83] + [0x00] * 58])
+
+    def test_maya_x_and_the_v2_dongle_are_both_claimed(self):
+        entries = maya_x_entries() + v2_entries()
+        res = self.poll(entries, self.cols(entries))
+        self.assertEqual([(r.name, r.level) for r in res], [("LAMZU Maya X", 81)])
 
 
 if __name__ == "__main__":

@@ -8,6 +8,11 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **LAMZU 8K Dongle V2** (`37b0:002e`): it lists the same `ffff:0000` vendor collection on
+  interface 2 as the Maya X dongle, so it is read with the same Aurora feature exchange
+  (`00 00 02 02 00 83` out, `a1 00 02 02 00 83 <charging> <battery %>` back). The paired
+  mouse is not identified, so the tray shows the dongle's own name. **Unverified** on
+  hardware; a test build is out for #153.
 - **Preferences → Icon style → Outline / Filled**: switch all device pictograms
   immediately and keep the choice after restarting. Filled artwork uses lighter
   body silhouettes and compensated small details while preserving the battery ring.

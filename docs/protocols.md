@@ -214,6 +214,12 @@ A reply of `ff aa` means the device does not know the command (a keyboard asleep
 
 Confirmed on a Harpe Ace Mini and a Falchion RX Low Profile, and on a Keris II Ace and an Azoth by @comipa in [#231](https://github.com/HeyOkay/HaloBattery/issues/231).
 
+### ASUS ROG Pelta
+
+**Connection:** 2.4 GHz receiver (0B05:1B84)
+
+The newer ROG headset generation, from G-Helper's `app/Peripherals/Headset` (`AsusHeadset.cs` / `Pelta.cs`; the model is confirmed by its users in [seerge/g-helper#5161](https://github.com/seerge/g-helper/issues/5161)). Unlike the mice it is read with output reports and the input queue: on the collection with a `0xFF00` usage, the packet `CC 12 07` (64 bytes; report id `0xCC` first) asks the battery and its reply echoes `12 07` in bytes 1-2 with the level in byte 6 (byte 5 is the sleep timer); a second packet `CC 12 08` answers charging with byte 5 == 1. `FF AA` in bytes 1-2 or 5-6 is a firmware NAK, and a reply without the echo is not read as a level. The headset keeps its icon, without a level, when nothing answers. **Unverified** - no Pelta was on hand; the packets, the collection rule and the offsets come from G-Helper.
+
 ### Corsair Dark Core RGB Pro SE
 
 **Connection:** 2.4 GHz dongle (1B1C:1B7F)

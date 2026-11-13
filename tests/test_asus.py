@@ -199,5 +199,129 @@ class PollTest(ProviderTest):
         self.assertEqual(mouse.opened, 0)
 
 
+# ------------------------------------------------------------ the ROG Pelta (#199)
+def pelta_reply(command, level=0, charging=0, report_id=True, nak=False):
+    """One reply as the Pelta frames it: 12 <command> echoed in bytes 1-2 of the
+    buffer whose byte 0 is the report id (or in bytes 0-1 without one), the level in
+    byte 6, charging in byte 5, FF AA in bytes 1-2 as a NAK."""
+    if nak:
+        r = [0xFF, 0xAA] + [0] * 62
+        return ([0xCC] + r) if report_id else r
+    if command == A.PELTA_CMD_BATTERY:
+        r = [0x12, command, 0x00, 0x00, 0x05, level, 0x14, 0x01] + [0] * 56
+    else:
+        r = [0x12, command, 0x00, 0x00, charging] + [0] * 59
+    return ([0xCC] + r) if report_id else r
+
+
+def pelta_entries(usage_page=0xFF00, path=b"pelta-ff00"):
+    return [{"product_id": A.PELTA_PID, "interface_number": 3, "usage_page": usage_page,
+             "usage": 1, "path": path, "product_string": "ROG PELTA (2.4GHz)"}]
+
+
+class FakePelta:
+    """mode: "answer", "no_id" (replies carry no report id), "nak" (FF AA),
+    "junk" (two other frames first), "silent"."""
+
+    def __init__(self, level=77, charging=0, mode="answer"):
+        self.level, self.charging, self.mode = level, charging, mode
+        self.writes = []
+        self.queue = [[0xCC, 0x12, 0x01, 0x00, 0x04]]     # a stale volume event
+        self.opened = 0
+
+    def on_write(self, data):
+        self.writes.append(list(data))
+        if list(data[:2]) != [0xCC, 0x12] or self.mode == "silent":
+            return
+        command = data[2]
+        if self.mode == "junk":
+            self.queue += [[0xCC, 0x12, 0x01, 0x00, 0x77],
+                           [0xCC, 0x12, 0x02, 0x00, 0x01]]
+        if self.mode == "nak":
+            self.queue.append(pelta_reply(command, nak=True))
+        elif command == A.PELTA_CMD_BATTERY:
+            self.queue.append(pelta_reply(command, level=self.level,
+                                          report_id=(self.mode != "no_id")))
+        else:
+            self.queue.append(pelta_reply(command, charging=self.charging,
+                                          report_id=(self.mode != "no_id")))
+
+    def on_read(self):
+        return self.queue.pop(0) if self.queue else []
+
+
+class PeltaParseTest(unittest.TestCase):
+    def test_the_level_and_the_charging_byte(self):
+        self.assertEqual(A.parse_pelta_reply(pelta_reply(0x07, level=77), 0x07), 77)
+        self.assertEqual(A.parse_pelta_reply(pelta_reply(0x08, charging=1), 0x08), 1)
+        self.assertEqual(A.parse_pelta_reply(pelta_reply(0x08, charging=0), 0x08), 0)
+
+    def test_a_reply_without_the_report_id(self):
+        self.assertEqual(A.parse_pelta_reply(
+            pelta_reply(0x07, level=64, report_id=False), 0x07), 64)
+
+    def test_key_updates_and_other_commands_are_not_replies(self):
+        self.assertIsNone(A.parse_pelta_reply([0xCC, 0x12, 0x01, 0x00, 0x55], 0x07))
+        self.assertIsNone(A.parse_pelta_reply([], 0x07))
+        self.assertIsNone(A.parse_pelta_reply([0xCC, 0x12], 0x07))
+
+    def test_nak_in_both_shapes(self):
+        self.assertIsNone(A.parse_pelta_reply(pelta_reply(0x07, nak=True), 0x07))
+        echo_then_nak = [0xCC, 0x12, 0x07, 0x00, 0x00, 0xFF, 0xAA] + [0] * 57
+        self.assertIsNone(A.parse_pelta_reply(echo_then_nak, 0x07))
+        # on the charging command the NAK is what separates "no answer" (None) from
+        # a plain "not charging" (0) - without it this would read as a real 0
+        charging_nak = [0xCC, 0x12, 0x08, 0x00, 0x00, 0xFF, 0xAA] + [0] * 57
+        self.assertIsNone(A.parse_pelta_reply(charging_nak, 0x08))
+        self.assertEqual(A.parse_pelta_reply(pelta_reply(0x08, charging=0), 0x08), 0)
+
+    def test_out_of_range_is_refused(self):
+        self.assertEqual(A.parse_pelta_reply(pelta_reply(0x07, level=0), 0x07), 0)
+        self.assertIsNone(A.parse_pelta_reply(pelta_reply(0x07, level=101), 0x07))
+        self.assertIsNone(A.parse_pelta_reply(pelta_reply(0x07, level=255), 0x07))
+
+
+class PeltaPollTest(ProviderTest):
+    def test_pelta_reads_level_and_charging(self):
+        pelta = FakePelta(level=77, charging=1)
+        res = self.poll(pelta_entries(), {b"pelta-ff00": pelta})
+        self.assertEqual([(r.key, r.name, r.level, r.charging, r.kind) for r in res],
+                         [("asus:rog-pelta", "ROG Pelta", 77, True, "headset")])
+        self.assertEqual(len(pelta.writes), 2)
+        self.assertEqual(pelta.writes[0][:3], [0xCC, 0x12, 0x07])
+        self.assertEqual(pelta.writes[1][:3], [0xCC, 0x12, 0x08])
+        self.assertEqual(len(pelta.writes[0]), A.PELTA_PACKET_LENGTH)
+        self.assertEqual(set(pelta.writes[0][3:]), {0})
+
+    def test_pelta_reply_without_report_id_is_read_too(self):
+        res = self.poll(pelta_entries(), {b"pelta-ff00": FakePelta(mode="no_id")})
+        self.assertEqual([r.level for r in res], [77])
+
+    def test_pelta_event_frames_are_skipped(self):
+        pelta = FakePelta(level=64, mode="junk")
+        res = self.poll(pelta_entries(), {b"pelta-ff00": pelta})
+        self.assertEqual([r.level for r in res], [64])
+
+    def test_pelta_nak_and_silence_keep_the_icon_without_a_level(self):
+        for mode in ("nak", "silent"):
+            pelta = FakePelta(mode=mode)
+            res = self.poll(pelta_entries(), {b"pelta-ff00": pelta})
+            self.assertEqual([(r.name, r.level, r.kind) for r in res],
+                             [("ROG Pelta", None, "headset")], mode)
+
+    def test_pelta_uses_the_ff00_collection_only(self):
+        entries = pelta_entries(usage_page=0xFF07, path=b"pelta-ff07") + \
+            pelta_entries()
+        wrong = FakePelta()
+        pelta = FakePelta(level=90)
+        res = self.poll(entries, {b"pelta-ff07": wrong, b"pelta-ff00": pelta})
+        self.assertEqual([r.level for r in res], [90])
+        self.assertEqual((wrong.opened, pelta.opened), (0, 1))
+
+    def test_pelta_without_a_vendor_collection_shows_the_device(self):
+        res = self.poll(pelta_entries(usage_page=0xFF07, path=b"pelta-ff07"), {})
+        self.assertEqual([(r.name, r.level) for r in res], [("ROG Pelta", None)])
+
+
 if __name__ == "__main__":
     unittest.main()

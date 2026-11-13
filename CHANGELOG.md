@@ -11,6 +11,10 @@ and the project follows [Semantic Versioning](https://semver.org/).
 - **Preferences → Icon style → Outline / Filled**: switch all device pictograms
   immediately and keep the choice after restarting. Filled artwork uses lighter
   body silhouettes and compensated small details while preserving the battery ring.
+- ASUS ROG Pelta headset (0B05:1B84): level and charging on its 2.4 GHz receiver,
+  from G-Helper's implementation
+  ([#199](https://github.com/HeyOkay/HaloBattery/issues/199)). Unverified here -
+  no Pelta was on hand.
 
 ### Fixed
 

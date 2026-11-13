@@ -34,13 +34,17 @@ def answer(level=58, charging=False):
 class FakeMchose:
     """One fake receiver for every open_path; only `answer_path` replies with 0xA1."""
 
-    def __init__(self, level=58, charging=False, answer_path=None):
+    def __init__(self, level=58, charging=False, answer_path=None,
+                 status=None, feature=None):
         self.level = level
         self.charging = charging
         self.answer_path = answer_path
         self.path = None
         self.sent = []                    # (path, bytes)
+        self.written = []                 # output reports, (path, bytes)
         self.reads = 0
+        self.status = status or {}        # path -> report-0x55 answer
+        self.feature = feature or {}      # path -> feature-report answer
 
     # hid.device API
     def open_path(self, path):
@@ -49,15 +53,27 @@ class FakeMchose:
     def close(self):
         pass
 
+    def set_nonblocking(self, flag):
+        pass
+
     def send_feature_report(self, data):
         self.sent.append((self.path, bytes(data)))
         return len(data)
 
     def get_feature_report(self, report_id, length):
         self.reads += 1
+        if self.path in self.feature:
+            return self.feature[self.path]
         if self.path == self.answer_path:
             return [M.A5_REPORT_ID] + answer(self.level, self.charging)
         return [0x00] * length               # silent: no 0xA1 marker in it
+
+    def write(self, data):
+        self.written.append((self.path, bytes(data)))
+        return len(data)
+
+    def read(self, size):
+        return self.status.get(self.path, [])
 
 
 def entries(pid=0xF013, prefix=b"a5"):
@@ -79,6 +95,40 @@ def entries(pid=0xF013, prefix=b"a5"):
 FF_F1 = entries()[2]["path"]         # ffff:0001 on interface 1
 FF_F2 = entries()[6]["path"]         # ffff:0000 on interface 2
 FFA0 = entries()[1]["path"]
+
+
+def status55(level=77, state=2):
+    """A report-0x55 status answer: id, 0x65, level, state."""
+    return [0x55, 0x65, level, state] + [0x00] * 60
+
+
+def feature_status(level=64, charge=0, vid=0x3837, model=0x0031):
+    """A valid 0x06 feature reply (cmd echoed inverted, payload inverted)."""
+    pay = bytearray(11)
+    pay[0:2] = vid.to_bytes(2, "little")
+    pay[2:4] = model.to_bytes(2, "little")
+    pay[9] = level
+    pay[10] = charge
+    return [M.SHORT_REPORT, M.CMD_STATUS ^ 0xFF] + [b ^ 0xFF for b in pay] + [0x00] * 7
+
+
+def newer_entries(pid, product, shape, prefix):
+    return [{"vendor_id": 0x3837, "product_id": pid, "interface_number": i,
+             "usage_page": p, "usage": u,
+             "path": prefix + b"-%d-%04x-%02x" % (i, p, u),
+             "product_string": product}
+            for i, p, u in shape]
+
+
+def k99_entries():
+    # the vendor collections in the reporter's #189 dump
+    return newer_entries(0x3033, "MCHOSE K99 V3 2.4G",
+                         [(3, 0xFF70, 0x0071), (2, 0xFF31, 0x0074)], b"k99")
+
+
+def v7_entries():
+    return newer_entries(0x1016, "MCHOSE V7",
+                         [(2, 0xFF01, 0x0001), (3, 0xFF60, 0x0061)], b"v7")
 
 
 class ParseTest(unittest.TestCase):
@@ -164,6 +214,46 @@ class PollTest(unittest.TestCase):
         # (review by @ahmedkhursheed23)
         self.assertNotIn(FFA0, {p for p, _ in fake.sent})
         self.assertTrue(any("no A1 answer" in line for line in diag))
+
+
+class Newer3837Test(PollTest):
+    """#189: the K99 V3 and V7 read their battery on output report 0x55."""
+
+    def test_k99_is_read_on_report_0x55_and_keeps_a_keyboard_icon(self):
+        ents = k99_entries()
+        fake = FakeMchose(status={ents[0]["path"]: status55(77, 2)})
+        out, _ = self.poll(fake, ents)
+        self.assertEqual([(s.key, s.name, s.level, s.charging, s.kind) for s in out],
+                         [("mchose:3837", "MCHOSE K99 V3 2.4G", 77, False, "keyboard")])
+        self.assertEqual(fake.written[0][1], bytes([0x55]) + M.STATUS_REQUEST)
+
+    def test_charging_state_is_shown(self):
+        ents = v7_entries()
+        fake = FakeMchose(status={ents[0]["path"]: status55(55, 3)})
+        out, _ = self.poll(fake, ents)
+        self.assertEqual([(s.level, s.charging, s.kind) for s in out], [(55, True, "mouse")])
+
+    def test_the_two_devices_get_one_icon_each(self):
+        ents = k99_entries() + v7_entries()
+        fake = FakeMchose(status={k99_entries()[0]["path"]: status55(77, 2),
+                                  v7_entries()[0]["path"]: status55(55, 2)})
+        out, _ = self.poll(fake, ents)
+        self.assertEqual(sorted((s.key, s.level) for s in out),
+                         [("mchose:3837:1016", 55), ("mchose:3837:3033", 77)])
+
+    def test_states(self):
+        self.assertEqual(M.parse_status_55(status55(80, 2)), (80, False))
+        self.assertEqual(M.parse_status_55(status55(80, 3)), (80, True))
+        self.assertEqual(M.parse_status_55(status55(80, 4)), (80, False))
+        self.assertEqual(M.parse_status_55(status55(80, 26)), (None, False))
+        self.assertIsNone(M.parse_status_55(status55(101, 2)))
+
+    def test_falls_back_to_the_feature_channel_when_0x55_is_silent(self):
+        ents = v7_entries()
+        fake = FakeMchose(feature={ents[0]["path"]: feature_status(64)})
+        out, _ = self.poll(fake, ents)
+        self.assertEqual([(s.level, s.charging) for s in out], [(64, False)])
+        self.assertTrue(any(w[1][:1] == b"\x55" for w in fake.written))
 
 
 if __name__ == "__main__":

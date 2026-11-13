@@ -8,6 +8,11 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **MCHOSE K99 V3 and V7** (`3837:3033` keyboard, `3837:1016` mouse): the newer 0x3837
+  devices answer neither feature-report channel, so they are read with M HUB's own
+  63-byte `65 01` request on output report `0x55` (level byte 2, state byte 3). The
+  keyboard keeps a keyboard pictogram, and two 0x3837 devices no longer share one icon.
+  **Unverified** on hardware; a test build is out for #189.
 - **Preferences → Icon style → Outline / Filled**: switch all device pictograms
   immediately and keep the choice after restarting. Filled artwork uses lighter
   body silhouettes and compensated small details while preserving the battery ring.

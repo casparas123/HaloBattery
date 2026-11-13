@@ -275,6 +275,12 @@ A third MCHOSE exchange, on a third vendor id: 64-byte feature reports on the ve
 
 The same protocol as the M7 Ultra on MCHOSE's newer vendor id, which the reference driver treats identically: the diagnostics in [#4](https://github.com/HeyOkay/HaloBattery/issues/4) show the same interface shape (collections 0xFF0B:0x104 and 0xFF01:0x01 on interface 2). The status read is documented on the shorter 0x11 report, so both report ids are tried, and the mouse is named from the receiver's own product string. Icon of its own, so it and an M7 Ultra stay two devices. **Unverified** — no A7 V2 Ultra was on hand, so a level out of range is refused rather than shown
 
+### MCHOSE K99 V3 and V7
+
+**Connection:** 2.4 GHz receiver (`3837:3033` keyboard, `3837:1016` mouse)
+
+The newer 0x3837 devices answer neither feature-report channel the A7 V2 Ultra uses. M HUB's current bundle reads them on a third channel: the 63-byte `65 01` request on **output** report `0x55`, answered by an input report `0x55` with the level in byte 2 and the state in byte 3 (2 discharging, 3 charging, 4 full, 26 asleep). The same frame is what the V9 headset's community driver uses. The provider writes it to the first vendor collection that answers (the K99 V3 lists `0xFF70:0x0071` and `0xFF31:0x0074`, the V7 `0xFF01:0x0001` and `0xFF60:0x0061`). The keyboard keeps a keyboard pictogram; with two 0x3837 devices present they get one icon each. **Unverified** on hardware — a test build is with the reporter of #189.
+
 ### MCHOSE G7
 
 **Connection:** USB (A8A5:2255, chip 'YJX-CHIP')

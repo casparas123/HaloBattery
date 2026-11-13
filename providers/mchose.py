@@ -51,6 +51,18 @@ than by model list, which is what this provider does as well. The diagnostics in
 0xFF01:0x01 on interface 2) have exactly that shape, and the reference documents the status
 read on the *short* 0x11 report, so both report ids are tried before a poll gives up.
 
+The devices that driver snapshot does not cover - the K99 V3 keyboard and the V7 mouse in
+issue #189, both 0x3837 - answer neither report id. M HUB's current bundle reads their
+battery on a third channel: the same 63-byte ``65 01`` frame on *output* report 0x55 that
+its non-audio devices get, answered by an input report 0x55 whose level is byte 2 and state
+byte 3 (2 discharging, 3 charging, 4 full, 26 asleep). The bundle's own charge-status
+listener decodes the same frame and treats 3 and 4 alike (both mean on the cable), so this
+does too; 26 is no reading, which leaves the last value on the greyed icon. The ask is the
+bundle's battery getter byte for byte, and the collection comes from the reporter's dump
+(the K99 V3 offers 0xFF70:0x0071 and 0xFF31:0x0074, the V7 0xFF01:0x0001 and
+0xFF60:0x0061), so the frame goes to the first vendor collection that answers.
+**Unverified** until #189's reporter runs a test build.
+
 The first-generation A5 Pro Max (0x2023 - the 1K receiver F013, the 4K receiver F015 and the
 wired mouse F019; issue #149) speaks a third exchange, taken from the community web driver
 z750sasr/mchose-a5-pro-max-web-driver (MIT, whose transport the independent Klegus/mchose-macos
@@ -99,7 +111,8 @@ from .base import DeviceStatus, Provider, hexdump, log
 # 0x5253 is the family measured here and keeps the plain icon key; 0x3837 is the newer
 # MCHOSE vendor id the reference driver treats identically (issue #4's A7 V2 Ultra).
 MEASURED_VID = 0x5253
-MCHOSE_VIDS = (MEASURED_VID, 0x3837)
+NEW_VID = 0x3837
+MCHOSE_VIDS = (MEASURED_VID, NEW_VID)
 
 # model ids seen in the 0x06 reply (the receiver's own PID does not identify the mouse:
 # 0x1020 is used by the M7 Ultra and by the L7 Pro)
@@ -154,6 +167,18 @@ STATUS_DISCHARGING = 2
 STATUS_CHARGING = 3
 STATUS_FULL = 4
 STATUS_ASLEEP = 26
+STATUS_READS = 6                  # non-blocking reads, ~0.4 s in total
+STATUS_READ_GAP = 0.06
+
+# MCHOSE's own keyboard names (the M HUB bundle's device lists): a 0x3837 product whose
+# name matches one keeps the keyboard pictogram instead of the historic mouse (#189).
+KEYBOARD_WORDS = ("ace 6", "g75", "jet 75", "zero 75", "mix 87", "k87", "k99",
+                  "g87", "g98", "gx87", "ut98", "z75", "x75", "kx75")
+
+
+def kind_of(name: str) -> str:
+    n = (name or "").lower()
+    return "keyboard" if any(w in n for w in KEYBOARD_WORDS) else "mouse"
 HEADSET_ATTEMPTS = 2
 HEADSET_READ_MS = 400         # a tucked-in device answers in milliseconds
 
@@ -338,7 +363,7 @@ def parse_status_55(resp) -> Optional[Tuple[Optional[int], bool]]:
 
 
 
-def device_key(vid: int, pid: int) -> str:
+def device_key(vid: int, pid: int, split_new: bool = False) -> str:
     """One icon per device: the dongle and the cable of the same product share a key.
 
     The keys main has always produced are kept: 0x5253 is plain "mchose", everything
@@ -355,6 +380,12 @@ def device_key(vid: int, pid: int) -> str:
         return "mchose"
     if pid in HEADSET_PAIR:
         return f"mchose:{vid:04x}:{HEADSET_PAIR[pid]:04x}"
+    if vid == NEW_VID and split_new:
+        # Two 0x3837 devices on one machine (#189: a K99 V3 keyboard and a V7 mouse)
+        # would otherwise share one icon and one of the two readings. The vendor-only
+        # key is kept whenever there is only one such device, so existing icons,
+        # custom names and history do not move (#215 review).
+        return f"mchose:{vid:04x}:{pid:04x}"
     return f"mchose:{vid:04x}"
 
 
@@ -454,6 +485,46 @@ class MchoseProvider(Provider):
                                           f"{attempt + 1}: {hexdump(resp, 16)}")
                         return got
                 self._diag.append(f"    no fresh reply to 0x06 on report {report:#04x}")
+            return None
+        finally:
+            try:
+                dev.close()
+            except Exception:
+                pass
+
+    def _read_status_55(self, path: bytes) -> Optional[Tuple[Optional[int], bool]]:
+        """The newer 0x3837 channel (#189): one 63-byte '65 01' request on output report
+        0x55, then its answer. M HUB gives the device 2 s; this waits ~0.4 s, because a
+        device that does not answer at once is asleep rather than slow.
+        """
+        dev = hid.device()
+        try:
+            dev.open_path(path)
+        except (OSError, IOError) as e:
+            self._diag.append(f"    open: {e}")
+            return None
+        try:
+            try:
+                dev.set_nonblocking(True)
+            except Exception:                       # pragma: no cover
+                pass
+            try:
+                dev.write(bytes([AUDIO_REPORT]) + STATUS_REQUEST)
+            except (OSError, ValueError) as e:
+                self._diag.append(f"    write on report {AUDIO_REPORT:#04x}: {e}")
+                return None
+            for _ in range(STATUS_READS):
+                time.sleep(STATUS_READ_GAP)
+                try:
+                    resp = dev.read(64)
+                except (OSError, ValueError):
+                    continue
+                got = parse_status_55(resp)
+                if got:
+                    self._diag.append(f"    answered on report {AUDIO_REPORT:#04x}: "
+                                      f"{hexdump(resp, 8)}")
+                    return got
+            self._diag.append(f"    no answer on report {AUDIO_REPORT:#04x}")
             return None
         finally:
             try:
@@ -611,10 +682,11 @@ class MchoseProvider(Provider):
             groups.setdefault((d["vendor_id"], d["product_id"]), []).append(d)
 
         found: Dict[str, List[Tuple[int, bool, int, int]]] = {}   # key -> readings
+        split_new = len({pid for (vid, pid) in groups if vid == NEW_VID}) > 1
         for (vid, pid), ifaces in groups.items():
-            key = device_key(vid, pid)
-            self._kinds[key] = "headset" if pid in HEADSET_PIDS else "mouse"
+            key = device_key(vid, pid, split_new)
             product = (ifaces[0].get("product_string") or "").strip()
+            self._kinds[key] = "headset" if pid in HEADSET_PIDS else kind_of(product)
             if product and (key not in self._names or "+" in product):
                 # over one product the more informative string wins: the dongle
                 # says "V9 Turbo", the headset itself says "MCHOSE V9 Turbo+"
@@ -676,10 +748,17 @@ class MchoseProvider(Provider):
                             found.setdefault(key, []).append((got[0], bool(got[1]), pid, 0))
                         break     # one answer per product; the pair shares an icon
                 else:
-                    got = self._read_collection(d["path"])
-                    if got:
-                        self._models[key] = got[2]
-                        found.setdefault(key, []).append((got[0], bool(got[1]), pid, got[2]))
+                    if vid == NEW_VID:
+                        got55 = self._read_status_55(d["path"])
+                        if got55 and got55[0] is not None:
+                            found.setdefault(key, []).append(
+                                (got55[0], bool(got55[1]), pid, 0))
+                    if not found.get(key):
+                        got = self._read_collection(d["path"])
+                        if got:
+                            self._models[key] = got[2]
+                            found.setdefault(key, []).append(
+                                (got[0], bool(got[1]), pid, got[2]))
                 if found.get(key):
                     break
 

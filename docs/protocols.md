@@ -422,7 +422,9 @@ an idle test on the keyboard; absence of battery requests alone is not a power m
 
 **Connection:** 2.4 GHz receiver (3434:D028) and USB cable (3434:D048)
 
-Keychron's vendor protocol on interface 4: a 64-byte feature report `b3 06` (status), answered by a 64-byte input report `b4 06` whose byte 20 is the level, retried up to three times. From csutcliff/keychron-battery-dkms, which implements it for these two ids. The **Nape Pro** (`3434:d026`, the "Keychron Link-KM" receiver, #270) speaks the same exchange but publishes its vendor collection on **interface 1** (`ffc1:0001`), not 4, so the provider picks interface 4 first and then any vendor page. **Unverified** on hardware; a test build is with the reporter. **Unverified** - no Keychron device was on hand, so a level above 100 is refused rather than shown
+Keychron's vendor protocol on interface 4: a 64-byte feature report `b3 06` (status), answered by a 64-byte input report `b4 06` whose byte 20 is the level, retried up to three times. From csutcliff/keychron-battery-dkms, which implements it for these two ids. **Unverified** - no Keychron device was on hand, so a level above 100 is refused rather than shown.
+
+The **Nape Pro / M6** (`3434:d026`, the "Keychron Link-KM" receiver, #270) uses a **different** exchange, from the Keychron Launcher's WebHID code: a 32-byte output report `a7 31` on the raw-HID collection `ff60:0061` (report id 0), answered by an input report `a7 31 <level> <state>`; the reply takes about 0.8 s. The provider reads that collection directly and does not try the `b3 06` request on this receiver. The state byte is not used, so no charging state is shown. **Unverified** on hardware; a test build is with the reporters.
 
 ### Lofree Hyzen
 

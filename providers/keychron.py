@@ -73,22 +73,35 @@ class KeychronProvider(Provider):
     def __init__(self):
         self._diag: List[str] = []
 
-    def _pick(self, infos: List[dict]) -> Optional[dict]:
+    def _candidates(self, infos: List[dict]) -> List[dict]:
+        # The Ultra-Link receiver's battery channel is the vendor collection on
+        # interface 4. The Link-KM (d026) also exposes a plain keyboard collection
+        # on interface 4, so interface alone is not a safe first choice (#270).
+        # Its vendor pages are ffc1:0001 on interface 1 and ff60:0061 (VIA) on
+        # interface 3; try the vendor page before VIA, then everything else.
+        ordered: List[dict] = []
+        seen = set()
+
+        def add(d):
+            if d is not None and d.get("path") not in seen:
+                seen.add(d.get("path"))
+                ordered.append(d)
+
+        vendor = [d for d in infos if (d.get("usage_page") or 0) >= 0xFF00]
+        for d in vendor:
+            if d.get("interface_number") == VENDOR_INTERFACE:
+                add(d)
+        for d in vendor:
+            if (d.get("usage_page") or 0) == 0xFFC1:
+                add(d)
+        for d in vendor:
+            add(d)
         for d in infos:
             if d.get("interface_number") == VENDOR_INTERFACE:
-                return d
-        # the Nape Pro's Link-KM receiver puts its vendor collection on interface 1
-        # (ffc1:0001), not interface 4: pick the vendor page wherever it is (#270)
-        vendor = [d for d in infos if (d.get("usage_page") or 0) >= 0xFF00]
-        if vendor:
-            self._diag.append(f"  no interface {VENDOR_INTERFACE} collection; using "
-                              f"iface={vendor[0].get('interface_number')} "
-                              f"{vendor[0].get('usage_page', 0):04x}:"
-                              f"{vendor[0].get('usage', 0):04x}")
-            return vendor[0]
-        self._diag.append(f"  no interface {VENDOR_INTERFACE} collection; "
-                          f"falling back to the first of {len(infos)}")
-        return infos[0] if infos else None
+                add(d)
+        for d in infos:
+            add(d)
+        return ordered
 
     def _query(self, path: bytes) -> Optional[List[int]]:
         dev = hid.device()
@@ -134,20 +147,19 @@ class KeychronProvider(Provider):
             mine = [d for d in infos if d["product_id"] == pid and d["path"] not in seen]
             if not mine:
                 continue
-            d = self._pick(mine)
-            if d is None:
-                continue
-            seen.add(d["path"])
             name = PIDS[pid]
-            self._diag.append(f"[Keychron] pid={pid:04x} '{name}' "
-                              f"iface={d.get('interface_number')} "
-                              f"{d.get('usage_page', 0):04x}:{d.get('usage', 0):04x}")
-            reply = self._query(d["path"])
-            level = parse_level(reply)
-            if level is None:
-                continue
-            out.append(DeviceStatus(f"keychron:{pid:04x}", name, level, False, True,
-                                    "keychron"))
+            for d in self._candidates(mine):
+                seen.add(d["path"])
+                self._diag.append(f"[Keychron] pid={pid:04x} '{name}' "
+                                  f"iface={d.get('interface_number')} "
+                                  f"{d.get('usage_page', 0):04x}:{d.get('usage', 0):04x}")
+                reply = self._query(d["path"])
+                level = parse_level(reply)
+                if level is None:
+                    continue
+                out.append(DeviceStatus(f"keychron:{pid:04x}", name, level, False, True,
+                                        "keychron"))
+                break
         return out
 
     def diagnostics(self) -> List[str]:

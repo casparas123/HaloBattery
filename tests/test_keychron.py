@@ -52,6 +52,10 @@ class PollTest(unittest.TestCase):
          "usage_page": 0xFFC1, "usage": 0x0001, "product_id": 0xD026},
         {"path": b"nape-via", "interface_number": 3,
          "usage_page": 0xFF60, "usage": 0x0061, "product_id": 0xD026},
+        # the real Link-KM also exposes a plain keyboard collection on interface 4;
+        # it must not win over the vendor channel (#270)
+        {"path": b"nape-keyboard", "interface_number": 4,
+         "usage_page": 0x0001, "usage": 0x0006, "product_id": 0xD026},
     ]
 
     def setUp(self):
@@ -84,6 +88,13 @@ class PollTest(unittest.TestCase):
         out, dev = self.poll([reply(42)], infos)
         self.assertEqual(42, out[0].level)
         self.assertEqual([b"iface4"], dev.opened)
+
+    def test_a_silent_collection_falls_through_to_the_next(self):
+        # ffc1 gets three empty replies, then the VIA collection answers
+        out, dev = self.poll([[], [], [], reply(66)], self.NAPE)
+        self.assertEqual([(s.name, s.level) for s in out],
+                         [("Keychron Nape Pro", 66)])
+        self.assertEqual([b"nape-vendor", b"nape-via"], dev.opened)
 
     def test_a_bad_reply_is_not_a_level(self):
         self.assertIsNone(K.parse_level([0xB3, 0x06] + [0] * 62))

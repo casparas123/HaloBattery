@@ -513,6 +513,14 @@ class HeadsetTests(LogitechTestCase):
         [st] = self.headset(0x0AC4, [0x0E, 0xA0, 0x01], page=0x000C, usage=0x0001).poll()
         self.assertEqual((st.level, st.charging), (28, False))
 
+    def test_g325_uses_its_ffa0_collection_and_feature_table(self):
+        self.use([entry(0x0B21, 0xFFA0, 0x0001, b"hs")],
+                 {b"hs": ({0xFF: FakeHidpp(adc([0x0F, 0x5A, 0x01]))}, None)})
+        [st] = L.LogitechProvider().poll()
+        self.assertEqual((st.name, st.kind), ("Logitech G325", "headset"))
+        self.assertIsNotNone(st.level)
+        self.assertFalse(st.charging)
+
 
 # ------------------------------------------------------------------ safety
 class SafetyTests(LogitechTestCase):

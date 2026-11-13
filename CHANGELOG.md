@@ -11,6 +11,10 @@ and the project follows [Semantic Versioning](https://semver.org/).
 - **Preferences → Icon style → Outline / Filled**: switch all device pictograms
   immediately and keep the choice after restarting. Filled artwork uses lighter
   body silhouettes and compensated small details while preserving the battery ring.
+- Logitech G325 (`046d:0b21`): HID++ 2.0 headset whose long collection is
+  `ffa0:0001` rather than the usual `ff43:0202`; read through the existing
+  `0x1F20` battery feature ([#232](https://github.com/HeyOkay/HaloBattery/issues/232)).
+  **Unverified** on hardware - a test build is with the reporter.
 
 ### Fixed
 

@@ -103,14 +103,16 @@ HEADSETS = {
     0x0ABA: "Logitech G PRO X",
     0x0AFB: "Logitech G PRO X 2",
     0x0AFC: "Logitech G PRO X 2",
+    0x0B21: "Logitech G325",
 }
 # headsets whose long collection is not ff43:0202 (usage page, usage)
-HEADSET_COLLECTION = {0x0AC4: (0x000C, 0x0001)}
+HEADSET_COLLECTION = {0x0AC4: (0x000C, 0x0001),
+                      0x0B21: (0xFFA0, 0x0001)}   # G325 LIGHTSPEED (#232)
 
-# A headset whose long collection carries the old HID++ 1.0 registers instead of a
-# feature table: the charge register, read with sub-id 0x05 on the long report, and
-# answered with a battery voltage and a state byte (HeadsetControl, G533/G535 and
-# logitech_g535.hpp). Only the pids in HEADSET_COLLECTION are read this way.
+# long-only headset that answers the HID++ 1.0 charge register instead of a feature
+# table (the G535). The G325 also needs a collection mapping of its own, but it has a
+# feature table, so it must not take this path.
+HEADSET_REGISTER_PIDS = {0x0AC4}
 HEADSET_CHARGE_REG = 0x0D
 HEADSET_REG_SUBID = 0x05
 HEADSET_CHARGING = 0x03
@@ -452,7 +454,7 @@ class LogitechProvider(Provider):
     def _read(self, ch: _Channel, pid: int, idx: int,
               instance: str = "", multi: bool = False) -> Optional[DeviceStatus]:
         slot = (pid, instance, idx)
-        if pid in HEADSET_COLLECTION and not ch.has_short():
+        if pid in HEADSET_REGISTER_PIDS and not ch.has_short():
             # long-only HID++ 1.0 headset (the G535): no feature table to ping, the
             # registers answer. Read before the ping so a reading does not report
             # the device as asleep first.

@@ -74,20 +74,25 @@ class KeychronProvider(Provider):
         self._diag: List[str] = []
 
     def _pick(self, infos: List[dict]) -> Optional[dict]:
-        for d in infos:
-            if d.get("interface_number") == VENDOR_INTERFACE:
-                return d
-        # the Nape Pro's Link-KM receiver puts its vendor collection on interface 1
-        # (ffc1:0001), not interface 4: pick the vendor page wherever it is (#270)
+        # Prefer a vendor collection wherever it is. The Nape Pro's Link-KM receiver
+        # puts its battery channel on interface 1 (ffc1:0001) and also exposes a
+        # plain keyboard collection on interface 4; picking interface first opened
+        # that keyboard collection and every read failed (#270). Interface 4 is
+        # still preferred within the vendor pages for the Ultra-Link receiver.
         vendor = [d for d in infos if (d.get("usage_page") or 0) >= 0xFF00]
         if vendor:
-            self._diag.append(f"  no interface {VENDOR_INTERFACE} collection; using "
+            for d in vendor:
+                if d.get("interface_number") == VENDOR_INTERFACE:
+                    return d
+            self._diag.append(f"  no vendor collection on interface {VENDOR_INTERFACE}; using "
                               f"iface={vendor[0].get('interface_number')} "
                               f"{vendor[0].get('usage_page', 0):04x}:"
                               f"{vendor[0].get('usage', 0):04x}")
             return vendor[0]
-        self._diag.append(f"  no interface {VENDOR_INTERFACE} collection; "
-                          f"falling back to the first of {len(infos)}")
+        for d in infos:
+            if d.get("interface_number") == VENDOR_INTERFACE:
+                return d
+        self._diag.append(f"  no vendor collection; falling back to the first of {len(infos)}")
         return infos[0] if infos else None
 
     def _query(self, path: bytes) -> Optional[List[int]]:

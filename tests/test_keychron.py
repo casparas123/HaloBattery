@@ -52,6 +52,10 @@ class PollTest(unittest.TestCase):
          "usage_page": 0xFFC1, "usage": 0x0001, "product_id": 0xD026},
         {"path": b"nape-via", "interface_number": 3,
          "usage_page": 0xFF60, "usage": 0x0061, "product_id": 0xD026},
+        # the real Link-KM also exposes a plain keyboard collection on interface 4;
+        # it must not win over the vendor channel (#270)
+        {"path": b"nape-keyboard", "interface_number": 4,
+         "usage_page": 0x0001, "usage": 0x0006, "product_id": 0xD026},
     ]
 
     def setUp(self):

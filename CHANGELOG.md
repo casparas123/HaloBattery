@@ -16,6 +16,9 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 - Keep the colored Xbox logo centered inside the battery ring on both taskbar
   themes, and refresh the icon and charging previews with the current renderer.
+- Keychron Link-KM (`3434:d026`): read the vendor collection instead of the
+  plain keyboard collection the receiver also exposes. The old order opened the
+  keyboard channel on interface 4, so every battery read failed ([#270](https://github.com/HeyOkay/HaloBattery/issues/270)).
 
 ## [1.17.0] - 2026-11-12
 

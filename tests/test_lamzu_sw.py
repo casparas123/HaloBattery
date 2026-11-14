@@ -25,6 +25,10 @@ def reply(level, charging=0x00, status=0xA1):
     return [0x00, status, 0x00, 0x00, 0x00, 0x00, 0x83, charging, level] + [0x00] * 56
 
 
+def aurora_reply(level, charging=0x00):
+    return [0xA1, 0x00, 0x02, 0x02, 0x00, 0x83, charging, level] + [0x00] * 57
+
+
 class FakeDevice:
     def __init__(self, replies):
         self.replies = list(replies)
@@ -49,6 +53,9 @@ class PollTest(unittest.TestCase):
     INFO = [{"path": b"tachi-vendor", "interface_number": 1,
              "usage_page": 0xFFA0, "usage": 0x0001,
              "product_id": L.PID, "product_string": "LAMZU TACHI 8K Receiver"}]
+    AURORA_INFO = [{"path": b"tachi-aurora", "interface_number": 2,
+                    "usage_page": 0xFFFF, "usage": 0x0000,
+                    "product_id": L.PID, "product_string": "LAMZU TACHI 8K Receiver"}]
 
     def setUp(self):
         # Keep checking the hypothesis without enabling the stable target.
@@ -85,6 +92,18 @@ class PollTest(unittest.TestCase):
         out, _dev = self.poll([reply(50, status=0xA4)])
         self.assertIsNone(out[0].level)
         self.assertFalse(out[0].online)
+
+    def test_the_aurora_query_is_tried_first_on_the_37b0_receiver(self):
+        out, dev = self.poll([aurora_reply(82)], infos=self.AURORA_INFO)
+        self.assertEqual([(s.name, s.level) for s in out], [("Lamzu Tachi", 82)])
+        self.assertEqual([b"tachi-aurora"], dev.opened)
+        self.assertEqual(1, len(dev.sent))
+        self.assertEqual(bytes([0x00] + L.AURORA_QUERY + [0x00] * 58), dev.sent[0])
+
+    def test_the_sinowealth_query_stays_as_the_fallback(self):
+        out, dev = self.poll([[], [], reply(77)], infos=self.AURORA_INFO + self.INFO)
+        self.assertEqual([(s.name, s.level) for s in out], [("Lamzu Tachi", 77)])
+        self.assertEqual([b"tachi-aurora", b"tachi-vendor"], dev.opened)
 
     def test_no_receiver_reports_nothing(self):
         out, _dev = self.poll([], infos=[])

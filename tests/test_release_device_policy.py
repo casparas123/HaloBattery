@@ -54,7 +54,8 @@ class StableDevicePolicyTests(unittest.TestCase):
     def test_tachi_does_not_open_its_vendor_collection(self):
         entries = [{"product_id": 0x000C, "usage_page": 0xFFA0, "usage": 1,
                     "path": b"held", "interface_number": 1}]
-        with mock.patch.object(lamzu_sw.hidlist, "enumerate", return_value=entries), \
+        with mock.patch.object(lamzu_sw, "ENABLED_PIDS", frozenset()), \
+             mock.patch.object(lamzu_sw.hidlist, "enumerate", return_value=entries), \
              mock.patch.object(lamzu_sw.hid, "device") as device:
             provider = lamzu_sw.LamzuSinowealthProvider()
             self.assertEqual(provider.poll(), [])

@@ -7,6 +7,8 @@ and the project follows [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- MCHOSE G98 Pro (`41E4:2004`) keyboard support through the same Sinowealth
+  `13 4A 01` command as the K87; unverified on hardware (#378).
 - Russian localization, including native settings, tray menus, notifications,
   Windows language detection and Russian plural forms.
 - License-only Iconify eligibility without independent brand/logo/Bluetooth

@@ -55,6 +55,11 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Bluetooth: query battery properties per PnP node and retry the other WinRT
+  radio type when the first query fails. A WinRT failure on every root no longer
+  hides a device that PnP still reports as present, and the diagnostics now show
+  the PnP/property/WinRT counts (#366). Test build only; unverified on the
+  reporter's hardware.
 - Show the closed-eye Lucide glyph when a device is hidden from the tray.
 
 - Use single-language Language card headings in English, French and Spanish.

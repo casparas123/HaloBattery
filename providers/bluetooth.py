@@ -48,27 +48,41 @@ try {
   $script:tLE = [Windows.Devices.Bluetooth.BluetoothLEDevice, Windows.Devices.Bluetooth, ContentType = WindowsRuntime]
 } catch { $script:winrtErr = "$_" }
 
+function Get-BtOne($r, $useLe) {
+  $conn = $null; $err = $null; $cls = $null
+  try {
+    $addr = [Convert]::ToUInt64($r.mac, 16)
+    if ($useLe) { $t = $script:tLE; $op = [Windows.Devices.Bluetooth.BluetoothLEDevice]::FromBluetoothAddressAsync($addr) }
+    else        { $t = $script:tClassic; $op = [Windows.Devices.Bluetooth.BluetoothDevice]::FromBluetoothAddressAsync($addr) }
+    $task = $script:asTask.MakeGenericMethod($t).Invoke($null, @($op))
+    if ($task.Wait(3000)) {
+      $d = $task.Result
+      if ($d) {
+        $conn = ("$($d.ConnectionStatus)" -eq 'Connected')
+        try { if ($useLe) { $cls = [int]$d.Appearance.RawValue } else { $cls = [int]$d.ClassOfDevice.RawValue } } catch { }
+        $d.Dispose()
+      }
+    } else { $err = 'timeout' }
+  } catch {
+    $inner = $_.Exception
+    while ($inner.InnerException) { $inner = $inner.InnerException }
+    $err = "$inner"
+  }
+  return [pscustomobject]@{ conn = $conn; err = $err; cls = $cls }
+}
+
 function Get-BtConn($roots) {
   $out = @()
   if ($script:winrtErr) { return $out }
   foreach ($r in $roots) {
-    $conn = $null; $err = $null; $cls = $null
-    try {
-      $addr = [Convert]::ToUInt64($r.mac, 16)
-      if ($r.le) { $t = $script:tLE; $op = [Windows.Devices.Bluetooth.BluetoothLEDevice]::FromBluetoothAddressAsync($addr) }
-      else       { $t = $script:tClassic; $op = [Windows.Devices.Bluetooth.BluetoothDevice]::FromBluetoothAddressAsync($addr) }
-      $task = $script:asTask.MakeGenericMethod($t).Invoke($null, @($op))
-      if ($task.Wait(3000)) {
-        $d = $task.Result
-        if ($d) {
-          $conn = ("$($d.ConnectionStatus)" -eq 'Connected')
-          # device type: Class of Device (classic) or Appearance (LE)
-          try { if ($r.le) { $cls = [int]$d.Appearance.RawValue } else { $cls = [int]$d.ClassOfDevice.RawValue } } catch { }
-          $d.Dispose()
-        }
-      } else { $err = 'timeout' }
-    } catch { $err = "$_" }
-    $out += [pscustomobject]@{ addr = $r.mac; conn = $conn; le = $r.le; err = $err; cls = $cls }
+    $got = Get-BtOne $r $r.le
+    # A dual-mode device can be listed under the other radio; if the first
+    # query fails, try the other WinRT type before giving up (issue #366).
+    if ($null -eq $got.conn -and $got.err -and $got.err -ne 'timeout') {
+      $other = Get-BtOne $r (-not $r.le)
+      if ($null -ne $other.conn) { $got = $other }
+    }
+    $out += [pscustomobject]@{ addr = $r.mac; conn = $got.conn; le = $r.le; err = $got.err; cls = $got.cls }
   }
   return $out
 }
@@ -77,17 +91,22 @@ function Get-BtSnapshot {
   # --- PnP: battery level (and the fallback connection flag) ---
   $devs = @(Get-PnpDevice -PresentOnly | Where-Object { $_.InstanceId -match '^(BTHENUM|BTHLE|BTHLEDEVICE)\\' })
   $props = @()
-  if ($devs.Count -gt 0) {
-    $props = @(Get-PnpDeviceProperty -InstanceId $devs.InstanceId -KeyName '%BAT%', '%CONN%' |
-               Where-Object { $_.Data -ne $null } |
-               ForEach-Object { [pscustomobject]@{ id = $_.InstanceId; key = $_.KeyName; data = $_.Data } })
+  # Query each node separately: passing the whole InstanceId array to
+  # Get-PnpDeviceProperty returns nothing on some PowerShell builds (issue #366).
+  foreach ($dev in $devs) {
+    $got = @(Get-PnpDeviceProperty -InstanceId $dev.InstanceId -KeyName '%BAT%', '%CONN%' -ErrorAction SilentlyContinue)
+    foreach ($p in $got) {
+      if ($null -ne $p.Data) {
+        $props += [pscustomobject]@{ id = $p.InstanceId; key = $p.KeyName; data = $p.Data }
+      }
+    }
   }
   $list = @($devs | ForEach-Object { [pscustomobject]@{ id = $_.InstanceId; name = $_.FriendlyName; status = "$($_.Status)" } })
   $roots = @($devs | Where-Object { $_.InstanceId -match '^(BTHENUM|BTHLE)\\DEV_([0-9A-F]{12})' } |
              ForEach-Object { $null = $_.InstanceId -match '^(BTHENUM|BTHLE)\\DEV_([0-9A-F]{12})'
                               [pscustomobject]@{ le = ($Matches[1] -eq 'BTHLE'); mac = $Matches[2] } })
   $aep = @(Get-BtConn $roots)
-  return [pscustomobject]@{ devs = $list; props = $props; aep = $aep; aep_error = $script:winrtErr; roots = $roots }
+  return [pscustomobject]@{ devs = $list; props = $props; aep = $aep; aep_error = $script:winrtErr; roots = $roots; pnp_count = $devs.Count; prop_count = $props.Count; aep_count = $aep.Count }
 }
 
 function Get-ConnKey($aep) { return (@($aep | ForEach-Object { "$($_.addr)=$($_.conn)" }) -join ',') }
@@ -212,6 +231,11 @@ def group_devices(data: dict, diag: List[str],
     if data.get("aep_error"):
         diag.append(f"[Bluetooth] WinRT unavailable ({data['aep_error'][:150]}), "
                     f"using the fallback PnP flag")
+    diag.append(f"[Bluetooth] PnP nodes={data.get('pnp_count', '?')} "
+                f"properties={data.get('prop_count', '?')} WinRT roots={data.get('aep_count', '?')}")
+    winrt_all_failed = bool(aep) and all(a.get("err") for a in aep)
+    if winrt_all_failed:
+        diag.append("[Bluetooth] WinRT failed for every root; using PnP/status fallback")
 
     info = {d.get("id"): d for d in devs if d.get("id")}
     by_mac: Dict[str, dict] = {}
@@ -279,11 +303,13 @@ def group_devices(data: dict, diag: List[str],
             shown, src = g["aep_conn"], "WinRT"
         elif g["pnp_conn"] is not None:
             shown, src = g["pnp_conn"], "PnP"
-        elif g["aep_err"]:
+        elif g["aep_err"] and not winrt_all_failed:
             # WinRT gave no answer for this device and there is no PnP flag: hide it
             # (falling back to "status OK" here used to show disconnected headsets)
             shown, src = False, "no data"
         else:
+            # When WinRT failed for every root, a PnP/status answer is more useful
+            # than hiding every device (issue #366).
             shown, src = g["status_ok"], "status"
         kind = g["kind"] or ("headset" if g["audio"] else "")
         diag.append(f"[Bluetooth] {name} ({mac}): {level}%{' (cached)' if cached else ''} "

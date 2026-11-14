@@ -165,13 +165,15 @@ class FakeCollection:
         return self.queue.pop(0) if self.queue else []
 
 
-def omni_entries(instance="7&1111111&0"):
-    # the collections of one OMNI receiver: interface 0 is the keyboard, the vendor
-    # collections are on interface 2
+def omni_entries(instance="7&1111111&0", pid=A.OMNI_PID):
+    # the collections of one receiver: interface 0 is the keyboard, the vendor
+    # collections are on interface 2. Both the OMNI (1ace) and SpeedNova (1ad0)
+    # receivers have this shape.
     def e(iface, col, page, usage):
-        path = f"\\\\?\\hid#vid_0b05&pid_1ace&mi_0{iface}&col0{col}#{instance}&000{col - 1}#{{4d1e}}"
-        return {"product_id": A.OMNI_PID, "interface_number": iface, "usage_page": page,
-                "usage": usage, "path": path.encode(), "product_string": "ROG OMNI RECEIVER"}
+        path = f"\\\\?\\hid#vid_0b05&pid_{pid:04x}&mi_0{iface}&col0{col}#{instance}&000{col - 1}#{{4d1e}}"
+        name = "ROG SPEEDNOVA 8K RECEIVER" if pid == A.SPEEDNOVA_PID else "ROG OMNI RECEIVER"
+        return {"product_id": pid, "interface_number": iface, "usage_page": page,
+                "usage": usage, "path": path.encode(), "product_string": name}
     return [e(0, 1, 0x0001, 6), e(2, 1, 0xFF02, 1), e(2, 2, 0xFF00, 1), e(2, 3, 0xFF01, 1)]
 
 
@@ -234,6 +236,22 @@ class OmniPollTest(ProviderTest):
             self.assertEqual(len(w[0]), 64)
             self.assertEqual(w[0][:len(request)], request)
             self.assertEqual(set(w[0][len(request):]), {0})
+
+    def test_speednova_azoth_96he_reads_the_keyboard_reply(self):
+        # #238: Gear Link's SpeedNova pair list carried 1c12 and its keyboard
+        # power reply was 02 12 01 00 00 00 18 02 01 00 ... (24 %, not charging)
+        entries = omni_entries(pid=A.SPEEDNOVA_PID)
+        pairs = [0x01, 0xA0, 0x00, 0x01, 0x00, 0x12, 0x1C, 0x02, 0x04] + [0] * 55
+        keyboard = [0x02, 0x12, 0x01, 0x00, 0x00, 0x00, 0x18, 0x02, 0x01, 0x00,
+                    0x14, 0x18, 0x96, 0x0E] + [0] * 50
+        bus = omni_bus(entries, pairs=pairs, keyboard=keyboard,
+                       mouse=[0xFF, 0xAA] + [0] * 62)
+        res = self.poll(entries, bus)
+        self.assertEqual([(r.name, r.level, r.charging, r.kind, r.key) for r in res],
+                         [("ROG Azoth 96 HE", 24, False, "keyboard",
+                           "asus:rog-azoth-96-he")])
+        self.assertEqual(bus[entries[1]["path"]].writes[0][:4], A.OMNI_PAIRS)
+        self.assertEqual(bus[entries[2]["path"]].writes[0][:3], A.OMNI_KEYBOARD_REQUEST)
 
     def test_interface_0_is_not_opened(self):
         entries = omni_entries()

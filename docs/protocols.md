@@ -214,6 +214,15 @@ A reply of `ff aa` means the device does not know the command (a keyboard asleep
 
 Confirmed on a Harpe Ace Mini and a Falchion RX Low Profile, and on a Keris II Ace and an Azoth by @comipa in [#231](https://github.com/HeyOkay/HaloBattery/issues/231).
 
+The **ROG SpeedNova 8K receiver** (`0B05:1AD0`) answers the same pair-list request
+and keyboard read. The **ROG Azoth 96 HE** (`1c12` in the pair list) answered
+`02 12 01 00 00 00 18 02 01 00 ...` — 24 %, not charging — in Gear Link's own
+capture for [#238](https://github.com/HeyOkay/HaloBattery/issues/238); the
+provider reads byte 6 and charging byte 9 exactly as for the OMNI keyboards.
+The SpeedNova is also the Harpe II receiver, so the provider follows the pair
+list rather than assuming which device is attached. **Reporter test pending**
+for the provider build; the Harpe II mouse path is unchanged.
+
 ### Corsair Dark Core RGB Pro SE
 
 **Connection:** 2.4 GHz dongle (1B1C:1B7F)

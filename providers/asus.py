@@ -167,8 +167,10 @@ KNOWN: Dict[int, Tuple[str, int]] = {
     0x1947: ("ROG Strix Impact II Wireless", STEPS),
 }
 
-# ROG OMNI receiver (G-Helper PeripheralsProvider.cs)
+# ROG OMNI receiver (G-Helper PeripheralsProvider.cs) and the SpeedNova 8K
+# receiver, which answers the same pair-list and keyboard read (#238).
 OMNI_PID = 0x1ACE
+SPEEDNOVA_PID = 0x1AD0
 OMNI_INTERFACE = 2
 OMNI_CONTROL, OMNI_KEYBOARD, OMNI_MOUSE = 0xFF02, 0xFF00, 0xFF01    # col01, col02, col03
 OMNI_PACKET_LENGTH = 64
@@ -205,6 +207,10 @@ OMNI_KEYBOARDS: Dict[int, Tuple[str, int]] = {
     0x1AB0: ("ROG Strix Scope II 96 Wireless", 6),
     0x1B7A: ("ROG Strix Scope II 96 RX Wireless", 6),
     0x1B06: ("ROG Falchion RX Low Profile", 11),
+    # #238: Azoth 96 HE paired to the SpeedNova 8K receiver (1ad0). Gear Link's
+    # reply was 02 12 01 00 00 00 18 02 01 00 ... = 24 %, not charging; the
+    # same keyboard reply as the OMNI receiver, battery at byte 6.
+    0x1C12: ("ROG Azoth 96 HE", 6),
     # #340: the pair list's own id for the Morph 96 ("01 a0 00 01 00 ea 1c 02 04");
     # G-Helper has no entry for it yet, so it takes the family default byte 6 -
     # unverified until the reporter's test build is read
@@ -461,6 +467,38 @@ class AsusProvider(Provider):
                     out.append((name, "keyboard", res))
         return out
 
+    def _poll_speednova_keyboard(self, infos: List[dict]) -> List[Tuple[str, str, Reading]]:
+        """The Azoth 96 HE on a SpeedNova receiver, from its pair list (#238).
+
+        The SpeedNova (1ad0) is also the Harpe II receiver. Only called when the
+        Harpe II mouse did not answer, so a working mouse receiver never gets its
+        control collection opened.
+        """
+        receivers: Dict[str, Dict[int, bytes]] = {}
+        for d in infos:
+            if d["product_id"] == SPEEDNOVA_PID and d.get("interface_number") == OMNI_INTERFACE:
+                receivers.setdefault(_instance(d["path"]), {})[d.get("usage_page", 0)] = d["path"]
+
+        out: List[Tuple[str, str, Reading]] = []
+        for cols in receivers.values():
+            if OMNI_CONTROL not in cols:
+                continue
+            self._diag.append(f"[ASUS] ROG SpeedNova receiver pid={SPEEDNOVA_PID:04x}")
+            r = self._ask(cols[OMNI_CONTROL], OMNI_PAIRS, lambda r: bool(parse_pairs(r)),
+                          OMNI_PACKET_LENGTH)
+            pids = parse_pairs(r or [])
+            self._diag.append("  paired: " + (" ".join(f"{p:04x}" for p in pids) or "none"))
+            keyboard = next((p for p in pids if p in OMNI_KEYBOARDS), None)
+            if keyboard is not None and OMNI_KEYBOARD in cols:
+                name, battery_byte = OMNI_KEYBOARDS[keyboard]
+                self._diag.append(f"  keyboard {name} pid={keyboard:04x}")
+                r = self._ask(cols[OMNI_KEYBOARD], OMNI_KEYBOARD_REQUEST,
+                              is_omni_keyboard_reply, OMNI_PACKET_LENGTH)
+                res = self._parsed(r, lambda r: parse_omni_keyboard(r, battery_byte))
+                if res is not None:
+                    out.append((name, "keyboard", res))
+        return out
+
     def _read_headset(self, path) -> Optional[Tuple[int, bool]]:
         """One feature-report exchange with the ROG Strix Go 2.4 (a mirror of
         G-Helper's WriteForResponse): send the packet, wait 35 ms, read the feature
@@ -540,6 +578,7 @@ class AsusProvider(Provider):
             self._diag.append(f"  -> {res[2] or str(res[0]) + '%'}{' charging' if res[1] else ''}")
             keep(name, "mouse", res)
 
+        harpe_seen = False
         for d in infos:
             pid = d.get("product_id")
             if pid == HARPE_II_RECEIVER:
@@ -560,6 +599,13 @@ class AsusProvider(Provider):
             res = self._parsed(self._ask(d["path"], request, wanted, 64), parse)
             if res is not None:
                 keep(name, "mouse", res)
+                if pid == HARPE_II_RECEIVER:
+                    harpe_seen = True
+
+        if not harpe_seen:
+            for name, kind, res in self._poll_speednova_keyboard(infos):
+                self._diag.append(f"  -> {name}: {res[0]}%{' charging' if res[1] else ''}")
+                keep(name, kind, res)
 
         for name, kind, res in self._poll_omni(infos):
             self._diag.append(f"  -> {name}: {res[0]}%{' charging' if res[1] else ''}")

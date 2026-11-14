@@ -263,6 +263,19 @@ Claimed from [#304](https://github.com/HeyOkay/HaloBattery/issues/304)'s collect
 
 The same feature report exchange as the WLmouse and G-Wolves mice (`00 00 02 02 00 83` out, `a1 00 02 02 00 83 <charging> <battery %>` back), on the vendor collection `ffff:0000` of interface 2 only; protocol from Sheroune/lamzu-battery-monitory (MIT). Confirmed on a Maya X on its 8K dongle
 
+### GANSS GS3075T
+
+The 2.4 GHz receiver (`0C45:FEFE`) exposes the Sonix vendor collection
+`FF60:0061` on interface 3. The 32-byte query `AA 10 18 00 ...` is answered by
+`55 10 18 ...` with the level at byte 25 and byte 26 `0x02` while charging,
+`0x00` on battery. The first request after the link wakes up can be lost, so it
+is tried twice. Measured on a GS3075T by the reporter of #379; other GANSS
+T-series boards use the same receiver but are not claimed.
+
+The ATK U2 Plus Nearlink receiver (`373B:10C9`) speaks the existing Compx
+17-byte `0x08` power query documented above; it is the same table entry as the
+ATK A9 SE (#379).
+
 ### MCHOSE A5 Pro Max
 
 **Connection:** 1K receiver (2023:F013), 4K receiver (2023:F015) or USB cable (2023:F019)

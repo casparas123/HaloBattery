@@ -92,8 +92,8 @@ its cable) and millivolts big-endian in bytes 8-9. The same endpoint also pushes
 events (command 0x0a), so a reply is only accepted when the header and the checksum
 both check out, the command is the one we asked for, and the level is 0..100.
 
-Additional measured CompX IDs: Scyrox 3554:F5F7/F5F6 (#182), ATK A9 SE
-373B:10C9 (#347), Cougar Revenger Pro 3554:F5DF/F5DE/F5DC (#354).
+Additional measured CompX IDs: Scyrox 3554:F5F7/F5F6 (#182), ATK A9 SE / U2 Plus
+373B:10C9 (#347, #379), Cougar Revenger Pro 3554:F5DF/F5DE/F5DC (#354).
 Pulsar X2 V3 Mini uses the Sonix feature protocol from jonkristian/pulsar-x3-python
 (#213). NK NANO 373B:1216 is dispatched separately to atk_bitmouse (#350).
 """
@@ -151,7 +151,7 @@ PIDS: Dict[int, Dict[int, str]] = {
     0x373B: {
         0x11B6: "ATK A9 Ultimate (wired)",
         0x11D9: "ATK A9 Ultimate (2.4 GHz dongle)",
-        0x10C9: "ATK A9 SE (2.4 GHz)",
+        0x10C9: "ATK A9 SE / U2 Plus (2.4 GHz)",
         0x1085: "ATK VXE R1 SE+ (2.4 GHz)",
         0x101A: "ATK X1 Pro (2.4 GHz)",
         0x101B: "ATK Fire X 8K (2.4 GHz dongle)",

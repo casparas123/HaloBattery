@@ -7,6 +7,10 @@ and the project follows [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- GANSS GS3075T (`0C45:FEFE`) keyboard support through the receiver's Sonix
+  `AA 10 18` query (#379); level and charging measured by the reporter.
+- ATK U2 Plus Nearlink (`373B:10C9`) is covered by the existing ATK A9 SE
+  Compx entry; its label now names both mice (#379).
 - Russian localization, including native settings, tray menus, notifications,
   Windows language detection and Russian plural forms.
 - License-only Iconify eligibility without independent brand/logo/Bluetooth

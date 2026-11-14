@@ -3,6 +3,7 @@ from .aula import AulaProvider  # noqa: F401
 from .alienware import AlienwareProvider  # noqa: F401
 from .barracuda import BarracudaProvider  # noqa: F401
 from .barracuda_x import BarracudaXProvider  # noqa: F401
+from .barracuda_x_0550 import BarracudaX0550Provider  # noqa: F401
 from .audeze import AudezeProvider  # noqa: F401
 from .razer import RazerProvider  # noqa: F401
 from .wlmouse import WLmouseProvider  # noqa: F401

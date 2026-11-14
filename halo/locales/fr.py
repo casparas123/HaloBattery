@@ -71,6 +71,7 @@ MESSAGES = {
     "provider.audeze": "Audeze Maxwell",
     "provider.barracuda": "Razer Barracuda Pro",
     "provider.barracuda_x": "Razer Barracuda X",
+    "provider.barracuda_x_0550": "Razer Barracuda X (YS-Tech receiver)",
     "provider.corsair": "Casques Corsair",
     "provider.dji": "DJI Mic Mini 2",
     "provider.gwolves": "Souris G-Wolves",

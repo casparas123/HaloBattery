@@ -7,6 +7,11 @@ and the project follows [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Razer Barracuda X (2022), YS-Tech receiver** (`1532:0550`, #264): the
+  other bridge variant of the same headset. It uses report id `0x02`, a
+  CRC-16/XMODEM frame and an `'O'`/`'F'` acknowledgement; the protocol is
+  mirrored from mehdibouchami/razer-barracuda-x-battery (MIT). Test build is
+  with the reporter; the Macronix `0552` provider is unchanged.
 - Russian localization, including native settings, tray menus, notifications,
   Windows language detection and Russian plural forms.
 - License-only Iconify eligibility without independent brand/logo/Bluetooth

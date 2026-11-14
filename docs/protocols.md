@@ -572,6 +572,20 @@ same RACE commands wrapped in `02 80 <len> <crcLo> <crcHi> payload` with a CRC-1
 over the whole report and an `'O'`/`'F'` input-report acknowledgement - documented in that
 project, not implemented here until a 0550 unit can test it.
 
+### Razer Barracuda X (2022) (YS-Tech receiver)
+
+**Connection:** 2.4 GHz dongle (`1532:0550`, product `Razer Barracuda X 2.4`)
+
+The other bridge variant of the Barracuda X. It speaks the same Airoha RACE
+commands but frames them for the YS-Tech bridge: report id `0x02`, a 64-byte
+report `02 80 <len> <crcLo> <crcHi> 50 41 ...`, CRC-16/XMODEM over the report,
+and an input-report `'O'`/`'F'` acknowledgement before the reply. Mirrored from
+mehdibouchami/razer-barracuda-x-battery (`Protocol.cs`, MIT); voltage is
+interpolated on the same Li-ion curve and charging uses the sample spread.
+
+**Unverified** on hardware; test build 1 is with [#264]
+(https://github.com/HeyOkay/HaloBattery/issues/264).
+
 ### URX Core75 (2.4 GHz)
 
 **Connection:** 2.4 GHz dongle (36B0:3002, "URX Core75 Wireless")

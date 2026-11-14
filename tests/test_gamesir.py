@@ -125,6 +125,20 @@ class GameSirTests(unittest.TestCase):
         self.assertEqual((result.level, result.charging), (90, True))
         self.assertTrue(any("zero state" in line for line in diag))
 
+    def test_the_generic_1053_collection_is_the_charging_fallback(self):
+        # #221: 0575 answers zeros while charging; the same pad's generic 1053
+        # collection carries the real state, so it is read next.
+        zero = FakePad([state(0, 0)])
+        real = FakePad([state(91, 1)])
+        cols = [dict(COLLECTION, product_id=0x0575, product_string="GameSir-Cyclone 2"),
+                dict(COLLECTION, product_id=G.XINPUT_WIRED_PID, path=b"xbox",
+                     product_string="Xbox 360 Controller for Windows")]
+        diag = []
+        with mock.patch.object(G.hidlist, "enumerate", return_value=cols),                 mock.patch.object(G.hid, "device", side_effect=[zero, real]):
+            result = G.read_connected(diag)
+        self.assertEqual((result.level, result.charging), (91, True))
+        self.assertTrue(any("pid=0575" in line for line in diag))
+
     def test_disconnect_and_silence_are_safe(self):
         for pad in (FakePad(fail="open"), FakePad(fail="write"), FakePad(fail="read"),
                     FakePad([state()], sent=-1), FakePad([state()], sent=1), FakePad()):

@@ -22,7 +22,9 @@ and the project follows [Semantic Versioning](https://semver.org/).
   the XInput provider now pairs that report to the GameSir collection instead of
   its `1000/1000` placeholder. The charging identity answers with an all-zero
   `0x12` report before its real one, so the reader now waits for a non-zero
-  state instead of freezing at 0 % (test build 3; reporter run pending).
+  state instead of freezing at 0 %. When the charging identity answers only
+  zeros, the same pad's generic `1053` collection is read as a fallback
+  (test build 4; reporter run pending).
 
 ### Fixed
 

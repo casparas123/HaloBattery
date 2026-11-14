@@ -128,9 +128,19 @@ def read_connected(diag: List[str]) -> Optional[Reading]:
         if sent is not None and sent < len(STATUS_REQUEST):
             diag.append(f"[GameSir] request write failed ({sent})")
             return None
+        skipped_zero = False
         for _ in range(40):
             frame = bytes(dev.read(64, 25))
             if not frame:
+                continue
+            # The charging identity answers the request with an all-zero state
+            # report before its real one (#221, 3537:0575). Treating that as
+            # 0 % froze the icon at zero while the pad was charging; wait for
+            # the next report instead.
+            if (len(frame) > LEVEL_BYTE and frame[0] == STATE_REPORT
+                    and frame[CHARGE_BYTE] == 0 and frame[LEVEL_BYTE] == 0):
+                skipped_zero = True
+                diag.append(f"[GameSir] pid={pid:04x}: zero state report; waiting for the real one")
                 continue
             reading = parse_state(frame, pid)
             if reading is not None:
@@ -138,6 +148,8 @@ def read_connected(diag: List[str]) -> Optional[Reading]:
                             f"{hexdump(frame[CHARGE_BYTE:LEVEL_BYTE + 1], 2)} -> "
                             f"{reading.level}%, charging={reading.charging}")
                 return reading
+        if skipped_zero:
+            diag.append(f"[GameSir] pid={pid:04x}: only zero state reports after the request")
         diag.append(f"[GameSir] pid={pid:04x}: no state report after the request")
     except (OSError, ValueError) as e:
         diag.append(f"[GameSir] {e}")

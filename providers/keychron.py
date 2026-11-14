@@ -17,16 +17,14 @@ vendor protocol:
     interface 1 as an interrupt-OUT endpoint; when SET_FEATURE is refused or
     unanswered, the identical frame is retried with write() (#270, confirmed by
     a Keychron Launcher USB capture).
-  * reply: a 64-byte input report on the interrupt endpoint: `b4 06 ... <level> ...`,
-    the battery in byte 20, accepted only when it is 100 or less.
+  * reply: a 64-byte input report on the interrupt endpoint: `b4 06 ... <level> ...`.
+    Byte 20 holds the level in its low seven bits and the charging flag in bit 7.
   * up to three attempts, 100 ms apart, with a 500 ms wait for each reply.
-
-The reply carries no charging flag, so none is reported.
 """
 from __future__ import annotations
 
 import time
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 import hid
 
@@ -61,14 +59,21 @@ def make_request() -> List[int]:
     return [REPORT_ID_CMD, CMD_STATUS] + [0x00] * (REPORT_SIZE - 2)
 
 
-def parse_level(r) -> Optional[int]:
-    """Percent from a status reply, or None when this is not one."""
+def parse_level(r) -> Optional[Tuple[int, bool]]:
+    """(percent, charging) from a status reply, or None when this is not one.
+
+    Byte 20 holds the level in its low seven bits and the charging flag in bit 7
+    (csutcliff/keychron-battery-dkms, and the Keychron Launcher capture in #270).
+    """
     if not r or len(r) <= BATTERY_OFFSET:
         return None
     if r[0] != REPORT_ID_RESP or r[1] != CMD_STATUS:
         return None
-    level = r[BATTERY_OFFSET]
-    return level if 0 <= level <= 100 else None
+    raw = r[BATTERY_OFFSET]
+    level = raw & 0x7F
+    if not 0 <= level <= 100:
+        return None
+    return level, bool(raw & 0x80)
 
 
 class KeychronProvider(Provider):
@@ -184,10 +189,11 @@ class KeychronProvider(Provider):
                               f"iface={d.get('interface_number')} "
                               f"{d.get('usage_page', 0):04x}:{d.get('usage', 0):04x}")
             reply = self._query(d["path"])
-            level = parse_level(reply)
-            if level is None:
+            parsed = parse_level(reply)
+            if parsed is None:
                 continue
-            out.append(DeviceStatus(f"keychron:{pid:04x}", name, level, False, True,
+            level, charging = parsed
+            out.append(DeviceStatus(f"keychron:{pid:04x}", name, level, charging, True,
                                     "keychron"))
         return out
 

@@ -20,8 +20,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from providers import keychron as K  # noqa: E402
 
 
-def reply(level):
-    return [K.REPORT_ID_RESP, K.CMD_STATUS] + [0x00] * 18 + [level] + [0x00] * (K.REPORT_SIZE - 21)
+def reply(level, charging=False):
+    raw = level | (0x80 if charging else 0)
+    return [K.REPORT_ID_RESP, K.CMD_STATUS] + [0x00] * 18 + [raw] + [0x00] * (K.REPORT_SIZE - 21)
 
 
 class FakeDevice:
@@ -80,6 +81,10 @@ class PollTest(unittest.TestCase):
         self.assertEqual([b"nape-vendor"], dev.opened)
         self.assertEqual([bytes(K.make_request())], dev.sent)
 
+    def test_the_charging_bit_reaches_the_icon(self):
+        out, _ = self.poll([reply(99, True)], self.NAPE)
+        self.assertEqual((out[0].level, out[0].charging), (99, True))
+
     def test_ffc1_wins_over_the_via_page_when_enumerated_last(self):
         # #270: the Link-KM receiver lists ff60 (VIA) and ffc1 (battery); the
         # VIA page accepts writes but never answers, so ffc1 must be chosen
@@ -104,6 +109,10 @@ class PollTest(unittest.TestCase):
         self.assertIsNone(K.parse_level([0xB4, 0x06] + [0] * 10))     # too short
         self.assertIsNone(K.parse_level(reply(101)))
         self.assertIsNone(K.parse_level([]))
+
+    def test_the_charging_bit_is_masked_and_reported(self):
+        self.assertEqual(K.parse_level(reply(99, True)), (99, True))
+        self.assertEqual(K.parse_level(reply(99, False)), (99, False))
 
     def test_a_refused_feature_report_falls_back_to_the_output_endpoint(self):
         out, dev = self.poll([reply(100)], self.NAPE, feature_result=-1)

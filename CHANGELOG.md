@@ -23,7 +23,9 @@ and the project follows [Semantic Versioning](https://semver.org/).
   GameSir Connect). While charging the pad enumerates as `3537:0575` with the
   same collection and Windows exposes it as a generic Xbox pad (`3537:1053`);
   the XInput provider now pairs that report to the GameSir collection instead of
-  its `1000/1000` placeholder. Charging identity test-build pending.
+  its `1000/1000` placeholder. The charging identity answers with an all-zero
+  `0x12` report before its real one, so the reader now waits for a non-zero
+  state instead of freezing at 0 % (test build 3; reporter run pending).
 
 ### Fixed
 

@@ -118,6 +118,13 @@ class GameSirTests(unittest.TestCase):
         self.assertEqual((result.level, result.charging, result.name),
                          (96, True, "GameSir Cyclone 2"))
 
+    def test_a_zero_state_before_the_real_one_does_not_freeze_the_level(self):
+        # #221: 3537:0575 answered 00 00 first and the old read stopped at 0 %.
+        pad = FakePad([state(0, 0), state(90, 1)])
+        result, diag = self.read(pad)
+        self.assertEqual((result.level, result.charging), (90, True))
+        self.assertTrue(any("zero state" in line for line in diag))
+
     def test_disconnect_and_silence_are_safe(self):
         for pad in (FakePad(fail="open"), FakePad(fail="write"), FakePad(fail="read"),
                     FakePad([state()], sent=-1), FakePad([state()], sent=1), FakePad()):

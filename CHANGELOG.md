@@ -55,6 +55,10 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Keychron Ultra-Link 8K: fall back to an output report when the receiver
+  rejects SET_FEATURE, read the charging flag in bit 7 of byte 20, and query
+  every matching receiver collection so two 8K dongles get separate icons
+  (#373). Test build only; unverified on hardware.
 - Show the closed-eye Lucide glyph when a device is hidden from the tray.
 
 - Use single-language Language card headings in English, French and Spanish.

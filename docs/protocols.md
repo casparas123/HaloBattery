@@ -422,7 +422,7 @@ an idle test on the keyboard; absence of battery requests alone is not a power m
 
 **Connection:** 2.4 GHz receiver (3434:D028) and USB cable (3434:D048)
 
-Keychron's vendor protocol on interface 4: a 64-byte feature report `b3 06` (status), answered by a 64-byte input report `b4 06` whose byte 20 is the level, retried up to three times. From csutcliff/keychron-battery-dkms, which implements it for these two ids. The **Nape Pro** (`3434:d026`, the "Keychron Link-KM" receiver, #270) speaks the same exchange but publishes its vendor collection on **interface 1** (`ffc1:0001`), not 4, so the provider picks interface 4 first and then any vendor page. **Unverified** on hardware; a test build is with the reporter. **Unverified** - no Keychron device was on hand, so a level above 100 is refused rather than shown
+Keychron's vendor protocol on interface 4: `b3 06` (status), normally a 64-byte feature report, answered by a 64-byte input report `b4 06`. Byte 20 holds the level in its low seven bits and the charging flag in bit 7. Some 8K receivers reject SET_FEATURE with `-1`; the same frame is then written as an output report (#373). From csutcliff/keychron-battery-dkms, which implements it for these two ids. The **Nape Pro** (`3434:d026`, the "Keychron Link-KM" receiver, #270) speaks the same exchange but publishes its vendor collection on **interface 1** (`ffc1:0001`), not 4, so the provider picks interface 4 first and then the `ffc1` vendor page. A single receiver id can appear twice (two Ultra-Link 8K dongles); every candidate collection is queried and each answering receiver gets its own icon. **Unverified on hardware for the 8K path**; the reporter's run of the test build in #373 is the first.
 
 ### Lofree Hyzen
 

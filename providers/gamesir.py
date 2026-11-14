@@ -44,8 +44,13 @@ MODEL = "GameSir G7 Pro 8K"
 # The Cyclone 2's receiver is 3537:100b (#221); its own app shows 85 % while Windows
 # reports the 1000/1000 placeholder.
 OTHER_MODELS: Dict[int, str] = {
-    0x100B: "GameSir Cyclone 2",
+    0x100B: "GameSir Cyclone 2",     # 2.4 GHz receiver
+    0x0575: "GameSir Cyclone 2",     # cable / charging dock (#221)
 }
+# Windows exposes the charging identity as a generic Xbox 360 pad; pair it to the
+# GameSir HID collection instead of trusting the Xbox PID alone.
+XINPUT_WIRED_PID = 0x1053
+CYCLONE_CHARGING_PID = 0x0575
 # GameSir Connect's G7ProCE modes: pid -> edition. Each pair is cable, dongle.
 EDITIONS: Dict[int, str] = {
     0x10B7: "", 0x10B9: "", 0x10CB: "", 0x10CC: "", 0x10CD: "", 0x10CE: "",
@@ -82,11 +87,35 @@ def parse_state(frame, pid: int = 0) -> Optional[Reading]:
     return Reading(frame[LEVEL_BYTE], frame[CHARGE_BYTE] == 1, "", name)
 
 
+def supported_collections() -> List[dict]:
+    """The vendor collections of a supported GameSir pad, if any."""
+    try:
+        out = []
+        for d in hidlist.enumerate(VENDOR_VID):
+            pid = d.get("product_id") or 0
+            if pid not in OTHER_MODELS and pid not in EDITIONS:
+                continue
+            if d.get("usage_page") != USAGE_PAGE:
+                continue
+            if (pid == CYCLONE_CHARGING_PID
+                    and "cyclone" not in (d.get("product_string") or "").casefold()):
+                # 0x0575 is also the idle G7 dongle; only the Cyclone 2's
+                # "GameSir-Cyclone 2" identity is the charging collection (#221).
+                continue
+            out.append(d)
+        return out
+    except (OSError, ValueError):
+        return []
+
+
+def has_supported_collection() -> bool:
+    """True when a supported GameSir HID collection is present."""
+    return bool(supported_collections())
+
+
 def read_connected(diag: List[str]) -> Optional[Reading]:
     """Read only the vendor collection; the caller identifies the XInput slot."""
-    cols = [d for d in hidlist.enumerate(VENDOR_VID)
-            if is_supported(d.get("product_id") or 0)
-            and d.get("usage_page") == USAGE_PAGE]
+    cols = supported_collections()
     # More than one pad cannot be matched to the one XInput slot reliably.
     if len(cols) != 1:
         diag.append(f"[GameSir] {len(cols)} vendor collection(s): not read")

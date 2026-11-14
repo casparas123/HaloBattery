@@ -118,6 +118,7 @@ MESSAGES = {
     "provider.irocks": "iRocks M31R",
     "provider.jabra": "Jabra 耳机（Link 380 / 390 适配器）",
     "provider.mchose_kb": "MCHOSE 键盘",
+    "provider.mchose_qhw": "MCHOSE G98 V3",
     "provider.mchose_v9": "MCHOSE V9 Pro",
     "provider.monsgeek": "MonsGeek 键盘",
     "provider.rapoo": "Rapoo 鼠标和键盘",

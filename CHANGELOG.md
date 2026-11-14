@@ -7,6 +7,10 @@ and the project follows [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- MCHOSE G98 V3 keyboard (`3837:1015`) on its 2.4 GHz receiver: the QHW
+  `0x4D` / command `0x0904` read, with descriptor lengths checked before any
+  command. **Unverified on hardware**; a test build is with the reporter of
+  [#362](https://github.com/HeyOkay/HaloBattery/issues/362).
 - Russian localization, including native settings, tray menus, notifications,
   Windows language detection and Russian plural forms.
 - License-only Iconify eligibility without independent brand/logo/Bluetooth

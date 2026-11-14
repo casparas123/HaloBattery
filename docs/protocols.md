@@ -287,6 +287,26 @@ A different chip from the M7 Ultra, and a different protocol: a 65-byte output r
 
 The vendor collection (usage page 0xFF01; the sibling 0xFF0B never answers): feature report 0x11 (the shorter report, tried first) or 0x12 with command 0x06, every payload byte inverted, which returns `53 52 31 00 02 05 07 00 09 64 00 64` — vid 0x5253, model 0x31, firmware, flags, then the level and the charging byte (1 while charging). The request has to be repeated for each read, and the receiver only relays a real value while the mouse is awake: asleep it answers with zeros, so a silent mouse keeps its last level on a greyed icon. On the cable the mouse answers on its own PID (5253:0031, the number it reports as its model id) and the receiver goes quiet: both connections share one icon, and whichever one reports charging wins
 
+### MCHOSE G98 V3
+
+**Connection:** 2.4 GHz receiver (3837:1015)
+
+A separate keyboard exchange from the MCHOSE mice, recovered from M HUB's own code by
+the maintainers of `wushuai0802/myfinder-device-battery` and implemented here from those
+protocol notes (their AGPL implementation is not copied). The receiver's `ff80:0001`
+collection takes output report `0x4D` with the eight-byte payload
+`01 03 00 04 09 00 <seq> <0E ^ seq>` padded to the descriptor's output length. The reply
+comes on an input report and starts `01 03 02 04 09 00 <seq> <charge> <level>`: charge
+`0` is discharging, `1` charging, `2` full (not charging), and the level is `0..100`.
+The reply check byte's algorithm is not established, so it is not validated rather than
+rejected by a guessed XOR.
+
+Only the exact product string `MCHOSE G98 V3 2.4G` and collection `ff80:0001` are opened;
+the app checks the input/output report lengths from the HID caps first, so an unknown
+layout is refused before any command. No configuration, lighting or firmware command is
+sent. **Unverified on hardware** - a test build is with the reporter of
+[#362](https://github.com/HeyOkay/HaloBattery/issues/362).
+
 ### Pulsar X2 V2 Mini, Pulsar X2 CrazyLight Mini, ATK VXE R1 SE+, VXE R1 Pro Max
 
 **Connection:** 2.4 GHz dongle (3554:F508, 373B:1085, 3554:F58A, 3554:F505, 3710:5406) and USB cable (3554:F507, 3554:F58F, 3554:F58C, 3554:F506, 3710:3414)

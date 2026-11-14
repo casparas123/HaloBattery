@@ -237,10 +237,19 @@ class AjazzProvider(Provider):
                 wrote = dev.write(make_request())
             except (OSError, ValueError) as e:
                 self._diag.append(f"    write: {e}")
-                return None, False
-            if wrote is not None and wrote < 0:
-                self._diag.append("    write refused (no output report here)")
-                return None, False
+                wrote = -1
+            if wrote is None or wrote < 0:
+                # Some 3151 receivers expose no interrupt-OUT report at all,
+                # but still accept the same frame as a feature report (#289).
+                self._diag.append(f"    write refused ({wrote}); trying feature")
+                try:
+                    wrote = dev.send_feature_report(make_request())
+                except (OSError, ValueError) as e:
+                    self._diag.append(f"    feature write: {e}")
+                    return None, False
+                self._diag.append(f"    feature write -> {wrote}")
+                if wrote is None or wrote < 0:
+                    return None, False
             announce = None
             for _ in range(READ_ATTEMPTS):
                 r = dev.read(READ_SIZE, READ_TIMEOUT_MS)

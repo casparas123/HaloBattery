@@ -51,9 +51,10 @@ class FakeCollection:
     """replies: frames the collection answers with, in order; accept_write:
     False means the collection has no output report (hidapi returns -1)."""
 
-    def __init__(self, replies=(), accept_write=True):
+    def __init__(self, replies=(), accept_write=True, accept_feature=None):
         self.replies = list(replies)
         self.accept_write = accept_write
+        self.accept_feature = accept_write if accept_feature is None else accept_feature
         self.sent = []
         self.opened = 0
         self.reads = 0
@@ -76,6 +77,10 @@ def fake_device_class(cols, order_log):
         def write(self, data):
             self.c.sent.append(list(data))
             return len(data) if self.c.accept_write else -1
+
+        def send_feature_report(self, data):
+            self.c.sent.append(list(data))
+            return len(data) if self.c.accept_feature else -1
 
         def read(self, n, timeout):
             return self.c.read()
@@ -254,8 +259,20 @@ class PollTest(unittest.TestCase):
         self.order.clear()
         self.poll(entries, cols)
         self.assertEqual(self.order[0], VENDOR_PATH)
-        self.assertEqual(cols[CONSUMER_PATH].sent, [list(A.make_request())])  # tried once, refused
+        self.assertEqual(len(cols[CONSUMER_PATH].sent), 2)   # output refused, feature refused
+        self.assertEqual(cols[CONSUMER_PATH].sent[0], list(A.make_request()))
         self.assertEqual(cols[CONSUMER_PATH].opened, 1)                       # never opened again
+
+    def test_a_collection_without_an_output_report_can_use_feature_reports(self):
+        # #289: every 3151 collection refused the interrupt-OUT write; the same
+        # frame as a feature report is the remaining transport.
+        entries = receiver_entries()
+        cols = {e["path"]: FakeCollection(([CAPTURED75] if e["path"] == VENDOR_PATH else ()),
+                                          accept_write=False,
+                                          accept_feature=(e["path"] == VENDOR_PATH))
+                for e in entries}
+        out = self.poll(entries, cols)
+        self.assertEqual([(s.key, s.level) for s in out], [("ajazz:5c2f", 75)])
 
     def test_an_announcement_alone_is_enough(self):
         entries = receiver_entries()

@@ -7,6 +7,11 @@ and the project follows [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Razer BlackShark V3 X HyperSpeed** (`1532:057D`, #280): the receiver's
+  newer 64-byte feature-report protocol (report id `0x07`, class `0x07`,
+  battery command `0x80`, level byte 10), from everyoneexe/blackshark-linux's
+  Synapse captures. It is a different protocol from the BlackShark V3's
+  `0x02` frames; test build awaiting the reporter's run.
 - Russian localization, including native settings, tray menus, notifications,
   Windows language detection and Russian plural forms.
 - License-only Iconify eligibility without independent brand/logo/Bluetooth

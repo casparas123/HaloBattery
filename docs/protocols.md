@@ -540,6 +540,22 @@ Byte 3 is the charger state: `0x00` on battery and `0x04` with the cable in, the
 
 **Confirmed on hardware by @notisv** on the second test build: the icon showed the level continuously (`reply: 0e a1 5c 00` = 92 %), agreed with Bluetooth, Windows and Command Center at the same time, and the charging state followed the cable in and out. They kept it running for over an hour before reporting.
 
+### Razer BlackShark V3 X HyperSpeed
+
+**Connection:** 2.4 GHz receiver (`1532:057D`, product `BlackShark V3 X`)
+
+This model is **not** the BlackShark V3's `0x02`/`ff14` family and not the 2023
+"PA" frames. Its protocol was reverse-engineered byte-for-byte from Synapse
+captures by everyoneexe/blackshark-linux (`PROTOCOL.md`,
+`blackshark-rs/src/protocol.rs`, MIT) for the Xbox edition (`1532:0A5B`). Frames
+are 64-byte feature reports with report id `0x07`; the battery is a read-only
+GET, class `0x07`, command `0x80`, with the level in byte 10 and a CRC of XOR
+bytes 3..60 in byte 62. The PC receiver (`057D`) publishes the same vendor pages
+(`ff90`, `ff82`); the test build tries both and is the evidence for the id.
+
+**Unverified** on the reporter's hardware; test build 1 is with [#280]
+(https://github.com/HeyOkay/HaloBattery/issues/280).
+
 ### Razer Barracuda X (2022) (2.4 GHz)
 
 **Connection:** 2.4 GHz dongle (1532:0552, "Razer Barracuda X 2.4", Macronix bridge)

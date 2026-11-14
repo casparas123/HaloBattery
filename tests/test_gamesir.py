@@ -136,7 +136,8 @@ class GameSirTests(unittest.TestCase):
         diag = []
         with mock.patch.object(G.hidlist, "enumerate", return_value=cols),                 mock.patch.object(G.hid, "device", side_effect=[zero, real]):
             result = G.read_connected(diag)
-        self.assertEqual((result.level, result.charging), (91, True))
+        self.assertEqual((result.level, result.charging, result.name),
+                         (91, True, "GameSir Cyclone 2"))
         self.assertTrue(any("pid=0575" in line for line in diag))
 
     def test_disconnect_and_silence_are_safe(self):

@@ -220,8 +220,11 @@ and keyboard read. The **ROG Azoth 96 HE** (`1c12` in the pair list) answered
 capture for [#238](https://github.com/HeyOkay/HaloBattery/issues/238); the
 provider reads byte 6 and charging byte 9 exactly as for the OMNI keyboards.
 The SpeedNova is also the Harpe II receiver, so the provider follows the pair
-list rather than assuming which device is attached. **Reporter test pending**
-for the provider build; the Harpe II mouse path is unchanged.
+list rather than assuming which device is attached. **Confirmed on hardware**
+by @benlinkwk in [#238](https://github.com/HeyOkay/HaloBattery/issues/238):
+36 %, and charging followed the cable in both directions. The same run read a
+ROG Keris II Origin on the OMNI receiver at 61 %. The Harpe II mouse path is
+unchanged.
 
 ### Corsair Dark Core RGB Pro SE
 

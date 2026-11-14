@@ -11,8 +11,10 @@ and the project follows [Semantic Versioning](https://semver.org/).
 - **ASUS ROG Azoth 96 HE** on its SpeedNova 8K receiver (`0b05:1ad0`): the
   receiver answers the same pair-list and keyboard `12 01` read as the OMNI
   receivers, with the level in byte 6 and charging in byte 9. From Gear Link's
-  capture in [#238](https://github.com/HeyOkay/HaloBattery/issues/238); reporter
-  test pending.
+  capture in [#238](https://github.com/HeyOkay/HaloBattery/issues/238).
+  **Confirmed on hardware** by @benlinkwk: 36 %, and charging followed the
+  cable in both directions. The same diagnostics read a ROG Keris II Origin on
+  the OMNI receiver at 61 %, so both requested devices were in the tray.
 - Use the matte glass application icon for executables and the settings header,
   with less transparent padding in taskbar icons and theme-specific SVG artwork
   placed close to, and vertically centered beside, HaloBattery in the header.

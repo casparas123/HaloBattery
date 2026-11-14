@@ -92,8 +92,10 @@ def parse_state(frame, pid: int = 0) -> Optional[Reading]:
 def supported_collections() -> List[dict]:
     """The vendor collections of a supported GameSir pad, if any."""
     try:
+        infos = hidlist.enumerate(VENDOR_VID)
         out = []
-        for d in hidlist.enumerate(VENDOR_VID):
+        cyclone_hid = False
+        for d in infos:
             pid = d.get("product_id") or 0
             if pid not in OTHER_MODELS and pid not in EDITIONS:
                 continue
@@ -105,6 +107,16 @@ def supported_collections() -> List[dict]:
                 # "GameSir-Cyclone 2" identity is the charging collection (#221).
                 continue
             out.append(d)
+            if pid == CYCLONE_CHARGING_PID:
+                cyclone_hid = True
+        if cyclone_hid:
+            # While charging, Windows also exposes the same pad on the generic
+            # Xbox id. Its fff0:0040 collection can carry the state the 0575
+            # collection answers only as zeros (#221 follow-up).
+            out += [d for d in infos
+                    if d.get("product_id") == XINPUT_WIRED_PID
+                    and d.get("usage_page") == USAGE_PAGE
+                    and d not in out]
         return out
     except (OSError, ValueError):
         return []
@@ -118,46 +130,51 @@ def has_supported_collection() -> bool:
 def read_connected(diag: List[str]) -> Optional[Reading]:
     """Read only the vendor collection; the caller identifies the XInput slot."""
     cols = supported_collections()
-    # More than one pad cannot be matched to the one XInput slot reliably.
-    if len(cols) != 1:
+    # One pad cannot be matched to the one XInput slot reliably. The charging
+    # identity adds the generic 1053 collection as a fallback, so two entries
+    # are expected exactly when 0575 + 1053 belong to the same pad.
+    pids = {d.get("product_id") for d in cols}
+    if len(cols) == 0 or len(cols) > 2 or (
+            len(cols) == 2 and pids != {CYCLONE_CHARGING_PID, XINPUT_WIRED_PID}):
         diag.append(f"[GameSir] {len(cols)} vendor collection(s): not read")
         return None
-    pid = cols[0]["product_id"]
-    dev = hid.device()
-    try:
-        dev.open_path(cols[0]["path"])
-        sent = dev.write(STATUS_REQUEST)
-        if sent is not None and sent < len(STATUS_REQUEST):
-            diag.append(f"[GameSir] request write failed ({sent})")
-            return None
-        skipped_zero = False
-        for _ in range(40):
-            frame = bytes(dev.read(64, 25))
-            if not frame:
-                continue
-            # The charging identity answers the request with an all-zero state
-            # report before its real one (#221, 3537:0575). Treating that as
-            # 0 % froze the icon at zero while the pad was charging; wait for
-            # the next report instead.
-            if (len(frame) > LEVEL_BYTE and frame[0] == STATE_REPORT
-                    and frame[CHARGE_BYTE] == 0 and frame[LEVEL_BYTE] == 0):
-                skipped_zero = True
-                diag.append(f"[GameSir] pid={pid:04x}: zero state report; waiting for the real one")
-                continue
-            reading = parse_state(frame, pid)
-            if reading is not None:
-                diag.append(f"[GameSir] {reading.name} pid={pid:04x} report 0x12 bytes 35-36: "
-                            f"{hexdump(frame[CHARGE_BYTE:LEVEL_BYTE + 1], 2)} -> "
-                            f"{reading.level}%, charging={reading.charging}")
-                return reading
-        if skipped_zero:
-            diag.append(f"[GameSir] pid={pid:04x}: only zero state reports after the request")
-        diag.append(f"[GameSir] pid={pid:04x}: no state report after the request")
-    except (OSError, ValueError) as e:
-        diag.append(f"[GameSir] {e}")
-    finally:
+    for d in cols:
+        pid = d["product_id"]
+        dev = hid.device()
         try:
-            dev.close()
-        except Exception:
-            pass
+            dev.open_path(d["path"])
+            sent = dev.write(STATUS_REQUEST)
+            if sent is not None and sent < len(STATUS_REQUEST):
+                diag.append(f"[GameSir] pid={pid:04x} request write failed ({sent})")
+                continue
+            skipped_zero = False
+            for _ in range(40):
+                frame = bytes(dev.read(64, 25))
+                if not frame:
+                    continue
+                # The charging identity answers the request with an all-zero state
+                # report before its real one (#221, 3537:0575). Treating that as
+                # 0 % froze the icon at zero while the pad was charging; wait for
+                # the next report instead.
+                if (len(frame) > LEVEL_BYTE and frame[0] == STATE_REPORT
+                        and frame[CHARGE_BYTE] == 0 and frame[LEVEL_BYTE] == 0):
+                    skipped_zero = True
+                    diag.append(f"[GameSir] pid={pid:04x}: zero state report; waiting for the real one")
+                    continue
+                reading = parse_state(frame, pid)
+                if reading is not None:
+                    diag.append(f"[GameSir] {reading.name} pid={pid:04x} report 0x12 bytes 35-36: "
+                                f"{hexdump(frame[CHARGE_BYTE:LEVEL_BYTE + 1], 2)} -> "
+                                f"{reading.level}%, charging={reading.charging}")
+                    return reading
+            if skipped_zero:
+                diag.append(f"[GameSir] pid={pid:04x}: only zero state reports after the request")
+            diag.append(f"[GameSir] pid={pid:04x}: no state report after the request")
+        except (OSError, ValueError) as e:
+            diag.append(f"[GameSir] pid={pid:04x}: {e}")
+        finally:
+            try:
+                dev.close()
+            except Exception:
+                pass
     return None

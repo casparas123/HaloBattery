@@ -136,6 +136,7 @@ def read_connected(diag: List[str]) -> Optional[Reading]:
             len(cols) == 2 and pids != {CYCLONE_CHARGING_PID, XINPUT_WIRED_PID}):
         diag.append(f"[GameSir] {len(cols)} vendor collection(s): not read")
         return None
+    has_cyclone = any(d.get("product_id") == CYCLONE_CHARGING_PID for d in cols)
     for d in cols:
         pid = d["product_id"]
         dev = hid.device()
@@ -161,6 +162,10 @@ def read_connected(diag: List[str]) -> Optional[Reading]:
                     continue
                 reading = parse_state(frame, pid)
                 if reading is not None:
+                    if pid == XINPUT_WIRED_PID and has_cyclone:
+                        # The generic 1053 collection carries the Cyclone's state;
+                        # its pid alone maps to the G7 Pro name (#221).
+                        reading = reading._replace(name=OTHER_MODELS[CYCLONE_CHARGING_PID])
                     diag.append(f"[GameSir] {reading.name} pid={pid:04x} report 0x12 bytes 35-36: "
                                 f"{hexdump(frame[CHARGE_BYTE:LEVEL_BYTE + 1], 2)} -> "
                                 f"{reading.level}%, charging={reading.charging}")

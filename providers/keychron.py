@@ -11,8 +11,12 @@ vendor protocol:
 
   * the vendor collection on interface 4 - the interface number is the only handle
     that module uses to find it, and a probe logs what is actually present.
-  * request: a 64-byte *feature* report `b3 06 00 ...` (report id 0xB3, command
-    0x06 status).
+  * request: a 64-byte `b3 06 00 ...` frame (report id 0xB3, command 0x06
+    status), sent as a feature report on the Ultra-Link 8K.
+  * the Nape Pro's Link-KM receiver publishes the same vendor collection on
+    interface 1 as an interrupt-OUT endpoint; when SET_FEATURE is refused or
+    unanswered, the identical frame is retried with write() (#270, confirmed by
+    a Keychron Launcher USB capture).
   * reply: a 64-byte input report on the interrupt endpoint: `b4 06 ... <level> ...`,
     the battery in byte 20, accepted only when it is 100 or less.
   * up to three attempts, 100 ms apart, with a 500 ms wait for each reply.
@@ -101,12 +105,35 @@ class KeychronProvider(Provider):
             for attempt in range(ATTEMPTS):
                 if attempt:
                     time.sleep(RETRY_DELAY)
+                sent = None
                 try:
-                    dev.send_feature_report(make_request())
+                    sent = dev.send_feature_report(make_request())
                 except (OSError, IOError, ValueError) as e:
-                    self._diag.append(f"  attempt {attempt + 1} send: {e}")
-                    continue
-                r = dev.read(REPORT_SIZE, READ_TIMEOUT_MS)
+                    self._diag.append(f"  attempt {attempt + 1} feature send: {e}")
+                feature_ok = sent is not None and sent >= 0
+                if not feature_ok:
+                    self._diag.append(f"  attempt {attempt + 1} feature refused "
+                                      f"({sent}); trying output")
+                r = dev.read(REPORT_SIZE, READ_TIMEOUT_MS) if feature_ok else None
+                if feature_ok and not r:
+                    # The Nape Pro's Link-KM receiver (#270) publishes its vendor
+                    # collection as an interrupt-OUT endpoint. The capture of
+                    # Keychron Launcher shows the same b3 06 frame written as a
+                    # 64-byte output report; SET_FEATURE is refused or ignored,
+                    # so retry the identical frame on the output endpoint.
+                    self._diag.append(f"  attempt {attempt + 1}: feature accepted, "
+                                      "no reply; trying output")
+                    feature_ok = False
+                if not feature_ok:
+                    try:
+                        sent = dev.write(make_request())
+                    except (OSError, IOError, ValueError) as e:
+                        self._diag.append(f"  attempt {attempt + 1} output send: {e}")
+                        continue
+                    if sent is None or sent < 0:
+                        self._diag.append(f"  attempt {attempt + 1} output refused ({sent})")
+                        continue
+                    r = dev.read(REPORT_SIZE, READ_TIMEOUT_MS)
                 if not r:
                     self._diag.append(f"  attempt {attempt + 1}: no reply")
                     continue

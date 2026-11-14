@@ -80,6 +80,14 @@ class PollTest(unittest.TestCase):
         self.assertEqual([b"nape-vendor"], dev.opened)
         self.assertEqual([bytes(K.make_request())], dev.sent)
 
+    def test_ffc1_wins_over_the_via_page_when_enumerated_last(self):
+        # #270: the Link-KM receiver lists ff60 (VIA) and ffc1 (battery); the
+        # VIA page accepts writes but never answers, so ffc1 must be chosen
+        infos = [self.NAPE[2], self.NAPE[1]]
+        out, dev = self.poll([reply(100)], infos)
+        self.assertEqual(out[0].level, 100)
+        self.assertEqual([b"nape-vendor"], dev.opened)
+
     def test_interface_4_still_wins_when_it_exists(self):
         infos = [
             {"path": b"iface1", "interface_number": 1,

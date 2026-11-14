@@ -55,10 +55,10 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
-- Keychron Nape Pro (`3434:d026`): the Link-KM receiver exposes its `ffc1:0001`
-  collection as an interrupt-OUT endpoint, so the identical `b3 06` frame is
-  retried with `write()` when SET_FEATURE is refused or unanswered. The Keychron
-  Launcher capture in #270 confirms the exchange and the 100 % reply.
+- Keychron Nape Pro (`3434:d026`): prefer the `ffc1:0001` battery collection
+  over the `ff60` VIA page, and retry the identical `b3 06` frame with
+  `write()` when SET_FEATURE is refused or unanswered. The Keychron Launcher
+  capture in #270 confirms the exchange and the 100 % reply.
 - Show the closed-eye Lucide glyph when a device is hidden from the tray.
 
 - Use single-language Language card headings in English, French and Spanish.

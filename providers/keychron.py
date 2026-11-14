@@ -81,15 +81,19 @@ class KeychronProvider(Provider):
         for d in infos:
             if d.get("interface_number") == VENDOR_INTERFACE:
                 return d
-        # the Nape Pro's Link-KM receiver puts its vendor collection on interface 1
-        # (ffc1:0001), not interface 4: pick the vendor page wherever it is (#270)
+        # the Nape Pro's Link-KM receiver puts its battery vendor collection on
+        # interface 1 (ffc1:0001), not interface 4; it also exposes a VIA page
+        # (ff60) on interface 3 that accepts writes but never answers (#270).
         vendor = [d for d in infos if (d.get("usage_page") or 0) >= 0xFF00]
-        if vendor:
+        battery = [d for d in vendor
+                   if (d.get("usage_page"), d.get("usage")) == (0xFFC1, 0x0001)]
+        chosen = battery or vendor[:1]
+        if chosen:
             self._diag.append(f"  no interface {VENDOR_INTERFACE} collection; using "
-                              f"iface={vendor[0].get('interface_number')} "
-                              f"{vendor[0].get('usage_page', 0):04x}:"
-                              f"{vendor[0].get('usage', 0):04x}")
-            return vendor[0]
+                              f"iface={chosen[0].get('interface_number')} "
+                              f"{chosen[0].get('usage_page', 0):04x}:"
+                              f"{chosen[0].get('usage', 0):04x}")
+            return chosen[0]
         self._diag.append(f"  no interface {VENDOR_INTERFACE} collection; "
                           f"falling back to the first of {len(infos)}")
         return infos[0] if infos else None
@@ -114,7 +118,13 @@ class KeychronProvider(Provider):
                 if not feature_ok:
                     self._diag.append(f"  attempt {attempt + 1} feature refused "
                                       f"({sent}); trying output")
-                r = dev.read(REPORT_SIZE, READ_TIMEOUT_MS) if feature_ok else None
+                r = None
+                if feature_ok:
+                    try:
+                        r = dev.read(REPORT_SIZE, READ_TIMEOUT_MS)
+                    except (OSError, IOError, ValueError) as e:
+                        self._diag.append(f"  attempt {attempt + 1} feature read: {e}")
+                        feature_ok = False
                 if feature_ok and not r:
                     # The Nape Pro's Link-KM receiver (#270) publishes its vendor
                     # collection as an interrupt-OUT endpoint. The capture of
@@ -133,7 +143,11 @@ class KeychronProvider(Provider):
                     if sent is None or sent < 0:
                         self._diag.append(f"  attempt {attempt + 1} output refused ({sent})")
                         continue
-                    r = dev.read(REPORT_SIZE, READ_TIMEOUT_MS)
+                    try:
+                        r = dev.read(REPORT_SIZE, READ_TIMEOUT_MS)
+                    except (OSError, IOError, ValueError) as e:
+                        self._diag.append(f"  attempt {attempt + 1} output read: {e}")
+                        continue
                 if not r:
                     self._diag.append(f"  attempt {attempt + 1}: no reply")
                     continue

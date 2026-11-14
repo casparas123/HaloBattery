@@ -7,6 +7,8 @@ and the project follows [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Lamzu Atlantis V2 (`3554:F50D`) on the Compx 17-byte power query; test build
+  only until the reporter of #408 runs it.
 - Russian localization, including native settings, tray menus, notifications,
   Windows language detection and Russian plural forms.
 - License-only Iconify eligibility without independent brand/logo/Bluetooth

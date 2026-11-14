@@ -108,11 +108,22 @@ class Endgame4kProvider(Provider):
         try:
             sent = dev.send_feature_report(frame)
         except (OSError, IOError, ValueError) as e:
-            self._diag.append(f"  query {opcode:02x}: send failed: {e}")
-            return None
+            self._diag.append(f"  query {opcode:02x}: feature send failed: {e}")
+            sent = -1
         if sent != len(frame):
-            self._diag.append(f"  query {opcode:02x}: short send ({sent})")
-            return None
+            # The HS dongle's ff02:0002 collection may expose the frame only as
+            # an interrupt-OUT report; the 4K exchange in #321 failed on the
+            # feature path, so try the identical 17-byte frame as output.
+            self._diag.append(f"  query {opcode:02x}: feature short send ({sent}); trying output")
+            try:
+                sent = dev.write(frame)
+            except (OSError, IOError, ValueError) as e:
+                self._diag.append(f"  query {opcode:02x}: output send failed: {e}")
+                return None
+            self._diag.append(f"  query {opcode:02x}: output send -> {sent}")
+            if sent != len(frame):
+                self._diag.append(f"  query {opcode:02x}: short send ({sent})")
+                return None
         deadline = time.monotonic() + TIMEOUT
         while time.monotonic() < deadline:
             try:

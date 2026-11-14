@@ -18,12 +18,18 @@ def battery_reply(level, charging):
 
 
 class FakeDongle:
-    def __init__(self, replies=None):
+    def __init__(self, replies=None, feature_ok=True):
         self.replies = [list(r) for r in (replies or [])]
         self.writes = []
+        self.outputs = []
+        self.feature_ok = feature_ok
 
     def send_feature_report(self, data):
         self.writes.append(list(data))
+        return len(data) if self.feature_ok else -1
+
+    def write(self, data):
+        self.outputs.append(list(data))
         return len(data)
 
     def read(self, size, timeout_ms):
@@ -49,6 +55,11 @@ class FakeBus:
                 if self.path != bus.feature:
                     raise AssertionError("a write went to the input collection")
                 return bus.dongle.send_feature_report(data)
+
+            def write(self, data):
+                if self.path != bus.feature:
+                    raise AssertionError("an output write went to the input collection")
+                return bus.dongle.write(data)
 
             def read(self, size, timeout_ms):
                 if self.path != bus.input:
@@ -101,6 +112,15 @@ class Endgame4kTest(unittest.TestCase):
         self.assertEqual(dongle.writes[0], E.query_frame(0x04))
         self.assertEqual(dongle.writes[0][0], 0x08)
         self.assertEqual(sum(dongle.writes[0]) & 0xFF, 0x55)
+
+    def test_the_frame_falls_back_to_an_output_report(self):
+        # #321: the dongle answered "short send (-1)" on the feature path.
+        dongle = FakeDongle([battery_reply(81, 0)], feature_ok=False)
+        provider = self.poll(dongle)
+        [st] = provider.poll()
+        self.assertEqual((st.level, st.charging), (81, False))
+        self.assertEqual(dongle.outputs[0], E.query_frame(0x04))
+        self.assertTrue(any("trying output" in line for line in provider.diagnostics()))
 
     def test_a_bad_checksum_is_skipped(self):
         bad = battery_reply(10, 0)

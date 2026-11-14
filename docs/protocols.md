@@ -139,6 +139,16 @@ On battery and after charge completion, it displays the reported level unchanged
 
 The headset's own "PA" protocol: output reports 0x02 on the vendor interface 0xFF00, remote mode 0xE1, commands 0x21 (battery) and 0x2A (charging)
 
+### Apple Magic Trackpad 2
+
+The trackpad's vendor collection `FF00:0014` answers a read-only input report
+`0x90`; byte 2 is the charge percentage. The same collection exists on Bluetooth
+(`004c:0265`) and USB (`05ac:0265`). The request is from
+[imbushuo/mac-precision-touchpad](https://github.com/imbushuo/mac-precision-touchpad)
+(MIT), which reads it in the Windows settings app. Some Windows HID stacks expose
+the GET only as a feature report, so the provider falls back to that form.
+**Unverified** on this reporter's hardware until test build 1 is run (#405).
+
 ### Sony INZONE H9
 
 **Connection:** the headset's USB dongle (`054C:0E53`), which exposes a serial (COM) port

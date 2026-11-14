@@ -122,6 +122,7 @@ MESSAGES = {
     "provider.shield": "Контроллеры NVIDIA SHIELD",
     "provider.skullcandy": "Гарнитуры Skullcandy",
     "provider.sony_inzone": "Sony INZONE H9",
+    "provider.apple_trackpad": "Apple Magic Trackpad 2",
     "provider.turtlebeach": "Гарнитуры Turtle Beach",
     "state.not_reported": "пока нет данных",
     "state.charging_unknown": "{state}, состояние зарядки неизвестно",

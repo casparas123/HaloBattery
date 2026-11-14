@@ -7,6 +7,9 @@ and the project follows [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Apple Magic Trackpad 2 (`004C:0265` / `05AC:0265`) battery over its vendor
+  collection using the read-only report from mac-precision-touchpad; test build
+  only until the reporter of #405 runs it.
 - Russian localization, including native settings, tray menus, notifications,
   Windows language detection and Russian plural forms.
 - License-only Iconify eligibility without independent brand/logo/Bluetooth

@@ -138,11 +138,20 @@ class KeychronProvider(Provider):
         return ordered
 
     @staticmethod
-    def _nape_collection(infos: List[dict]) -> Optional[dict]:
-        for d in infos:
-            if (d.get("usage_page"), d.get("usage")) == (NAPE_USAGE_PAGE, NAPE_USAGE):
-                return d
-        return None
+    def _nape_candidates(infos: List[dict]) -> List[dict]:
+        """The M6/Nape battery collection, vendor page first.
+
+        The Launcher's battery action writes report id 0 on the mouse's 1K
+        vendor page (ffc1:0001); the VIA page (ff60:0061) is the fallback. A
+        previous build only tried the VIA page, which stayed silent (#270).
+        """
+        ordered = []
+        for page, usage in ((0xFFC1, 0x0001), (NAPE_USAGE_PAGE, NAPE_USAGE)):
+            for d in infos:
+                if (d.get("usage_page"), d.get("usage")) == (page, usage):
+                    ordered.append(d)
+                    break
+        return ordered
 
     def _open(self, path: bytes):
         dev = hid.device()
@@ -253,21 +262,23 @@ class KeychronProvider(Provider):
                 continue
             name = PIDS[pid]
             if pid == NAPE_PID:
-                d = self._nape_collection(mine)
-                if d is None:
+                candidates = self._nape_candidates(mine)
+                if not candidates:
                     self._diag.append(f"[Keychron] pid={pid:04x} '{name}': "
-                                      f"no {NAPE_USAGE_PAGE:04x}:{NAPE_USAGE:04x} collection")
+                                      f"no ffc1:0001 or {NAPE_USAGE_PAGE:04x}:{NAPE_USAGE:04x} collection")
                     continue
-                seen.add(d["path"])
-                self._diag.append(f"[Keychron] pid={pid:04x} '{name}' "
-                                  f"iface={d.get('interface_number')} "
-                                  f"{d.get('usage_page', 0):04x}:{d.get('usage', 0):04x} "
-                                  f"(a7 31)")
-                reply = self._query_nape(d["path"])
-                level = parse_nape(reply)
-                if level is not None:
-                    out.append(DeviceStatus(f"keychron:{pid:04x}", name, level, False, True,
-                                            "keychron", charging_known=False))
+                for d in candidates:
+                    seen.add(d["path"])
+                    self._diag.append(f"[Keychron] pid={pid:04x} '{name}' "
+                                      f"iface={d.get('interface_number')} "
+                                      f"{d.get('usage_page', 0):04x}:{d.get('usage', 0):04x} "
+                                      f"(a7 31)")
+                    reply = self._query_nape(d["path"])
+                    level = parse_nape(reply)
+                    if level is not None:
+                        out.append(DeviceStatus(f"keychron:{pid:04x}", name, level, False, True,
+                                                "keychron", charging_known=False))
+                        break
                 continue
             for d in self._candidates(mine):
                 seen.add(d["path"])

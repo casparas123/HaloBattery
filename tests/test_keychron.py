@@ -88,7 +88,7 @@ class PollTest(unittest.TestCase):
         out, dev = self.poll([nape_reply(94)], self.NAPE)
         self.assertEqual([(s.key, s.name, s.level) for s in out],
                          [("keychron:d026", "Keychron Nape Pro", 94)])
-        self.assertEqual([b"nape-via"], dev.opened)
+        self.assertEqual([b"nape-vendor"], dev.opened)
         self.assertEqual([b"\x00" + bytes(K.make_nape_request())], dev.writes)
         self.assertEqual([], dev.sent)
         # charging state is not known on this exchange

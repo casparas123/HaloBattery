@@ -47,7 +47,8 @@ CHARGING_INDEX = 7
 LEVEL_INDEX = 8
 
 RF_DELAY_S = 0.10                  # the SetFeature -> RF -> GetFeature round trip
-READ_ATTEMPTS = 2                  # a waking mouse answers 0xA2 first; retry once
+READ_ATTEMPTS = 5                  # a waking mouse may answer 0xA2 / 0 % first
+RETRY_DELAY_S = 0.30               # longer pause before asking a waking mouse again
 ASLEEP_KEEP = 300
 
 # Wired ids of the same model, from GloriousBatteryMonitor-Go's DeviceDatabase.cs. Charging
@@ -146,7 +147,7 @@ class GloriousProvider(Provider):
             self._diag.append(f"    open: {e}")
             return None
         try:
-            for _ in range(READ_ATTEMPTS):
+            for attempt in range(READ_ATTEMPTS):
                 sent = dev.send_feature_report(bytes(make_request(length)))
                 if sent is not None and sent < 0:
                     self._diag.append(f"    feature write refused ({sent})")
@@ -157,7 +158,15 @@ class GloriousProvider(Provider):
                     self._diag.append(f"    reply: {hexdump(r, 12)}")
                 parsed = parse_reply(r)
                 if parsed is not None:
+                    # GloriousBatteryMonitor-Go retries a 0 % answer after a longer
+                    # pause: a mouse waking from sleep can answer A2/0 first.
+                    if parsed[0] == 0 and attempt < READ_ATTEMPTS - 1:
+                        self._diag.append("    level 0; waiting for the mouse to wake")
+                        time.sleep(RETRY_DELAY_S)
+                        continue
                     return parsed
+                if attempt < READ_ATTEMPTS - 1:
+                    time.sleep(RETRY_DELAY_S)
         except (OSError, IOError, ValueError) as e:
             self._diag.append(f"    error: {e}")
         finally:

@@ -118,6 +118,11 @@ class PollTest(unittest.TestCase):
                            "mouse")])
         self.assertEqual([bytes(G.make_request(65))], dev.sent)
 
+    def test_a_zero_answer_is_retried_until_the_mouse_wakes(self):
+        out, dev = self.poll([reply(0), CAPTURED_75])
+        self.assertEqual([(s.level, s.online) for s in out], [(75, True)])
+        self.assertEqual(2, len(dev.sent))
+
     def test_charging_is_reported(self):
         out, _dev = self.poll([CAPTURED_75_CHARGING])
         self.assertTrue(out[0].charging)

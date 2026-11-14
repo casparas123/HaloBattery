@@ -518,6 +518,23 @@ class BragiPollTest(unittest.TestCase):
         self.assertEqual(out[0].level, 76)
         self.assertEqual(bus.opened, [b"d"])
 
+    def test_the_m65_slipstream_receiver_is_read(self):
+        # #411: 1b1c:1ba6 'CORSAIR SLIPSTREAM WIRELESS USB Receiver'; the dump
+        # carries the same ff42:0001/0002 pair as the Dark Core dongle
+        out, bus = self.poll(
+            [entry(0x1BA6, b"m65", 1, 0xFF42, 0x0001,
+                   "CORSAIR SLIPSTREAM WIRELESS USB Receiver")],
+            {b"m65": FakeDongle(bragi_reply(550))})
+        self.assertEqual(len(out), 1)
+        st = out[0]
+        self.assertEqual((st.key, st.name, st.level, st.kind),
+                         ("corsair:m65", "Corsair M65 RGB Ultra Wireless", 55, "mouse"))
+        self.assertFalse(st.charging)
+        self.assertTrue(st.online)
+        self.assertEqual(bus.opened, [b"m65"])
+        self.assertEqual(bus.dongles[b"m65"].writes[0][:4],
+                         bytes((0x00, 0x09, 0x02, 0x0F)))
+
     def test_the_m75_slipstream_receiver_is_read(self):
         # #301: 1b1c:1bdc 'CORSAIR SLIPSTREAM WIRELESS USB Receiver' publishes the same
         # ff42:0001/0002 pair as the Dark Core dongle, so the same framed ask applies
@@ -535,6 +552,7 @@ class BragiPollTest(unittest.TestCase):
                                   0x0A97: "Corsair HS80 Max Wireless"})
         self.assertEqual(C.BRAGI_PIDS, {
             0x1B7F: "Corsair Dark Core RGB Pro SE",
+            0x1BA6: "Corsair M65 RGB Ultra Wireless",   # #411 (Slipstream receiver)
             0x0A40: "Corsair Virtuoso RGB Wireless SE",
             0x0A3E: "Corsair Virtuoso RGB Wireless SE",
             0x0A3D: "Corsair Virtuoso RGB Wireless SE",

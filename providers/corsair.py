@@ -92,6 +92,12 @@ exchange as the Dark Core's dongle: route 0x09 asks the paired keyboard for prop
 as a little-endian uint16 from the reply's bytes 3-4, so this id mirrors that; no
 charge property is read, because that handler reports none. Confirmed on the
 reporter's own unit (#154): his test build run showed 100 % (`01 02 00 e8 03`).
+
+The M65 RGB Ultra Wireless's SLIPSTREAM receiver (1b1c:1ba6, #411) publishes the
+same ff42:0001/0002 pair and answers the same routed get-property exchange as
+the Dark Core's dongle. Its diagnostics show no other battery-capable collection;
+the level is read from property 0x0F, with no charge property. **Unverified** until
+the reporter's test build answers.
 """
 from __future__ import annotations
 
@@ -269,6 +275,7 @@ def make_software_mode(endpoint: int) -> List[int]:
 # dongle is read.
 BRAGI_PIDS = {
     0x1B7F: "Corsair Dark Core RGB Pro SE",
+    0x1BA6: "Corsair M65 RGB Ultra Wireless",   # #411 SLIPSTREAM receiver
     0x2B07: "Corsair K65 PLUS Wireless",
     0x1BDC: "Corsair M75 Wireless",
     0x0A40: "Corsair Virtuoso RGB Wireless SE",
@@ -279,10 +286,11 @@ BRAGI_PIDS = {
 }
 # the pictogram each family member draws: the Dark Core is a mouse, the K65 PLUS a
 # keyboard; the Virtuoso ids are headsets
-BRAGI_KINDS = {0x1B7F: "mouse", 0x2B07: "keyboard", 0x1BDC: "mouse"}
+BRAGI_KINDS = {0x1B7F: "mouse", 0x1BA6: "mouse", 0x2B07: "keyboard", 0x1BDC: "mouse"}
 # one icon per product: a headset's receiver and cable ids share the key
 BRAGI_KEYS = {
     0x1B7F: "corsair:1b7f",
+    0x1BA6: "corsair:m65",
     0x2B07: "corsair:2b07",
     0x1BDC: "corsair:1bdc",
     0x0A40: "corsair:virtuoso-se",

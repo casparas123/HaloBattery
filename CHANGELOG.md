@@ -19,8 +19,11 @@ and the project follows [Semantic Versioning](https://semver.org/).
   are unverified.
 - **GameSir Cyclone 2** (`3537:100b`): the same `fff0:0040` gamepad-state report
   (GameSir Connect's `proxyC2.parseGamepadState()`), so the same reader is used.
-  **Unverified** on hardware - from the reporter's diagnostics in
-  [#221](https://github.com/HeyOkay/HaloBattery/issues/221).
+  The receiver was confirmed by the reporter on 2026-11-14 (85 %, matching
+  GameSir Connect). While charging the pad enumerates as `3537:0575` with the
+  same collection and Windows exposes it as a generic Xbox pad (`3537:1053`);
+  the XInput provider now pairs that report to the GameSir collection instead of
+  its `1000/1000` placeholder. Charging identity test-build pending.
 
 ### Fixed
 

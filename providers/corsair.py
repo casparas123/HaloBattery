@@ -99,7 +99,8 @@ the Dark Core's dongle. Its diagnostics show no other battery-capable collection
 the level is read from property 0x0F, with no charge property. When the mouse is
 plugged in, it moves to its cable identity 1b1c:1bb5, which publishes the same
 pair and answers level on target 0x08 plus charge property 0x10 (the exchange
-OpenLinkHub's m65rgbultraWU package uses). The cable and receiver share one icon;
+OpenLinkHub's m65rgbultraWU package uses; its state codes are 1 charging,
+2 on battery, 3 full). The cable and receiver share one icon;
 the cable's charging reading wins while it is connected. **Unverified** on this
 provider until the reporter runs the corrected test build.
 """
@@ -331,7 +332,7 @@ BRAGI_ROUTE_MOUSE = 0x09         # 0x08 | child 1: the paired mouse
 BRAGI_ROUTE_CHILD = 0x01         # the route the mouse's answers come back with
 BRAGI_CMD_GET = 0x02             # ckb-next: CMD_GET
 BRAGI_PROP_BATTERY = 0x0F        # ckb-next: BRAGI_BATTERY_LEVEL
-BRAGI_PROP_CHARGE = 0x10         # 1 = charging, 2 = on battery (#204, measured)
+BRAGI_PROP_CHARGE = 0x10         # 1 = charging, 2 = on battery, 3 = full (OpenLinkHub)
 BRAGI_PROP_HEARTBEAT = 0x12      # the session heartbeats (#204)
 BRAGI_PROP_FIRMWARE = 0x13       # the session's firmware query (#204)
 BRAGI_LEVEL_MAX = 1000           # tenths of a percent (765 -> 76 %)
@@ -449,14 +450,25 @@ def parse_bragi_cable(reply) -> Optional[int]:
     return value // 10
 
 
+def parse_bragi_charge_cable_state(reply) -> Optional[int]:
+    """The wired M65's property 0x10 state, or None.
+
+    OpenLinkHub's m65rgbultraWU package treats byte 3 as a state code:
+    1 charging, 2 on battery, 3 full, 0 not charging. The value is kept
+    separate from the level shape because it is a state, not a percentage.
+    """
+    value = _parse_bragi_cable_raw(reply)
+    if value in (0, 1, 2, 3):
+        return value
+    return None
+
+
 def parse_bragi_charge_cable(reply) -> Optional[bool]:
     """The charge state from the wired M65's property 0x10 answer, or None."""
-    value = _parse_bragi_cable_raw(reply)
-    if value == 1:
-        return True
-    if value == 2:
-        return False
-    return None
+    state = parse_bragi_charge_cable_state(reply)
+    if state is None:
+        return None
+    return state == 1
 
 
 def void_request() -> List[int]:
@@ -674,7 +686,18 @@ class CorsairProvider(Provider):
             return None
         if not self._write_bragi(dev, BRAGI_PROP_CHARGE, route=route, pid=pid):
             return None
-        charge_parse = parse_bragi_charge_cable if pid == 0x1BB5 else parse_bragi_charge
+        if pid == 0x1BB5:
+            state = self._ask_bragi(dev, min(BRAGI_CONFIRM_WINDOW_S,
+                                             deadline - time.monotonic()),
+                                    parse=parse_bragi_charge_cable_state)
+            if state is None:
+                self._diag.append("  no charge-state answer")
+                return None
+            self._diag.append("  charge state: " +
+                              {1: "charging", 2: "on battery", 3: "full"}
+                              .get(state, "not charging"))
+            return state == 1
+        charge_parse = parse_bragi_charge
         value = self._ask_bragi(dev, min(BRAGI_CONFIRM_WINDOW_S,
                                          deadline - time.monotonic()),
                                 parse=charge_parse)

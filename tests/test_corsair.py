@@ -149,6 +149,16 @@ class BragiParseTest(unittest.TestCase):
         self.assertEqual(C.parse_bragi_cable(cable_bragi_reply(380)), 38)
         self.assertIsNone(C.parse_bragi_cable(cable_bragi_reply(1001)))
 
+    def test_the_wired_m65_charge_codes_include_full(self):
+        # OpenLinkHub's m65rgbultraWU status map: 1 charging, 2 on battery,
+        # 3 full (the reporter's test-3 answer `00 02 00 03`).
+        self.assertTrue(C.parse_bragi_charge_cable(cable_bragi_reply(1)))
+        self.assertFalse(C.parse_bragi_charge_cable(cable_bragi_reply(2)))
+        self.assertFalse(C.parse_bragi_charge_cable(cable_bragi_reply(3)))
+        self.assertEqual(C.parse_bragi_charge_cable_state(cable_bragi_reply(3)), 3)
+        self.assertIsNone(C.parse_bragi_charge_cable(cable_bragi_reply(4)))
+        self.assertIsNone(C.parse_bragi_charge_cable_state(cable_bragi_reply(4)))
+
     def test_the_value_is_tenths_of_a_percent(self):
         self.assertEqual(C.parse_bragi(bragi_reply(765)), 76)
         self.assertEqual(C.parse_bragi(bragi_reply(1000)), 100)
@@ -579,6 +589,29 @@ class BragiPollTest(unittest.TestCase):
         self.assertEqual(d.writes[0][:4], bytes((0x00, 0x08, 0x02, 0x0F)))
         self.assertEqual(d.writes[2][:4], bytes((0x00, 0x08, 0x02, 0x10)))
         self.assertEqual([len(w) for w in d.writes], [C.BRAGI_MSG_SIZE + 1] * 3)
+
+    def test_the_m65_full_charge_code_keeps_the_level_and_no_charging_ring(self):
+        # Test 3's answer was 00 02 00 e8 03 (100 %) followed by 00 02 00 03:
+        # state 3 is "full" in OpenLinkHub, not a charging state.
+        class Cable(FakeDongle):
+            def __init__(self):
+                super().__init__(replies=[])
+                self.script = {1: [cable_bragi_reply(1000)],
+                               2: [cable_bragi_reply(1000)],
+                               3: [cable_bragi_reply(3)]}
+
+            def read(self, size, timeout_ms):
+                self.reads += 1
+                q = self.script.get(len(self.writes)) or []
+                return list(q.pop(0)) if q else []
+
+        d = Cable()
+        out, bus = self.poll(
+            [entry(0x1BB5, b"m65-cable", 1, 0xFF42, 0x0001,
+                   "CORSAIR M65 RGB ULTRA WIRELESS Gaming Mouse")],
+            {b"m65-cable": d})
+        self.assertEqual([(s.key, s.level, s.charging) for s in out],
+                         [("corsair:m65", 100, False)])
 
     def test_the_m65_receiver_and_cable_share_one_icon(self):
         # While charging, the receiver and the cable can both be present; the cable

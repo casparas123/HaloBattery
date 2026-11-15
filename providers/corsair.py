@@ -96,8 +96,12 @@ reporter's own unit (#154): his test build run showed 100 % (`01 02 00 e8 03`).
 The M65 RGB Ultra Wireless's SLIPSTREAM receiver (1b1c:1ba6, #411) publishes the
 same ff42:0001/0002 pair and answers the same routed get-property exchange as
 the Dark Core's dongle. Its diagnostics show no other battery-capable collection;
-the level is read from property 0x0F, with no charge property. **Unverified** until
-the reporter's test build answers.
+the level is read from property 0x0F, with no charge property. When the mouse is
+plugged in, it moves to its cable identity 1b1c:1bb5, which publishes the same
+pair and answers level on target 0x08 plus charge property 0x10 (the exchange
+OpenLinkHub's m65rgbultraWU package uses). The cable and receiver share one icon;
+the cable's charging reading wins while it is connected. **Unverified** on this
+provider until the reporter runs the corrected test build.
 """
 from __future__ import annotations
 
@@ -275,6 +279,10 @@ def make_software_mode(endpoint: int) -> List[int]:
 # dongle is read.
 BRAGI_PIDS = {
     0x1B7F: "Corsair Dark Core RGB Pro SE",
+    # The M65's cable identity is listed before the receiver: while charging both
+    # can be present, and the receiver then has no battery answer. Asking the
+    # cable first avoids waiting out the receiver's read budget before the level.
+    0x1BB5: "Corsair M65 RGB Ultra Wireless",   # #411 the same mouse on its cable
     0x1BA6: "Corsair M65 RGB Ultra Wireless",   # #411 SLIPSTREAM receiver
     0x2B07: "Corsair K65 PLUS Wireless",
     0x1BDC: "Corsair M75 Wireless",
@@ -286,11 +294,13 @@ BRAGI_PIDS = {
 }
 # the pictogram each family member draws: the Dark Core is a mouse, the K65 PLUS a
 # keyboard; the Virtuoso ids are headsets
-BRAGI_KINDS = {0x1B7F: "mouse", 0x1BA6: "mouse", 0x2B07: "keyboard", 0x1BDC: "mouse"}
+BRAGI_KINDS = {0x1B7F: "mouse", 0x1BA6: "mouse", 0x1BB5: "mouse",
+               0x2B07: "keyboard", 0x1BDC: "mouse"}
 # one icon per product: a headset's receiver and cable ids share the key
 BRAGI_KEYS = {
     0x1B7F: "corsair:1b7f",
     0x1BA6: "corsair:m65",
+    0x1BB5: "corsair:m65",
     0x2B07: "corsair:2b07",
     0x1BDC: "corsair:1bdc",
     0x0A40: "corsair:virtuoso-se",
@@ -343,8 +353,14 @@ BRAGI_BARE_PIDS = {0x0A40, 0x0A3E, 0x0A3D, 0x0A64, 0x0A62}
 BRAGI_SESSION_PIDS = {0x0A40}
 # the wired ids resolve their target the other way round: HeadsetControl's
 # resolveTarget tries 0x08 first on a wired id and 0x09 on a receiver, with the
-# other as the fallback (#570)
-BRAGI_WIRED_PIDS = {0x0A3D, 0x0A62}
+# other as the fallback (#570). The M65 RGB Ultra Wireless on its cable
+# (1b1c:1bb5) uses the same Bragi battery/charge properties as OpenLinkHub's
+# m65rgbultraWU package, with target 0x08 first.
+BRAGI_WIRED_PIDS = {0x0A3D, 0x0A62, 0x1BB5}
+# ids that answer the charge property 0x10. The Virtuoso family was measured in
+# #204; the wired M65 uses the same property in OpenLinkHub's m65rgbultraWU
+# package. The M65 receiver itself does not report a charge flag.
+BRAGI_CHARGE_PIDS = set(BRAGI_BARE_PIDS) | {0x1BB5}
 
 
 def bragi_request(prop: int = BRAGI_PROP_BATTERY,
@@ -616,7 +632,7 @@ class CorsairProvider(Provider):
                       route: int = BRAGI_ROUTE_MOUSE) -> Optional[bool]:
         """The charge state on the receivers that report one (property 0x10),
         or None."""
-        if pid not in BRAGI_BARE_PIDS or time.monotonic() >= deadline:
+        if pid not in BRAGI_CHARGE_PIDS or time.monotonic() >= deadline:
             return None
         if not self._write_bragi(dev, BRAGI_PROP_CHARGE, route=route, pid=pid):
             return None

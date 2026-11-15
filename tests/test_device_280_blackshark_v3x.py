@@ -73,6 +73,19 @@ class ProtocolTests(unittest.TestCase):
         self.assertIsNone(B.parse_reply(reply(101)))
         self.assertIsNone(B.parse_reply(b""))
 
+    def test_short_ack_is_not_a_zero_percent(self):
+        # Exact frame from the #280 test-build 1 diagnostic.
+        self.assertIsNone(B.parse_reply(bytes.fromhex(
+            '07 01 03 00 00 00 02 07 80 00 00 00')))
+
+    def test_nonzero_status_is_not_a_level(self):
+        frame = bytearray(reply(53))
+        frame[1] = 0x01
+        self.assertIsNone(B.parse_reply(frame))
+
+    def test_a_real_zero_percent_is_kept(self):
+        self.assertEqual(0, B.parse_reply(reply(0)))
+
     def test_wrong_class_or_command_is_not_a_level(self):
         frame = bytearray(reply(80))
         frame[7] = 0x18
@@ -110,8 +123,8 @@ class PollTests(unittest.TestCase):
         self.assertTrue(dev.closed)
 
     def test_a_refusing_page_falls_through_to_the_next(self):
-        out, dev = self.poll([[], reply(64)])
-        # first path returns no reply, second answers
+        out, dev = self.poll([[], [], [], reply(64)])
+        # the first path returns no reply on all three reads, second answers
         self.assertEqual([s.level for s in out], [64])
         self.assertEqual([b"ff90", b"ff82"], dev.opened)
 

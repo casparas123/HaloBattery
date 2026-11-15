@@ -22,6 +22,7 @@ configuration, firmware or lighting command is ever sent.
 """
 from __future__ import annotations
 
+import time
 from typing import List, Optional
 
 try:
@@ -43,6 +44,8 @@ TRANSACTION = 0x03
 CRC_FIRST, CRC_LAST, CRC_INDEX = 3, 60, 62
 CLASS_BATTERY = 0x07
 CMD_BATTERY = 0x80
+SETTLE_S = 0.05          # the reference waits 50 ms after SET before GET
+REPLY_TRIES = 3
 
 
 def checksum(frame) -> int:
@@ -65,12 +68,18 @@ def make_query(transaction: int = TRANSACTION) -> bytes:
 
 
 def parse_reply(data) -> Optional[int]:
-    """Battery percentage from the reply, or None when it is not one."""
+    """Battery percentage from the reply, or None when it is not one.
+
+    The reporter's first test build read a short 12-byte frame back from the
+    receiver (`07 01 03 ...`). That is an acknowledgement/status frame, not the
+    64-byte battery answer the reference captured: its status byte is non-zero
+    and its level byte is merely zero padding. Requiring the full observed
+    length and success status prevents it being shown as a real 0%.
+    """
     d = list(data or [])
-    if len(d) <= 10:
+    if len(d) < REPORT_LEN:
         return None
-    # hidapi on Windows returns the report id first; the repo's layout includes it.
-    if d[0] != REPORT_ID:
+    if d[0] != REPORT_ID or d[1] != 0x00:
         return None
     if d[6] != 0x02 or d[7] != CLASS_BATTERY or d[8] != CMD_BATTERY:
         return None
@@ -107,10 +116,16 @@ class BlackSharkV3XProvider(Provider):
             if sent is not None and sent < 0:
                 diag.append(f"    feature write refused ({sent})")
                 return None
-            r = dev.get_feature_report(REPORT_ID, REPORT_LEN)
-            if r:
-                diag.append(f"    reply: {hexdump(r, 12)}")
-            return parse_reply(r)
+            for attempt in range(REPLY_TRIES):
+                time.sleep(SETTLE_S)
+                r = dev.get_feature_report(REPORT_ID, REPORT_LEN)
+                if r:
+                    diag.append(f"    reply {attempt + 1}: len={len(r)} "
+                                f"{hexdump(r, 16)}")
+                level = parse_reply(r)
+                if level is not None:
+                    return level
+            return None
         except (OSError, IOError, ValueError) as e:
             diag.append(f"    error: {e}")
             return None

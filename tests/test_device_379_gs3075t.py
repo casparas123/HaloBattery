@@ -50,6 +50,11 @@ class ParseTest(unittest.TestCase):
         self.assertEqual(len(G.request()), G.REPORT_LEN)
         self.assertEqual(bytes(G.request()[:3]), b"\xaa\x10\x18")
 
+    def test_hidapi_gets_the_zero_report_id_first(self):
+        self.assertEqual(G.REPORT_ID, 0x00)
+        self.assertEqual(G.write_frame(), [0x00] + G.request())
+        self.assertEqual(len(G.write_frame()), G.REPORT_LEN + 1)
+
     def test_the_level_and_charge_are_read(self):
         self.assertEqual(G.parse_reply(reply(85, 0x00)), (85, False))
         self.assertEqual(G.parse_reply(reply(42, 0x02)), (42, True))
@@ -85,7 +90,7 @@ class PollTest(unittest.TestCase):
                           for s in out],
                          [("gs3075t:fefe", "GS3075T 2.4G", 85, True, True,
                            "gs3075t", "keyboard")])
-        self.assertEqual(fake.sent, [bytes(G.request())])
+        self.assertEqual(fake.sent, [bytes(G.write_frame())])
 
     def test_a_silent_first_read_does_not_stop_a_later_answer(self):
         fake = FakeKeyboard([[], reply(90, 0x00)])

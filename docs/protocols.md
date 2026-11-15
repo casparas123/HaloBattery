@@ -268,9 +268,14 @@ The same feature report exchange as the WLmouse and G-Wolves mice (`00 00 02 02 
 The 2.4 GHz receiver (`0C45:FEFE`) exposes the Sonix vendor collection
 `FF60:0061` on interface 3. The 32-byte query `AA 10 18 00 ...` is answered by
 `55 10 18 ...` with the level at byte 25 and byte 26 `0x02` while charging,
-`0x00` on battery. The first request after the link wakes up can be lost, so it
-is tried twice. Measured on a GS3075T by the reporter of #379; other GANSS
-T-series boards use the same receiver but are not claimed.
+`0x00` on battery. On Windows, hidapi treats the first byte passed to `write()`
+as the report id, so the query is sent as `00 AA 10 18 ...` (33 bytes to hidapi,
+32 on the wire); without the leading zero the receiver answers only a short
+`55 18` acknowledgement and no level arrives. The first request after the link
+wakes up can be lost, and the receiver answers more readily while the 2.4 GHz
+link is active; up to four attempts are made. Measured on a GS3075T by the
+reporter of #379; other GANSS T-series boards use the same receiver but are not
+claimed.
 
 The ATK U2 Plus Nearlink receiver (`373B:10C9`) speaks the existing Compx
 17-byte `0x08` power query documented above; it is the same table entry as the

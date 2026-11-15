@@ -3,12 +3,20 @@
 The receiver exposes the vendor collection ``FF60:0061`` on interface 3 and
 speaks the 32-byte Sonix keyboard exchange captured by the reporter in #379:
 
-    host    AA 10 18 00 ...                         32 bytes
+    host    AA 10 18 00 ...                         32 bytes on the wire
     kbd     55 10 18 ... ... <level> <charge> ...   32 bytes
 
 Byte 25 is the level in percent (0-based, with ``55`` at byte 0); byte 26 is
-``0x02`` while the charging cable is plugged in and ``0x00`` on battery. The
-first request after the link wakes up can be lost, so two attempts are made.
+``0x02`` while the charging cable is plugged in and ``0x00`` on battery.
+
+On Windows, hidapi treats the first byte passed to ``write()`` as the report id.
+The keyboard has no report id on this collection, so the host frame must start
+with a zero report-id byte: ``write([0x00] + request())`` passes 33 bytes to
+hidapi and puts the 32-byte query above on the wire. Without it the receiver
+answers only a short ``55 18`` acknowledgement and the level never arrives.
+
+The first request after the link wakes up can be lost, and the receiver answers
+more readily while the 2.4 GHz link is active. Up to four attempts are made.
 
 The reporter measured both the level and the charging byte on a GS3075T. The
 same receiver ships with other GANSS T-series boards; only this model is
@@ -38,12 +46,23 @@ LEVEL_AT = 25
 CHARGE_AT = 26
 CHARGE_ON = 0x02
 READ_MS = 100
-ATTEMPTS = 2
+ATTEMPTS = 4
+REPORT_ID = 0x00
 
 
 def request() -> List[int]:
-    """The 32-byte query: ``AA 10 18`` and zeros."""
+    """The 32-byte query on the wire: ``AA 10 18`` and zeros.
+
+    hidapi's ``write`` expects a report-id byte first; use ``write_frame()``
+    to send it. The report id is 0x00 on this collection, so 33 bytes go to
+    hidapi and the device sees the 32-byte frame above.
+    """
     return [0xAA, CMD_BATTERY, FRAME_TYPE] + [0x00] * (REPORT_LEN - 3)
+
+
+def write_frame() -> List[int]:
+    """The query as passed to hidapi, including the zero report id."""
+    return [REPORT_ID] + request()
 
 
 def parse_reply(r) -> Optional[Tuple[int, bool]]:
@@ -83,7 +102,7 @@ class Gs3075tProvider(Provider):
                 if attempt:
                     time.sleep(0.2)
                 try:
-                    dev.write(request())
+                    dev.write(write_frame())
                 except (OSError, ValueError) as e:
                     self._diag.append(f"    write: {e}")
                     return None
@@ -100,7 +119,7 @@ class Gs3075tProvider(Provider):
                                           f"{parsed[0]}% charging={parsed[1]}")
                         return parsed
                 if attempt + 1 < ATTEMPTS:
-                    self._diag.append("    no answer yet; retrying once")
+                    self._diag.append("    no answer yet; retrying")
             self._diag.append("    no answer (keyboard off or asleep)")
             return None
         finally:

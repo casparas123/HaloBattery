@@ -1055,6 +1055,13 @@ class CorsairProvider(Provider):
             mine = [d for d in infos if d["product_id"] == pid and d["path"] not in seen]
             if not mine:
                 continue
+            # The M65's cable and receiver can both be present while charging. The
+            # cable is asked first; when it answered, the receiver has no level to
+            # add and asking it would only spend its read budget.
+            if pid == 0x1BA6 and BRAGI_KEYS[0x1BB5] in found:
+                self._diag.append("[Corsair bragi] pid=1ba6 'Corsair M65 RGB Ultra "
+                                  "Wireless' - cable identity already read; receiver skipped")
+                continue
             self._diag.append(f"[Corsair bragi] pid={pid:04x} '{name}'")
             deadline = time.monotonic() + BRAGI_POLL_BUDGET_S
             for d in self._pick_bragi(mine):

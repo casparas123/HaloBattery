@@ -576,13 +576,14 @@ class BragiPollTest(unittest.TestCase):
                 q = self.script.get(len(self.writes)) or []
                 return list(q.pop(0)) if q else []
 
-        out, _ = self.poll(
+        out, bus = self.poll(
             [entry(0x1BA6, b"m65-rx", 1, 0xFF42, 0x0001),
              entry(0x1BB5, b"m65-cable", 1, 0xFF42, 0x0001)],
             {b"m65-rx": FakeDongle(bragi_reply(550)),
              b"m65-cable": Cable()})
         self.assertEqual([(s.key, s.level, s.charging) for s in out],
                          [("corsair:m65", 38, True)])
+        self.assertNotIn(b"m65-rx", bus.opened)
 
     def test_the_m75_slipstream_receiver_is_read(self):
         # #301: 1b1c:1bdc 'CORSAIR SLIPSTREAM WIRELESS USB Receiver' publishes the same

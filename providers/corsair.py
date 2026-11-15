@@ -403,7 +403,9 @@ def parse_bragi_raw(reply) -> Optional[int]:
     data = list(reply)
     if len(data) >= BRAGI_MSG_SIZE + 1:      # hidapi may hand the report id back
         data = data[1:]
-    if len(data) < 5 or data[0] != BRAGI_ROUTE_CHILD:
+    if len(data) < 5:
+        return None
+    if data[0] != BRAGI_ROUTE_CHILD:
         return None
     if data[1] == BRAGI_CMD_GET and data[2] == 0x00:            # the Dark Core
         return data[3] | (data[4] << 8)
@@ -419,6 +421,42 @@ def parse_bragi(reply) -> Optional[int]:
     if value is None or value == 0 or value > BRAGI_LEVEL_MAX:
         return None
     return value // 10
+
+
+def _parse_bragi_cable_raw(reply) -> Optional[int]:
+    """The wired M65 answer: report id 0, then ``02 00 <value LE16>``.
+
+    OpenLinkHub's m65rgbultraWU transfer reads the level at bytes 3..4 of
+    this buffer; the same shape is kept separate from the routed replies so
+    a receiver's own answer cannot be mistaken for the mouse's.
+    """
+    if not reply:
+        return None
+    data = list(reply)
+    if len(data) >= 5 and data[0] == 0x00 and data[1] == BRAGI_CMD_GET and data[2] == 0x00:
+        return data[3] | (data[4] << 8)
+    if len(data) >= 4 and data[0] == BRAGI_CMD_GET and data[1] == 0x00:
+        # Some Windows reads hand the report id back as a separate first byte.
+        return data[2] | (data[3] << 8)
+    return None
+
+
+def parse_bragi_cable(reply) -> Optional[int]:
+    """The battery level from a wired-M65 answer, or None."""
+    value = _parse_bragi_cable_raw(reply)
+    if value is None or value == 0 or value > BRAGI_LEVEL_MAX:
+        return None
+    return value // 10
+
+
+def parse_bragi_charge_cable(reply) -> Optional[bool]:
+    """The charge state from the wired M65's property 0x10 answer, or None."""
+    value = _parse_bragi_cable_raw(reply)
+    if value == 1:
+        return True
+    if value == 2:
+        return False
+    return None
 
 
 def void_request() -> List[int]:
@@ -636,9 +674,10 @@ class CorsairProvider(Provider):
             return None
         if not self._write_bragi(dev, BRAGI_PROP_CHARGE, route=route, pid=pid):
             return None
+        charge_parse = parse_bragi_charge_cable if pid == 0x1BB5 else parse_bragi_charge
         value = self._ask_bragi(dev, min(BRAGI_CONFIRM_WINDOW_S,
                                          deadline - time.monotonic()),
-                                parse=parse_bragi_charge)
+                                parse=charge_parse)
         if value is None:
             self._diag.append("  no charge-state answer")
             return None
@@ -671,6 +710,7 @@ class CorsairProvider(Provider):
             self._drain(dev)
             if pid in BRAGI_SESSION_PIDS:
                 self._bragi_session(dev, deadline, pid)
+            parse = parse_bragi_cable if pid == 0x1BB5 else parse_bragi
             routes = self._routes(pid)
             first = None
             route = routes[0]
@@ -678,7 +718,7 @@ class CorsairProvider(Provider):
                 if not self._write_bragi(dev, route=route, pid=pid):
                     return None
                 first = self._ask_bragi(dev, min(BRAGI_WINDOW_S,
-                                                 deadline - time.monotonic()))
+                                                 deadline - time.monotonic()), parse=parse)
                 if first is not None:
                     break
                 if i + 1 < len(routes):
@@ -690,7 +730,7 @@ class CorsairProvider(Provider):
             if not self._write_bragi(dev, route=route, pid=pid):
                 return None
             second = self._ask_bragi(dev, min(BRAGI_CONFIRM_WINDOW_S,
-                                              deadline - time.monotonic()))
+                                              deadline - time.monotonic()), parse=parse)
             if second is None:
                 self._diag.append("  (the confirming ask stayed silent; taking the "
                                   "single reading)")

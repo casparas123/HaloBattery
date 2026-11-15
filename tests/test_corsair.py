@@ -46,6 +46,17 @@ def bragi_reply(value=550, route=C.BRAGI_ROUTE_CHILD, cmd=C.BRAGI_CMD_GET, err=0
     return ([0x00] + list(payload)) if report_id else list(payload)
 
 
+def cable_bragi_reply(value=380, size=C.BRAGI_MSG_SIZE):
+    """The wired M65 answer: report id 0, then `02 00 <value LE16>` (OpenLinkHub)."""
+    payload = bytearray(size)
+    payload[0] = 0x00
+    payload[1] = C.BRAGI_CMD_GET
+    payload[2] = 0x00
+    payload[3] = value & 0xFF
+    payload[4] = (value >> 8) & 0xFF
+    return list(payload)
+
+
 def hs80_usb_reply(tenths=970, channel=0, command=0x02, status=0):
     report = bytearray(C.HS80_USB_REPORT_SIZE)
     report[:4] = bytes((0x01, channel, command, status))
@@ -131,6 +142,12 @@ class BragiParseTest(unittest.TestCase):
     def test_the_reporter_s_answer_parses_to_55_percent(self):
         # the frame from the probe output in #56: 01 02 00 26 02 ...
         self.assertEqual(C.parse_bragi(bragi_reply(550)), 55)
+
+    def test_the_wired_m65_answer_uses_the_openlinkhub_shape(self):
+        # #411, from the reporter's cable run: 00 02 00 e8 03 = 1000 = 100 %.
+        self.assertEqual(C.parse_bragi_cable(cable_bragi_reply(1000)), 100)
+        self.assertEqual(C.parse_bragi_cable(cable_bragi_reply(380)), 38)
+        self.assertIsNone(C.parse_bragi_cable(cable_bragi_reply(1001)))
 
     def test_the_value_is_tenths_of_a_percent(self):
         self.assertEqual(C.parse_bragi(bragi_reply(765)), 76)
@@ -541,9 +558,9 @@ class BragiPollTest(unittest.TestCase):
         class Cable(FakeDongle):
             def __init__(self):
                 super().__init__(replies=[])
-                self.script = {1: [bragi_reply(380)],   # level
-                               2: [bragi_reply(380)],   # level, confirmed
-                               3: [bragi_reply(1)]}     # charge: 1 = charging
+                self.script = {1: [cable_bragi_reply(380)],   # level
+                               2: [cable_bragi_reply(380)],   # level, confirmed
+                               3: [cable_bragi_reply(1)]}     # charge: 1 = charging
 
             def read(self, size, timeout_ms):
                 self.reads += 1
@@ -569,8 +586,8 @@ class BragiPollTest(unittest.TestCase):
         class Cable(FakeDongle):
             def __init__(self):
                 super().__init__(replies=[])
-                self.script = {1: [bragi_reply(380)], 2: [bragi_reply(380)],
-                               3: [bragi_reply(1)]}
+                self.script = {1: [cable_bragi_reply(380)], 2: [cable_bragi_reply(380)],
+                               3: [cable_bragi_reply(1)]}
 
             def read(self, size, timeout_ms):
                 q = self.script.get(len(self.writes)) or []

@@ -55,6 +55,8 @@ class PollTest(unittest.TestCase):
     NAPE = [
         {"path": b"nape-mouse", "interface_number": 0,
          "usage_page": 0x0001, "usage": 0x0002, "product_id": 0xD026},
+        {"path": b"nape-keyboard4", "interface_number": 4,
+         "usage_page": 0x0001, "usage": 0x0006, "product_id": 0xD026},
         {"path": b"nape-vendor", "interface_number": 1,
          "usage_page": 0xFFC1, "usage": 0x0001, "product_id": 0xD026},
         {"path": b"nape-via", "interface_number": 3,
@@ -88,7 +90,15 @@ class PollTest(unittest.TestCase):
     def test_ffc1_wins_over_the_via_page_when_enumerated_last(self):
         # #270: the Link-KM receiver lists ff60 (VIA) and ffc1 (battery); the
         # VIA page accepts writes but never answers, so ffc1 must be chosen
-        infos = [self.NAPE[2], self.NAPE[1]]
+        infos = [self.NAPE[3], self.NAPE[2]]
+        out, dev = self.poll([reply(100)], infos)
+        self.assertEqual(out[0].level, 100)
+        self.assertEqual([b"nape-vendor"], dev.opened)
+
+    def test_a_plain_interface_4_keyboard_page_does_not_win(self):
+        # #270: the Link-KM also exposes 0001:0006 on interface 4; the old
+        # number-only rule sent every b3 06 write to that silent keyboard page.
+        infos = [self.NAPE[1], self.NAPE[2], self.NAPE[3]]
         out, dev = self.poll([reply(100)], infos)
         self.assertEqual(out[0].level, 100)
         self.assertEqual([b"nape-vendor"], dev.opened)

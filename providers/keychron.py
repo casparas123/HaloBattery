@@ -83,10 +83,16 @@ class KeychronProvider(Provider):
         self._diag: List[str] = []
 
     def _pick(self, infos: List[dict]) -> Optional[dict]:
-        for d in infos:
-            if d.get("interface_number") == VENDOR_INTERFACE:
-                return d
-        # the Nape Pro's Link-KM receiver puts its battery vendor collection on
+        # Interface 4 is where the Ultra-Link 8K and M5 put their vendor
+        # collection, but the Link-KM receiver also exposes a plain keyboard
+        # collection on interface 4 (0001:0006). Choosing by the number alone
+        # sent the b3 06 query to that silent keyboard page (#270).
+        vendor4 = [d for d in infos
+                   if d.get("interface_number") == VENDOR_INTERFACE
+                   and (d.get("usage_page") or 0) >= 0xFF00]
+        if vendor4:
+            return vendor4[0]
+        # The Nape Pro's Link-KM receiver puts its battery vendor collection on
         # interface 1 (ffc1:0001), not interface 4; it also exposes a VIA page
         # (ff60) on interface 3 that accepts writes but never answers (#270).
         vendor = [d for d in infos if (d.get("usage_page") or 0) >= 0xFF00]
@@ -94,12 +100,12 @@ class KeychronProvider(Provider):
                    if (d.get("usage_page"), d.get("usage")) == (0xFFC1, 0x0001)]
         chosen = battery or vendor[:1]
         if chosen:
-            self._diag.append(f"  no interface {VENDOR_INTERFACE} collection; using "
-                              f"iface={chosen[0].get('interface_number')} "
+            self._diag.append(f"  no interface {VENDOR_INTERFACE} vendor collection; "
+                              f"using iface={chosen[0].get('interface_number')} "
                               f"{chosen[0].get('usage_page', 0):04x}:"
                               f"{chosen[0].get('usage', 0):04x}")
             return chosen[0]
-        self._diag.append(f"  no interface {VENDOR_INTERFACE} collection; "
+        self._diag.append(f"  no interface {VENDOR_INTERFACE} vendor collection; "
                           f"falling back to the first of {len(infos)}")
         return infos[0] if infos else None
 

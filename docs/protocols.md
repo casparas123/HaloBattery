@@ -554,8 +554,12 @@ bytes 3..60 in byte 62. The PC receiver (`057D`) publishes the same vendor pages
 (`ff90`, `ff82`); the test build tries both and is the evidence for the id.
 
 **Confirmed on hardware** in [#280](https://github.com/HeyOkay/HaloBattery/issues/280)
-with test build 2: the reporter saw a live level (49%). The charging state is not
-decoded by this provider, so it is shown as unknown rather than guessed.
+with test build 2: the reporter saw a live level (49%). The charging state is
+class `0x07`, command `0x04` read as `0x84`; its reply carries one argument at
+byte 9 (0 on battery, 1 charging). The query is implemented from
+[openrazer PR #2899](https://github.com/openrazer/openrazer/pull/2899), which
+tested both the receiver and the cable on hardware; test build 3 is waiting for
+the reporter's confirmation here.
 
 ### Razer Barracuda X (2022) (2.4 GHz)
 

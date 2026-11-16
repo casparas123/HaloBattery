@@ -11,7 +11,8 @@ and the project follows [Semantic Versioning](https://semver.org/).
   newer 64-byte feature-report protocol (report id `0x07`, class `0x07`,
   battery command `0x80`, level byte 10), from everyoneexe/blackshark-linux's
   Synapse captures. A different protocol from the BlackShark V3's `0x02`
-  frames; **confirmed on hardware** in #280: the reporter saw a live level.
+  frames; **confirmed on hardware** in #280 for the level, with a charging
+  query (`0x84`) added from openrazer PR #2899 in test build 3.
 - Open the existing What's new window from About, directly below the version.
 - Russian localization, including native settings, tray menus, notifications,
   Windows language detection and Russian plural forms.

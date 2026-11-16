@@ -32,6 +32,19 @@ def reply(level, extra=b"", status=B.STATUS_OK):
     return bytes(frame)
 
 
+def charge_reply(state, status=B.STATUS_OK):
+    frame = bytearray(64)
+    frame[0] = B.REPORT_ID
+    frame[1] = status
+    frame[2] = B.TRANSACTION
+    frame[6] = 0x01
+    frame[7] = B.CLASS_BATTERY
+    frame[8] = B.CMD_CHARGING
+    frame[9] = state
+    frame[62] = B.checksum(frame)
+    return bytes(frame)
+
+
 class FakeDevice:
     def __init__(self, replies):
         self.replies = list(replies)
@@ -70,6 +83,17 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual((0x07, 0x80, 0x00), (q[7], q[8], q[9]))
         self.assertEqual(B.checksum(q), q[62])
         self.assertEqual(0, q[63])
+
+    def test_the_charging_query_uses_command_0x84(self):
+        q = B.make_query(command=B.CMD_CHARGING)
+        self.assertEqual((0x02, 0x07, 0x84, 0x00, 0x00),
+                         (q[6], q[7], q[8], q[9], q[10]))
+
+    def test_a_charge_reply_is_byte_nine(self):
+        self.assertEqual(1, B.parse_reply(charge_reply(1), B.CMD_CHARGING))
+        self.assertEqual(0, B.parse_reply(charge_reply(0), B.CMD_CHARGING))
+        self.assertIsNone(B.parse_reply(charge_reply(2), B.CMD_CHARGING))
+        self.assertIsNone(B.parse_reply(charge_reply(1), B.CMD_BATTERY))
 
     def test_the_reply_level_is_byte_ten(self):
         self.assertEqual(92, B.parse_reply(reply(92)))
@@ -129,6 +153,17 @@ class PollTests(unittest.TestCase):
         self.assertEqual([b"ff90"], dev.opened)
         self.assertEqual(bytes(B.make_query()), dev.sent[0])
         self.assertTrue(dev.closed)
+
+    def test_the_charge_reply_is_read(self):
+        out, dev = self.poll([reply(77), charge_reply(1)])
+        self.assertEqual((out[0].level, out[0].charging, out[0].charging_known),
+                         (77, True, True))
+        self.assertEqual([s[8] for s in dev.sent], [B.CMD_BATTERY, B.CMD_CHARGING])
+
+    def test_an_unknown_charge_state_keeps_the_level(self):
+        out, _dev = self.poll([reply(77), charge_reply(2)])
+        self.assertEqual((out[0].level, out[0].charging, out[0].charging_known),
+                         (77, False, False))
 
     def test_a_refusing_page_falls_through_to_the_next(self):
         out, dev = self.poll([[], [], [], [], reply(64)])

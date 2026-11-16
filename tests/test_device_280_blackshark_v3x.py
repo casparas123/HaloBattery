@@ -18,12 +18,15 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from providers import blackshark_v3x as B, razer as R  # noqa: E402
 
 
-def reply(level, extra=b""):
+def reply(level, extra=b"", status=B.STATUS_OK):
     frame = bytearray(64)
     frame[0] = B.REPORT_ID
+    frame[1] = status
+    frame[2] = B.TRANSACTION
     frame[6] = 0x02
     frame[7] = B.CLASS_BATTERY
     frame[8] = B.CMD_BATTERY
+    frame[9] = 0x00
     frame[10] = level
     frame[62] = B.checksum(frame)
     return bytes(frame)
@@ -78,9 +81,14 @@ class ProtocolTests(unittest.TestCase):
         self.assertIsNone(B.parse_reply(bytes.fromhex(
             '07 01 03 00 00 00 02 07 80 00 00 00')))
 
-    def test_nonzero_status_is_not_a_level(self):
+    def test_busy_and_not_run_statuses_are_not_levels(self):
+        for status in (0x00, 0x01, 0x03, 0x04, 0x05):
+            with self.subTest(status=status):
+                self.assertIsNone(B.parse_reply(reply(53, status=status)))
+
+    def test_bad_checksum_is_not_a_level(self):
         frame = bytearray(reply(53))
-        frame[1] = 0x01
+        frame[62] ^= 0x01
         self.assertIsNone(B.parse_reply(frame))
 
     def test_a_real_zero_percent_is_kept(self):
@@ -123,8 +131,8 @@ class PollTests(unittest.TestCase):
         self.assertTrue(dev.closed)
 
     def test_a_refusing_page_falls_through_to_the_next(self):
-        out, dev = self.poll([[], [], [], reply(64)])
-        # the first path returns no reply on all three reads, second answers
+        out, dev = self.poll([[], [], [], [], reply(64)])
+        # the first path returns no reply on all four reads, second answers
         self.assertEqual([s.level for s in out], [64])
         self.assertEqual([b"ff90", b"ff82"], dev.opened)
 

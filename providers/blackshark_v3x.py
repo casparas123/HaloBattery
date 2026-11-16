@@ -44,8 +44,11 @@ TRANSACTION = 0x03
 CRC_FIRST, CRC_LAST, CRC_INDEX = 3, 60, 62
 CLASS_BATTERY = 0x07
 CMD_BATTERY = 0x80
+STATUS_BUSY = 0x01
+STATUS_OK = 0x02
+MAX_ARGUMENTS = 52
 SETTLE_S = 0.05          # the reference waits 50 ms after SET before GET
-REPLY_TRIES = 3
+REPLY_TRIES = 4
 
 
 def checksum(frame) -> int:
@@ -70,18 +73,24 @@ def make_query(transaction: int = TRANSACTION) -> bytes:
 def parse_reply(data) -> Optional[int]:
     """Battery percentage from the reply, or None when it is not one.
 
-    The reporter's first test build read a short 12-byte frame back from the
-    receiver (`07 01 03 ...`). That is an acknowledgement/status frame, not the
-    64-byte battery answer the reference captured: its status byte is non-zero
-    and its level byte is merely zero padding. Requiring the full observed
-    length and success status prevents it being shown as a real 0%.
+    The PC receiver can answer a read with a short status frame
+    (`07 01 03 ...` in the #280 test build) or with status BUSY while the
+    headset is still getting the answer ready.  A finished reply has the
+    request's transaction id and class/command, a valid checksum, status OK
+    (0x02) and two arguments; the level is the second argument at byte 10.
     """
     d = list(data or [])
-    if len(d) < REPORT_LEN:
+    if len(d) < REPORT_LEN or d[0] != REPORT_ID:
         return None
-    if d[0] != REPORT_ID or d[1] != 0x00:
+    if d[2] != TRANSACTION:
         return None
-    if d[6] != 0x02 or d[7] != CLASS_BATTERY or d[8] != CMD_BATTERY:
+    if d[6] < 2 or d[6] > MAX_ARGUMENTS:
+        return None
+    if d[7] != CLASS_BATTERY or d[8] != CMD_BATTERY:
+        return None
+    if d[CRC_INDEX] != checksum(d):
+        return None
+    if d[1] != STATUS_OK:
         return None
     level = d[10]
     if 0 <= level <= 100:

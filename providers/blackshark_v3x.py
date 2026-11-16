@@ -5,7 +5,8 @@ BlackShark V3's 0x02/ff14 exchange.  It was reverse-engineered byte-for-byte
 from Synapse captures by everyoneexe/blackshark-linux (`PROTOCOL.md`,
 `blackshark-rs/src/protocol.rs`, MIT) for the Xbox edition (1532:0A5B).  The
 receiver publishes the same vendor pages on the PC edition's interface 0; this
-provider is the test for that hardware.
+provider was confirmed on that hardware in #280 (test build 2 showed a live
+level).  It only reads the level; charging is left unknown.
 
 Every frame is a 64-byte feature report with report id 0x07:
 

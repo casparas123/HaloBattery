@@ -553,8 +553,9 @@ GET, class `0x07`, command `0x80`, with the level in byte 10 and a CRC of XOR
 bytes 3..60 in byte 62. The PC receiver (`057D`) publishes the same vendor pages
 (`ff90`, `ff82`); the test build tries both and is the evidence for the id.
 
-**Unverified** on the reporter's hardware; test build 1 is with [#280]
-(https://github.com/HeyOkay/HaloBattery/issues/280).
+**Confirmed on hardware** in [#280](https://github.com/HeyOkay/HaloBattery/issues/280)
+with test build 2: the reporter saw a live level (49%). The charging state is not
+decoded by this provider, so it is shown as unknown rather than guessed.
 
 ### Razer Barracuda X (2022) (2.4 GHz)
 

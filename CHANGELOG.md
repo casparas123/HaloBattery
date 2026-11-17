@@ -6,6 +6,11 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- ENDORFY LIV Plus Wireless (`3299:00A7` receiver / `3299:00A6` cable):
+  read the Compx 17-byte battery reply. Test build, awaiting hardware
+  comparison; charging follows the reply's cable flag.
+
 ### Changed
 - Match What's new branding to Settings, with Outfit lettering, closer icon
   spacing and a brighter accent. Soften inactive navigation labels and glyphs,

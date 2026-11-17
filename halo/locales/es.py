@@ -82,6 +82,7 @@ MESSAGES = {
     "provider.barracuda_x": "Razer Barracuda X",
     "provider.corsair": "Auriculares Corsair",
     "provider.dji": "DJI Mic Mini 2",
+    "provider.endorfy": "ENDORFY LIV Plus Wireless",
     "provider.gwolves": "Ratones G-Wolves",
     "provider.glorious": "Glorious Model O Wireless",
     "provider.hyperx": "HyperX Cloud II Wireless",

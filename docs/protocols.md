@@ -52,6 +52,14 @@ it is not included here. Confirmed XM2we support uses its separate provider.
 
 One dongle id serves several mice - the XM2w 4K, the OP1w 4K and their v2 revisions - and the adapter itself stays neutral; the vendor software resolves which mouse is behind it. The exchange is the family's 17-byte frame, documented for the XM2we by okms/xm2we-linux and by Janlhin/Endgame_Gear_Web_Configurator: a feature report `0x08` carrying `<opcode> 00 ...` with a `0x55 - sum` checksum, answered by an input report `0x09` whose data starts at byte 6 and whose bytes sum to `0x55`. Battery is opcode `0x04` - `data[0]` the percentage, `data[1]` the charging flag - and it is read before the link state because plugging the cable drops the link for a moment while the level stays valid. The dongle's two collections are paired by the receiver part of their HID paths: the feature collection is `ff02:0002`, the replies arrive on an `ff01` collection. Only the two documented status reads are built; nothing is written to the mouse. **Unverified** on this dongle - the frame is the XM2we's, and a test build is out for [#324](https://github.com/HeyOkay/HaloBattery/issues/324).
 
+### ENDORFY LIV Plus Wireless
+
+**Connection:** 2.4 GHz receiver (`3299:00A7`, product `LIV Plus Wireless 2.4 GHz`) or USB cable (`3299:00A6`, product `LIV Plus Wireless`)
+
+The mouse uses the shared Compx 17-byte report-`0x08` battery exchange on the `ff02:0002` collection: command `0x04`, level at byte 6, cable/charging flag at byte 7, millivolts big-endian at bytes 8-9, and checksum `0x55 - sum(bytes 0..15)`. The same frame is documented for the Pulsar/ATK/VXE family in [python-pulsar-mouse-tool](https://github.com/andrewrabert/python-pulsar-mouse-tool) and implemented by `providers/compx.py`; no vendor app is needed.
+
+The receiver is tried first; when the mouse is on its cable the receiver goes quiet and `00A6` answers instead, so both identities share the `endorfy:livplus` icon. Read-only: no setting, lighting or firmware command is sent. **Test build 1 is waiting for a hardware comparison with Bluetooth (55%) and the ENDORFY four-bar display.**
+
 ### HyperX Cloud Alpha 2
 
 **Connection:** 2.4 GHz station (03F0:08BE - the station's other function, 03F0:0ABE, is the audio-only "Chat" half and has nothing to read)

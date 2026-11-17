@@ -13,6 +13,9 @@ and the project follows [Semantic Versioning](https://semver.org/).
   and Exit HaloBattery hover colors, with themed pressed feedback.
 
 ### Added
+- Glorious Model D2 Wireless (`093A:824D` receiver / `093A:824A` cable):
+  read the Pixart receiver with the GetFeature-only CandidateD query from
+  GloriousBatteryMonitor-Go. Test build 1, awaiting hardware confirmation.
 - A fading app splash with a soft icon shadow and theme-matched startup background
   while the settings window loads and restores its saved view.
 - Open the existing What's new window from About, directly below the version.

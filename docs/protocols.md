@@ -339,6 +339,14 @@ The level is **confirmed in this app on hardware by @gumocska** (#281): the icon
 
 The **Lamzu Tachi** (`37B0:000C`, 8K receiver, #262) publishes the same collection layout (`ffa0:0001`, `ffff:0001/0000`), so the same query is tried on it - that layout is the only evidence, and the test build decides whether the Tachi is another Sinowealth device. **Unverified** on hardware; a test build is with the reporter of #262.
 
+### Glorious Model D2 Wireless (Pixart)
+
+**Connection:** 2.4 GHz receiver (`093A:824D`) or USB cable (`093A:824A`)
+
+The D2 Wireless is a different family from the Sinowealth Model O above. Its receiver exposes a 64-byte vendor feature collection (`FF00:0001`), and GloriousBatteryMonitor-Go's `HidDeviceService.cs` reads it with **Pixart CandidateD**: a plain `GetFeature` with report ids `0x00`-`0x0F`, no `SetFeature`, because that collection rejects writes. The project scans bytes 1-10 for a level, rejects replies with only one or two non-zero data bytes as firmware status, and treats the cable's pid (`824A`) as the charging signal rather than a charge bit.
+
+This app mirrors that reader and tries the receiver first, then the cable; `GloriousD2Provider` in `providers/glorious_pixart.py` also keeps the last level greyed when the mouse sleeps. **Unverified** on hardware: test build 1 is with @azgoodaz in #281.
+
 ### SteelSeries Aerox 3 Wireless
 
 **Connection:** 2.4 GHz dongle (1038:1838)

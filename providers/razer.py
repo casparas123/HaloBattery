@@ -92,6 +92,11 @@ KNOWN = {
     0x00A6: ("Razer Viper V2 Pro", 0x1F),
     0x00A7: ("Razer Naga V2 Pro", 0x1F),
     0x00A8: ("Razer Naga V2 Pro", 0x1F),
+    # Naga V3 Pro: the wired id from OpenRazer PR #2904, the wireless id from
+    # #259's diagnostic. The receiver exposes no vendor usage page; the 90-byte
+    # Razer feature report is tried on the standard mouse collections instead.
+    0x00E7: ("Razer Naga V3 Pro", 0x1F),
+    0x00E8: ("Razer Naga V3 Pro", 0x1F),
     0x00AA: ("Razer Basilisk V3 Pro", 0x1F),
     0x00AB: ("Razer Basilisk V3 Pro", 0x1F),
     0x00AF: ("Razer Cobra Pro", 0x1F),

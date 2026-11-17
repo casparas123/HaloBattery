@@ -215,6 +215,12 @@ class TableTest(unittest.TestCase):
         self.assertEqual(R.KNOWN[0x025A], ("Razer BlackWidow V3 Pro", 0x3F))
         self.assertEqual(R.KNOWN[0x025C], ("Razer BlackWidow V3 Pro", 0x9F))
 
+    def test_the_naga_v3_pro_pair_is_known(self):
+        # Wired id from OpenRazer PR #2904; the wireless id is the receiver in
+        # #259's diagnostic. Both use the same 90-byte feature report.
+        self.assertEqual(R.KNOWN[0x00E7], ("Razer Naga V3 Pro", 0x1F))
+        self.assertEqual(R.KNOWN[0x00E8], ("Razer Naga V3 Pro", 0x1F))
+
     def test_wired_viper_is_not_in_the_table(self):
         # 0078 is OpenRazer's USB_DEVICE_ID_RAZER_VIPER, a wired mouse with no battery.
         # The Viper Ultimate is 007A / 007B.

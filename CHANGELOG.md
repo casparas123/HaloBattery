@@ -6,6 +6,11 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Razer Naga V3 Pro (`1532:00E8` receiver / `1532:00E7` cable): try the
+  standard 90-byte Razer battery report. Test build, awaiting hardware
+  confirmation; the receiver exposes no vendor usage page.
+
 ### Changed
 - Match What's new branding to Settings, with Outfit lettering, closer icon
   spacing and a brighter accent. Soften inactive navigation labels and glyphs,

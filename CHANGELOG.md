@@ -30,6 +30,10 @@ and the project follows [Semantic Versioning](https://semver.org/).
   and Exit HaloBattery hover colors, with themed pressed feedback.
 
 ### Added
+- Battery support for the 8BitDo Ultimate 2 Wireless controller in XInput mode
+  (`2dc8:310b`): the level and charging bit are read from byte 14 of the
+  controller's enhanced HID report on `0xFF7A:0x0001`, while XInput keeps the
+  gamepad icon. Test build 1, unverified on hardware.
 - MCHOSE G98 Pro (`41E4:2004`) keyboard over the same Sinowealth `13 4A 01`
   command as the K87, with the charging flag read from the reply's high
   nibble. Level and charging confirmed on the reporter's hardware in

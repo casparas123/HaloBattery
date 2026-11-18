@@ -18,7 +18,10 @@ and the project follows [Semantic Versioning](https://semver.org/).
   The M87 reads the EWEADN X87 device-info block and the Zero 3 reads Rongyuan's
   status query; both protocols expose a level but no charge bit, so charging is
   inferred from the wired USB identity when it is present and is reported as
-  unknown on the receiver alone. Test build 2, unverified on hardware.
+  unknown on the receiver alone. The M87 Lite (and Attack Shark M87 PRO V2 /
+  C87) uses Xinmeng's `20 01` query on the same receiver, and its wired identity
+  is charging-only rather than a battery channel. Test build 3, unverified on
+  hardware.
 - A fading app splash with a soft icon shadow and theme-matched startup background
   while the settings window loads and restores its saved view.
 - Open the existing What's new window from About, directly below the version.

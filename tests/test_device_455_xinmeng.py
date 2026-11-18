@@ -41,6 +41,12 @@ def m87_replies(level=73, product=0x8006):
     return [m87_chunk(data, 0, 24), m87_chunk(data, 24, 8)]
 
 
+def m87_lite_reply(level=42):
+    r = [0x00] * 32
+    r[0], r[1], r[3] = 0x20, 0x01, level
+    return r
+
+
 def z_status(level=54, disconnected=0, usb=1, devices=1):
     r = [0x00] * 64
     r[0] = 1
@@ -51,7 +57,7 @@ def z_status(level=54, disconnected=0, usb=1, devices=1):
     return r
 
 
-def m87_entries(receiver=True, wired=False, product="2.4G Dongle"):
+def m87_entries(receiver=True, wired=False, product="2.4G Dongle", wired_product="Xinmeng M87"):
     out = []
     if receiver:
         out.append({"vendor_id": 0x0C45, "product_id": 0xFEFE, "interface_number": 3,
@@ -60,7 +66,7 @@ def m87_entries(receiver=True, wired=False, product="2.4G Dongle"):
     if wired:
         out.append({"vendor_id": 0x0C45, "product_id": 0x8006, "interface_number": 0,
                     "usage_page": 0x0001, "usage": 0x0006,
-                    "path": b"m87-wired", "product_string": "Xinmeng M87"})
+                    "path": b"m87-wired", "product_string": wired_product})
     return out
 
 
@@ -113,6 +119,27 @@ class FakeDev:
         return []
 
 
+class M87LiteDev(FakeDev):
+    """A receiver that ignores the X87 info request and answers only 20 01.
+
+    The provider tries the already-verified X87 protocol first.  This fake keeps
+    the two replies separate instead of letting the X87 reads consume the Lite
+    answer from one shared queue.
+    """
+
+    def __init__(self, level=42):
+        super().__init__()
+        self.level = level
+
+    def read(self, size, timeout_ms=0):
+        if timeout_ms == 0 or not self.sent:
+            return []
+        last = self.sent[-1][1]
+        if last[1:3] == bytes([0x20, 0x01]):
+            return m87_lite_reply(self.level)
+        return []
+
+
 class M87ParseTests(unittest.TestCase):
     def test_the_request_is_the_two_chunk_x87_info_block(self):
         requests = M.make_requests()
@@ -143,6 +170,21 @@ class M87ParseTests(unittest.TestCase):
         self.assertIsNone(M.parse_info(m87_data(101)))
         self.assertIsNone(M.parse_info([]))
         self.assertIsNone(M.parse_chunk([0x55, 0x10]))
+
+    def test_the_lite_request_is_20_01_in_a_zeroed_report(self):
+        req = M.make_lite_request()
+        self.assertEqual(len(req), 32)
+        self.assertEqual((req[0], req[1]), (0x20, 0x01))
+        self.assertEqual(sum(req[2:]), 0)
+
+    def test_the_lite_reply_reads_byte_three(self):
+        self.assertEqual(M.parse_lite(m87_lite_reply(42)), 42)
+        self.assertEqual(M.parse_lite([0] + m87_lite_reply(37)), 37)
+
+    def test_a_foreign_or_impossible_lite_answer_is_refused(self):
+        self.assertIsNone(M.parse_lite([]))
+        self.assertIsNone(M.parse_lite([0x20, 0x02, 0, 42]))
+        self.assertIsNone(M.parse_lite(m87_lite_reply(101)))
 
 
 class M87PollTests(unittest.TestCase):
@@ -175,7 +217,33 @@ class M87PollTests(unittest.TestCase):
         self.assertEqual(out[0].level, 73)
         self.assertTrue(out[0].charging)
         self.assertTrue(out[0].charging_known)
-        self.assertEqual({p for p, _ in fake.sent}, {b"m87-wired"})
+        self.assertEqual({p for p, _ in fake.sent}, {b"m87-receiver"})
+
+    def test_a_wired_lite_id_is_not_sent_the_vendor_query(self):
+        fake = FakeDev()
+        out, diag = self.poll(fake, m87_entries(receiver=False, wired=True,
+                                                wired_product="M87Lite"))
+        self.assertEqual([(s.key, s.name, s.level, s.charging, s.online,
+                           s.charging_known) for s in out],
+                         [("xinmeng:m87lite", "Xinmeng M87 Lite", None, True, False, True)])
+        self.assertEqual(fake.sent, [])
+        self.assertTrue(any("no vendor collection" in line for line in diag))
+
+    def test_the_lite_protocol_is_tried_on_the_same_receiver(self):
+        fake = M87LiteDev(42)
+        out, diag = self.poll(fake, m87_entries())
+        self.assertEqual([(s.key, s.name, s.level, s.charging, s.online,
+                           s.charging_known) for s in out],
+                         [("xinmeng:m87lite", "Xinmeng M87 Lite", 42, False, True, False)])
+        self.assertEqual({p for p, _ in fake.sent}, {b"m87-receiver"})
+        self.assertTrue(any("M87 Lite protocol" in line for line in diag))
+
+    def test_lite_on_cable_reads_the_receiver_and_reports_charging(self):
+        fake = M87LiteDev(58)
+        out, _ = self.poll(fake, m87_entries(wired=True, wired_product="M87Lite"))
+        self.assertEqual([(s.key, s.level, s.charging, s.online) for s in out],
+                         [("xinmeng:m87lite", 58, True, True)])
+        self.assertEqual({p for p, _ in fake.sent}, {b"m87-receiver"})
 
     def test_the_x66_is_left_to_its_own_provider(self):
         out, _ = self.poll(FakeDev(m87_replies()), m87_entries(product="X66 2.4G"))

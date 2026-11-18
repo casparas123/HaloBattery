@@ -619,7 +619,29 @@ but has its own provider and product string, and is left alone here.
 The block has **no charging bit**. The keyboard's wired USB identity (`0C45:8006`) is used as
 the charging signal while the cable is connected; on the receiver alone the charger is
 reported as unknown rather than guessed, because a charge-only cable does not have to
-enumerate. **Test build 2 pending** on the reporter's M87.
+enumerate. **Test build 3 pending** on the reporter's M87.
+
+### Xinmeng M87 Lite (2.4 GHz)
+
+**Connection:** the same 2.4 GHz receiver (0C45:FEFE, generic **"2.4G Dongle"**) or
+USB cable (0C45:8006, product string `M87Lite`).
+
+The M87 Lite, Attack Shark M87 PRO V2 and C87 use a simpler query on the same
+`0xFF60:0x0061` vendor collection, documented by the MIT
+[omarchy-gadget-batteries](https://github.com/69Harold69/omarchy-gadget-batteries)
+collector and taken from Xinmeng's own M87 keyboard application:
+
+    request  00 | 20 01 00 00 ...                 32-byte output report
+    reply    20 01 ?? <level>                     level at byte 3
+
+The provider tries the already-verified M87/X87 info block first, then this
+`20 01` query on the same receiver. It never sends commands `0x0F` or `0x1F`
+(the configuration writes in that application). The wired M87 Lite exposes only
+its keyboard collection `0001:0006`, not the vendor channel; the provider uses
+that identity only as the charging signal and does not send the vendor query to
+it. If only the wired identity is present, the app keeps a previous level if it
+has one and reports charging; it does not invent a level. **Test build 3
+pending** on the reporter's M87 Lite.
 
 ### Xinmeng Zero 3 (2.4 GHz)
 

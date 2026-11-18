@@ -13,6 +13,10 @@ and the project follows [Semantic Versioning](https://semver.org/).
   and Exit HaloBattery hover colors, with themed pressed feedback.
 
 ### Added
+- Battery support for the 8BitDo Ultimate 2 Wireless controller in XInput mode
+  (`2dc8:310b`): the level and charging bit are read from byte 14 of the
+  controller's enhanced HID report on `0xFF7A:0x0001`, while XInput keeps the
+  gamepad icon. Test build 1, unverified on hardware.
 - A fading app splash with a soft icon shadow and theme-matched startup background
   while the settings window loads and restores its saved view.
 - Open the existing What's new window from About, directly below the version.

@@ -22,7 +22,7 @@ import sys
 import time
 from typing import Dict, List, Optional
 
-from . import beitong, flydigi, hidlist, wgi
+from . import beitong, eightbitdo_ultimate2, flydigi, hidlist, wgi
 from .base import DeviceStatus, Provider, log
 
 ERROR_SUCCESS = 0
@@ -259,7 +259,17 @@ class XInputProvider(Provider):
                 hid_devices += hidlist.enumerate(vid)
             except Exception:
                 pass
+        # The Ultimate 2 is an XInput pad, but its battery lives on its own
+        # vendor collection; enumerate it here so the poll can name it and
+        # route the read below.
+        try:
+            hid_devices += hidlist.enumerate(0x2DC8)
+        except Exception:
+            pass
         base_name, base_vid = controller_name(hid_devices)
+        if any(d.get("vendor_id") == 0x2DC8 and d.get("product_id") == 0x310B
+               for d in hid_devices):
+            base_name, base_vid = "8BitDo Ultimate 2", 0x2DC8
 
         now = time.time()
         slots = []                                   # (slot, XInput reading or None)
@@ -338,6 +348,11 @@ class XInputProvider(Provider):
                     vendor_reading = beitong.read_connected(self._diag)
                 except Exception as e:
                     self._diag.append(f"[Beitong] {e}")
+            elif base_vid == 0x2DC8:
+                try:
+                    vendor_reading = eightbitdo_ultimate2.read_connected(self._diag)
+                except Exception as e:     # a broken pad path must not blind XInput
+                    self._diag.append(f"[8BitDo Ultimate 2] {e}")
 
         # separately: one of them failing must not blind the other
         try:

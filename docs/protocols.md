@@ -462,6 +462,19 @@ The same exchange as the DeathStalker V2 Pro TKL above, with the ids and interfa
 
 Listened to, never written: byte 14 of the controller's enhanced input report (report 0x01 over Bluetooth, 0x04 over USB; bits 0-6 the level in %, bit 7 charging), as SDL reads it. The controller sends that report only after Steam or a game has switched it on, see the note below the table. The Pro 3 (2DC8:6009) is the exception: its descriptor declares one input report, 0x04, on both transports, and it carries the level in byte 14 at all times, so the Pro 3 shows its level without Steam - **confirmed on a real Pro 3 over Bluetooth**, with Steam closed and the controller freshly turned on. In XInput mode these controllers are read as Xbox controllers. The other models are **unverified**, so a level of 0 or above 100 is refused rather than shown
 
+### 8BitDo Ultimate 2 Wireless (XInput)
+
+**Connection:** 2.4 GHz receiver (`2dc8:310b`) or USB; XInput mode.
+
+The controller appears as an Xbox pad, so the XInput provider owns the icon.
+Its battery is the same byte SDL's 8BitDo driver reads: byte 14 of the
+enhanced input report on vendor collection `0xFF7A:0x0001` (bit 7 charging,
+bits 0-6 the level). The v1.03 firmware report is 34 bytes and can arrive about
+250 ms after wake, so the reader only listens for a short window and never
+writes. A zero byte in an ordinary padded report is ignored, and the
+`remain=full=1000` Windows.Gaming.Input placeholder is not used as a level.
+**Test build 1 pending** on the reporter's controller.
+
 ### GameSir G7 Pro; FlyDigi Vader Pro
 
 **Connection:** 2.4 GHz receiver (shows up as an Xbox controller)

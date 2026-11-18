@@ -62,6 +62,11 @@ and the project follows [Semantic Versioning](https://semver.org/).
   immediately and keep the choice after restarting. Filled artwork uses lighter
   body silhouettes and compensated small details while preserving the battery ring.
 
+- **MCHOSE K99 V3** keyboard on its 2.4 GHz receiver (`3837:3033`), read with the
+  64-byte generic-desktop report (`55 03 00 38 38 ...` → `AA 03 00 38 ...`, level
+  at byte 8). Test build 1, unverified on hardware; the charger byte is logged but
+  its semantics are not documented.
+
 - **MCHOSE X9** headset on its 2.4 GHz dongle (`3837:6045`), read with M HUB's own
   BLK battery query (`65 01` on report `0x55`). Confirmed on hardware: the level and
   the discharging state on the dongle. On its cable the headset leaves the dongle and

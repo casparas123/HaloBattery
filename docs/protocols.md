@@ -287,6 +287,17 @@ A different chip from the M7 Ultra, and a different protocol: a 65-byte output r
 
 The vendor collection (usage page 0xFF01; the sibling 0xFF0B never answers): feature report 0x11 (the shorter report, tried first) or 0x12 with command 0x06, every payload byte inverted, which returns `53 52 31 00 02 05 07 00 09 64 00 64` — vid 0x5253, model 0x31, firmware, flags, then the level and the charging byte (1 while charging). The request has to be repeated for each read, and the receiver only relays a real value while the mouse is awake: asleep it answers with zeros, so a silent mouse keeps its last level on a greyed icon. On the cable the mouse answers on its own PID (5253:0031, the number it reports as its model id) and the receiver goes quiet: both connections share one icon, and whichever one reports charging wins
 
+### MCHOSE K99 V3 (2.4 GHz)
+
+**Connection:** 2.4 GHz receiver (3837:3033, "MCHOSE K99 V3 2.4G"), generic-desktop HID collection `0x0001:0x0000` on interface 1.
+
+The K99 V3 is a different protocol from the K87/K99 legacy keyboard: a fixed 64-byte report on the generic-desktop collection, documented by arutkowski00/mchose-hid-bridge from the receiver and M HUB:
+
+    request  55 03 00 38 38 00 00 00 00 ...
+    reply    AA 03 00 38 ... <level at byte 8> ...
+
+The reply echoes command `0x03` and sub-command `0x38`; there is no checksum, so that echo is the framing check. Byte 6 is logged in Diagnostics, but its charge semantics are not documented, so the app reports the charger as unknown rather than inventing a state. **Test build 1 pending** on the reporter's K99 V3.
+
 ### MCHOSE X9
 
 **Connection:** 2.4 GHz dongle (3837:6045, C-Media strings)

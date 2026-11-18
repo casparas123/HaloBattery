@@ -343,9 +343,9 @@ The **Lamzu Tachi** (`37B0:000C`, 8K receiver, #262) publishes the same collecti
 
 **Connection:** 2.4 GHz receiver (`093A:824D`) or USB cable (`093A:824A`)
 
-The D2 Wireless is a different family from the Sinowealth Model O above. Its receiver exposes a 64-byte vendor feature collection (`FF00:0001`), and GloriousBatteryMonitor-Go's `HidDeviceService.cs` reads it with **Pixart CandidateD**: a plain `GetFeature` with report ids `0x00`-`0x0F`, no `SetFeature`, because that collection rejects writes. The project scans bytes 1-10 for a level, rejects replies with only one or two non-zero data bytes as firmware status, and treats the cable's pid (`824A`) as the charging signal rather than a charge bit.
+The D2 Wireless is a different family from the Sinowealth Model O above. Its receiver is a **split-interface Pixart receiver** (`093a:824d`): the feature collection `ff00:0001` accepts a `GetFeature` trigger, but the answer arrives as an input report on the sibling collection `ff00:ff00` (8 bytes). This is GloriousBatteryMonitor-Go's **CandidateF**; its CandidateD GetFeature-only path is skipped on this shape because col01 returns firmware status rather than a battery frame.
 
-This app mirrors that reader and tries the receiver first, then the cable; `GloriousD2Provider` in `providers/glorious_pixart.py` also keeps the last level greyed when the mouse sleeps. **Unverified** on hardware: test build 1 is with @azgoodaz in #281.
+The trigger is report id `0x03` first (the receiver processes it in about five seconds), then `0x00`, `0x01`, `0x02` as fallbacks. The normal reply is `06 FB <level> ...`; other firmware is scanned for a level in bytes 1-10. The cable's pid (`824A`) is the charging signal rather than a charge bit. Test build 1 used CandidateD and got feature-read errors on both collections; test build 2 uses CandidateF. **Unverified** on hardware: test build 2 is with @azgoodaz in #281.
 
 ### SteelSeries Aerox 3 Wireless
 

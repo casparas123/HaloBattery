@@ -1,17 +1,24 @@
 """Glorious Model D2 Wireless over its Pixart receiver (#281).
 
-The D2 Wireless is not the Sinowealth Model O: it enumerates as Pixart's
-`093a:824d` with a 64-byte vendor feature collection (`ff00:0001`) and an input
-collection (`0001:0002`).  GloriousBatteryMonitor-Go's `HidDeviceService.cs`
-documents the matching path as `Pixart CandidateD`: the collection rejects
-SetFeature, but a plain GetFeature populates a reply that contains the battery
-level.  That project scans report ids 0x00..0x0f and bytes 1..10, rejecting
-answers with only one or two non-zero data bytes because those are firmware
-status, not a battery frame.
+The D2 Wireless is a split-interface Pixart receiver (`093a:824d`): the
+feature collection `ff00:0001` on interface 1 accepts a GetFeature *trigger*,
+but the answer arrives as an input report on the sibling collection
+`ff00:ff00` (8 bytes).  This is GloriousBatteryMonitor-Go's `CandidateF`
+probe; its `CandidateD` GetFeature-only path is deliberately skipped on split
+interfaces because col01 returns firmware-status bytes rather than a battery.
 
-The same project detects charging from the pid change (`824d` wireless ->
-`824a` on the cable), not from a charge bit, so the cable's presence is used
-here too.  The wired id is also tried when it is the only one present.
+    trigger   GetFeature(report id 0x03) on ff00:0001, then 0x00/0x01/0x02
+    reply     on ff00:ff00: 06 FB <level> ...
+
+The level is `reply[2]` for the normal frame; the reference also accepts a
+plausible level in bytes 1..10 for other firmware.  Charging is the wired
+`824a` identity (the same PID change GloriousBatteryMonitor-Go uses); there is
+no charge bit in the reply, and byte 3 = 0x01 in discharging captures, so it is
+not treated as one.
+
+The first trigger (report id 0x03) can take several seconds on the receiver;
+later polls try the same id first and use a shorter timeout.  Nothing is
+written to the device.
 """
 from __future__ import annotations
 
@@ -20,7 +27,6 @@ from typing import List, Optional, Tuple
 
 from . import hidlist
 from .base import DeviceStatus, Provider, hexdump, log
-from .gwolves import feature_length
 
 try:
     import hid  # type: ignore
@@ -34,38 +40,46 @@ PIDS = (PID_RECEIVER, PID_CABLE)
 NAME = "Glorious Model D2 Wireless"
 KEY = "glorious:d2"
 
-REPORT_IDS = range(0x10)
-LEVEL_FIRST = 1
-LEVEL_LAST = 10
+PAGE = 0xFF00
+TRIGGER_USAGE = 0x0001
+INPUT_USAGE = 0xFF00
+TRIGGER_LEN = 64
+INPUT_LEN = 8
+# (report id, timeout in seconds); 0x03 is the one the receiver processes in
+# about five seconds.  The rest are the reference's fallbacks.
+PROBES = ((0x03, 6.0), (0x00, 2.0), (0x01, 2.0), (0x02, 2.0))
 ASLEEP_KEEP = 300
 
 
-def parse_feature(r) -> Optional[Tuple[int, bool]]:
-    """(level, charging) from a CandidateD feature reply, or None.
-
-    A reply with one or two non-zero bytes is a firmware status, not a battery
-    frame (GloriousBatteryMonitor-Go rejects those).  The charge byte is only a
-    hint; the caller also treats the cable's pid as charging.
-    """
-    if not r or len(r) < 3:
+def parse_reading(r) -> Optional[int]:
+    """The level from a col05 input report, or None."""
+    if not r:
         return None
-    data = list(r)
-    if sum(1 for b in data[1:] if b) <= 2:
+    b = list(r)
+    if len(b) >= 3 and b[0] == 0x06 and b[1] == 0xFB:
+        if 1 <= b[2] <= 100:
+            return b[2]
         return None
-    for i in range(LEVEL_FIRST, min(LEVEL_LAST + 1, len(data))):
-        level = data[i]
-        if 1 <= level <= 100:
-            charging = ((i > 0 and data[i - 1] == 0x01)
-                        or (i + 1 < len(data) and data[i + 1] == 0x01))
-            return level, charging
+    # Other firmware: the reference scans bytes 1..10 for a plausible level.
+    for i in range(1, min(11, len(b))):
+        if 1 <= b[i] <= 100:
+            return b[i]
     return None
 
 
-def pick(infos: List[dict]) -> List[dict]:
-    """Vendor collections that can carry a feature report, longest first."""
-    vendor = [d for d in infos if (d.get("usage_page") or 0) >= 0xFF00]
-    with_len = [d for d in vendor if (feature_length(d["path"]) or 0) >= 8]
-    return with_len + [d for d in vendor if d not in with_len]
+def collections(infos: List[dict]) -> Tuple[Optional[dict], Optional[dict]]:
+    """The trigger and sibling input collections of the D2 receiver."""
+    trigger = None
+    inp = None
+    for d in infos:
+        if d.get("product_id") not in PIDS:
+            continue
+        page, usage = d.get("usage_page"), d.get("usage")
+        if (page, usage) == (PAGE, TRIGGER_USAGE):
+            trigger = trigger or d
+        elif (page, usage) == (PAGE, INPUT_USAGE):
+            inp = inp or d
+    return trigger, inp
 
 
 class GloriousD2Provider(Provider):
@@ -74,6 +88,7 @@ class GloriousD2Provider(Provider):
     def __init__(self):
         self._diag: List[str] = []
         self._last: Optional[Tuple[int, float]] = None
+        self._working_rid: Optional[int] = None
 
     def poll(self) -> List[DeviceStatus]:
         self._diag = []
@@ -87,28 +102,29 @@ class GloriousD2Provider(Provider):
         mine = [d for d in infos if d.get("product_id") in PIDS]
         if not mine:
             return []
-        self._diag.append(f"[Glorious D2] pid(s)="
-                          f"{', '.join(f'{d.get('product_id', 0):04x}' for d in mine)}")
+        self._diag.append("[Glorious D2] pid(s)="
+                          + ", ".join(f"{d.get('product_id', 0):04x}" for d in mine))
         receiver = [d for d in mine if d.get("product_id") == PID_RECEIVER]
         cable = [d for d in mine if d.get("product_id") == PID_CABLE]
         if cable:
             self._diag.append(f"  on the cable: {PID_CABLE:04x}")
 
         for group, plugged in ((receiver, False), (cable, True)):
-            for d in pick(group):
-                length = feature_length(d["path"]) or 65
-                self._diag.append(f"  trying pid={d.get('product_id', 0):04x} "
-                                  f"iface={d.get('interface_number')} "
-                                  f"{d.get('usage_page', 0):04x}:{d.get('usage', 0):04x} "
-                                  f"feature={length}")
-                parsed = self._ask(d["path"], length)
-                if parsed is not None:
-                    level, charge_bit = parsed
-                    charging = charge_bit or plugged or bool(cable)
-                    self._last = (level, time.time())
-                    self._diag.append(f"  -> {level}%{' charging' if charging else ''}")
-                    return [DeviceStatus(KEY, NAME, level, charging, True,
-                                         "glorious", kind="mouse")]
+            trigger, inp = collections(group)
+            if trigger is None or inp is None:
+                if group:
+                    self._diag.append("  no trigger/input collection pair")
+                continue
+            self._diag.append(f"  candidate F: trigger iface={trigger.get('interface_number')} "
+                              f"{PAGE:04x}:{TRIGGER_USAGE:04x}; input iface={inp.get('interface_number')} "
+                              f"{PAGE:04x}:{INPUT_USAGE:04x}")
+            level = self._read_cross(trigger["path"], inp["path"])
+            if level is not None:
+                charging = plugged or bool(cable)
+                self._last = (level, time.time())
+                self._diag.append(f"  -> {level}%{' charging' if charging else ''}")
+                return [DeviceStatus(KEY, NAME, level, charging, True,
+                                     "glorious", kind="mouse")]
 
         self._diag.append("  no battery answer (asleep, off, or not this collection)")
         # On the cable the mouse may stop answering the receiver but is still
@@ -121,32 +137,56 @@ class GloriousD2Provider(Provider):
                                  "glorious", kind="mouse")]
         return [DeviceStatus(KEY, NAME, None, False, False, "glorious", kind="mouse")]
 
-    def _ask(self, path, length: int) -> Optional[Tuple[int, bool]]:
-        """Read feature reports without writing anything to the mouse."""
-        dev = hid.device()  # type: ignore[union-attr]
+    def _read_cross(self, trigger_path, input_path) -> Optional[int]:
+        """GetFeature trigger on col01, read the reply on col05, no writes."""
+        in_dev = hid.device()  # type: ignore[union-attr]
         try:
-            dev.open_path(path)
+            in_dev.open_path(input_path)
         except (OSError, IOError) as e:
-            self._diag.append(f"    open: {e}")
+            self._diag.append(f"    input open: {e}")
             return None
+        probes = list(PROBES)
+        if self._working_rid is not None:
+            probes = [(self._working_rid, 2.0)] + [p for p in probes if p[0] != self._working_rid]
         try:
-            for rid in REPORT_IDS:
+            for rid, timeout in probes:
+                trigger = hid.device()  # type: ignore[union-attr]
                 try:
-                    r = dev.get_feature_report(rid, length)
+                    trigger.open_path(trigger_path)
+                except (OSError, IOError) as e:
+                    self._diag.append(f"    trigger open: {e}")
+                    return None
+                try:
+                    try:
+                        trigger.get_feature_report(rid, TRIGGER_LEN)
+                        self._diag.append(f"    trigger rid={rid:#04x}: accepted")
+                    except (OSError, IOError, ValueError) as e:
+                        # The receiver can process the request and still fail
+                        # the feature read; the answer is on col05.
+                        self._diag.append(f"    trigger rid={rid:#04x}: {e}")
+                finally:
+                    try:
+                        trigger.close()
+                    except Exception:
+                        pass
+                try:
+                    reply = in_dev.read(INPUT_LEN, int(timeout * 1000))
                 except (OSError, IOError, ValueError) as e:
-                    self._diag.append(f"    rid={rid:#04x}: {e}")
+                    self._diag.append(f"    rid={rid:#04x} input read: {e}")
                     continue
-                if r:
-                    self._diag.append(f"    rid={rid:#04x}: {hexdump(r, 12)}")
-                parsed = parse_feature(r)
-                if parsed is not None:
-                    return parsed
+                if not reply:
+                    continue
+                self._diag.append(f"    rid={rid:#04x} reply: {hexdump(reply, 12)}")
+                level = parse_reading(reply)
+                if level is not None:
+                    self._working_rid = rid
+                    return level
+            return None
         finally:
             try:
-                dev.close()
+                in_dev.close()
             except Exception:
                 pass
-        return None
 
     def diagnostics(self) -> List[str]:
         return list(self._diag)

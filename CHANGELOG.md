@@ -16,7 +16,10 @@ and the project follows [Semantic Versioning](https://semver.org/).
 - Battery support for the AULA F75 keyboard (`3554:fa09`, 20-byte `0x13/0x4A`
   receiver exchange) and the ATK Zero mouse (`373b:1155` receiver,
   `373b:1154` cable; 64-byte `0x72` register protocol, battery `0x07` and
-  charger `0x0F`). Test build 1, unverified on hardware.
+  charger `0x0F`). Both confirmed by @xenom0rphe; the ATK shows charging from
+  its charger register, while the F75's cable state is only reported by its
+  receiver. When the receiver stops answering, the F75 stays visible with its
+  last level instead of disappearing; its wired mode has no battery query.
 - A fading app splash with a soft icon shadow and theme-matched startup background
   while the settings window loads and restores its saved view.
 - Open the existing What's new window from About, directly below the version.

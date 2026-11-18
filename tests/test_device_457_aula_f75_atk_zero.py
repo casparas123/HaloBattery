@@ -127,10 +127,26 @@ class F75PollTests(unittest.TestCase):
         self.assertTrue(out[0].charging)
         self.assertTrue(out[0].charging_known)
 
-    def test_no_answer_gives_no_icon(self):
+    def test_no_answer_keeps_the_receiver_keyboard_visible_greyed_out(self):
         out, diag = self.poll(FakeDev([]))
-        self.assertEqual(out, [])
+        self.assertEqual([(s.key, s.name, s.level, s.online, s.charging_known)
+                          for s in out],
+                         [("aula:f75", "AULA F75", None, False, False)])
         self.assertTrue(any("no answer" in line for line in diag))
+
+    def test_a_later_silence_keeps_the_last_level_without_claiming_charging(self):
+        fake = FakeDev([f75_reply(97, 0x01)])
+        F.hid = types.SimpleNamespace(device=lambda: fake)
+        F.hidlist.enumerate = lambda vid=0: f75_entries()
+        F.compx.output_length = lambda path: 20
+        provider = F.AulaF75Provider()
+        self.assertEqual(provider.poll()[0].level, 97)
+
+        fake = FakeDev([])
+        F.hid = types.SimpleNamespace(device=lambda: fake)
+        out = provider.poll()
+        self.assertEqual((out[0].level, out[0].online, out[0].charging,
+                          out[0].charging_known), (97, False, False, False))
 
 
 # --- ATK Zero ---------------------------------------------------------------

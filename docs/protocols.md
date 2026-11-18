@@ -304,7 +304,16 @@ a different command or checksum is refused. The first request after the link
 comes up can be missed, so the provider retries before calling the keyboard
 silent. Receivers that report a 17-byte output use the older Compx frame
 (`providers/compx.py`); that path is still kept for the LEOBOG Hi75C Pro and
-earlier F75 firmware. **Test build 1 pending** on the reporter's F75.
+earlier F75 firmware.
+
+The receiver is the only part that reports a cable state, and it reports
+`0x10` only when it sees the cable. On the reporter's F75 it kept answering
+`0x01` with the cable connected, so there was no charging flag to show; the
+wired USB identity (`258a:010c`) has a different protocol and no battery or
+charging query. The provider now keeps the keyboard icon and its last level
+visible, greyed out, when the receiver stops answering, instead of removing the
+icon. Battery is confirmed by the reporter; cable charging is not reported by
+this keyboard's firmware.
 
 ### Pulsar X2 V2 Mini, Pulsar X2 CrazyLight Mini, ATK VXE R1 SE+, VXE R1 Pro Max
 

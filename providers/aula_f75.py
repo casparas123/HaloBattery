@@ -119,7 +119,13 @@ class AulaF75Provider(Provider):
 
         if got is None:
             self._diag.append("  no answer (keyboard off, asleep, or asleep on its cable)")
-            return []
+            # The receiver is still there, so keep the keyboard visible.  A
+            # greyed last level beats an icon that vanishes when the link
+            # drops; the charger stays unknown because no state was read.
+            level = self._last_level
+            return [DeviceStatus(KEY, NAME, level, False, False, "aula_f75",
+                                 kind="keyboard", wake_on_input=True,
+                                 charging_known=False)]
 
         level, charging, charging_known = got
         self._diag.append(f"  -> {level}%{' (charging)' if charging else ''}"

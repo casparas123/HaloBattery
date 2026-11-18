@@ -287,12 +287,31 @@ A different chip from the M7 Ultra, and a different protocol: a 65-byte output r
 
 The vendor collection (usage page 0xFF01; the sibling 0xFF0B never answers): feature report 0x11 (the shorter report, tried first) or 0x12 with command 0x06, every payload byte inverted, which returns `53 52 31 00 02 05 07 00 09 64 00 64` — vid 0x5253, model 0x31, firmware, flags, then the level and the charging byte (1 while charging). The request has to be repeated for each read, and the receiver only relays a real value while the mouse is awake: asleep it answers with zeros, so a silent mouse keeps its last level on a greyed icon. On the cable the mouse answers on its own PID (5253:0031, the number it reports as its model id) and the receiver goes quiet: both connections share one icon, and whichever one reports charging wins
 
+### AULA F75 (2.4 GHz)
+
+**Connection:** 2.4 GHz receiver (3554:FA09), 20-byte report on `0xFF02:0x0002`.
+
+The F75's newer receiver speaks a report-`0x13` exchange (ushineko/sanshoku#36,
+captured from this keyboard):
+
+    request  13 4A 00 00 ... <sum of bytes 0..18>
+    reply    13 4A 01 00 02 <level> <state> ... <sum of bytes 0..18>
+
+The level is byte 5 (1..100). Byte 6 is `0x01` on battery and `0x10` with the
+cable in; in the cable state the level byte is a placeholder 100 even at 97 %, so
+the last real level is kept and charging comes from the state byte. A reply with
+a different command or checksum is refused. The first request after the link
+comes up can be missed, so the provider retries before calling the keyboard
+silent. Receivers that report a 17-byte output use the older Compx frame
+(`providers/compx.py`); that path is still kept for the LEOBOG Hi75C Pro and
+earlier F75 firmware. **Test build 1 pending** on the reporter's F75.
+
 ### Pulsar X2 V2 Mini, Pulsar X2 CrazyLight Mini, ATK VXE R1 SE+, VXE R1 Pro Max
 
 **Connection:** 2.4 GHz dongle (3554:F508, 373B:1085, 3554:F58A, 3554:F505, 3710:5406) and USB cable (3554:F507, 3554:F58F, 3554:F58C, 3554:F506, 3710:3414)
 
 17-byte big-endian frames, report id 0x08: command 0x04 asks for the power details and answers with the level in byte 6, the on-cable flag in byte 7 and millivolts in bytes 8-9, with a checksum (0x55 minus the sum of the first 16 bytes) in byte 16. From andrewrabert/python-pulsar-mouse-tool, which also backs the "HID: pulsar" driver in review for Linux; the Kysona M600 and VXE Dragonfly R1 Pro use the same protocol but their ids are not claimed here. The ATK/VXE control panel of the OpenMouse project (@openmouse/protocol, drivers/atk) lists the R1 Pro Max receiver as 3554:f58a and reads it with the same command 0x04 frame, opening the collection with usage page 0xFF02 and usage 0x0002 - the R1 Pro Max dongle has five other interface-1 collections and the first of them is not the one that answers, so that collection is now preferred; a collection whose output report cannot carry the 17-byte frame is skipped, because Windows refuses that write and the refusal looks exactly like a device that is switched off. The framing is also in G-Wolves' own web driver (mouse.xyz), whose Compx class sends the same report-0x08 frame with a checksum of 0x55 minus the sum of the payload. The R1 Pro Max is confirmed on hardware on both of its transports, by the reporter of #87: this provider read the mouse on its stock 1 kHz receiver, on the `ff02:0002` collection, and on its cable the level agreed with ATK's own panel (hub.atk.pro) with the charging flag following the cable in both directions, so the cable id (3554:F58C) is read on hardware as well rather than only claimed from their report. A frame whose checksum does not match is refused rather than shown. The X2 CrazyLight Mini (#164) was tested by its reporter on both of its transports with this same frame - the dongle and the cable both answered command 0x04 with valid checksums, the cable reporting charging - so both of its ids (3710:5406, 3710:3414) are claimed from that report; the app-side reading was confirmed on their run of this branch in #164 - the dongle read 20 %, the same raw level as their own test, and the cable read while charging. VGN's Dragonfly 4K receiver (`3554:f505`) and the same mouse on its cable (`3554:f506`) follow the same exchange - the receiver lists six vendor pages on interface 1 with `ff02:0002` among them. The receiver is **confirmed on hardware by @TweaknFreak** (#323): the level it showed agreed with the vendor tool's 53 %, so the id is claimed from a working read rather than from the collection shape; the cable id stays claimed from the report until someone runs it with the mouse plugged in.
-17-byte big-endian frames, report id 0x08: command 0x04 asks for the power details and answers with the level in byte 6, the on-cable flag in byte 7 and millivolts in bytes 8-9, with a checksum (0x55 minus the sum of the first 16 bytes) in byte 16. From andrewrabert/python-pulsar-mouse-tool, which also backs the "HID: pulsar" driver in review for Linux; the Kysona M600 and VXE Dragonfly R1 Pro use the same protocol but their ids are not claimed here. The ATK/VXE control panel of the OpenMouse project (@openmouse/protocol, drivers/atk) lists the R1 Pro Max receiver as 3554:f58a and reads it with the same command 0x04 frame, opening the collection with usage page 0xFF02 and usage 0x0002 - the R1 Pro Max dongle has five other interface-1 collections and the first of them is not the one that answers, so that collection is now preferred; a collection whose output report cannot carry the 17-byte frame is skipped, because Windows refuses that write and the refusal looks exactly like a device that is switched off. The framing is also in G-Wolves' own web driver (mouse.xyz), whose Compx class sends the same report-0x08 frame with a checksum of 0x55 minus the sum of the payload. The R1 Pro Max is confirmed on hardware on both of its transports, by the reporter of #87: this provider read the mouse on its stock 1 kHz receiver, on the `ff02:0002` collection, and on its cable the level agreed with ATK's own panel (hub.atk.pro) with the charging flag following the cable in both directions, so the cable id (3554:F58C) is read on hardware as well rather than only claimed from their report. A frame whose checksum does not match is refused rather than shown. The X2 CrazyLight Mini (#164) was tested by its reporter on both of its transports with this same frame - the dongle and the cable both answered command 0x04 with valid checksums, the cable reporting charging - so both of its ids (3710:5406, 3710:3414) are claimed from that report; the app-side reading was confirmed on their run of this branch in #164 - the dongle read 20 %, the same raw level as their own test, and the cable read while charging. The ATK X1 Pro 1K dongle (373B:101A, #230), the ATK Fire X 8K (373B:101B) and the Compx keyboard receivers (3554:FA09 - seen on the AULA F75 in #247 and the LEOBOG Hi75C Pro in #257) list the same ff02:0002 control collection and are read with the same frame; the receiver id is shared by those keyboards, so the tray name is the receiver's, not one model's. The Corsair Sabre v2 Pro Ultralight (1B1C:2B2A, #290) is the same exchange too:
+17-byte big-endian frames, report id 0x08: command 0x04 asks for the power details and answers with the level in byte 6, the on-cable flag in byte 7 and millivolts in bytes 8-9, with a checksum (0x55 minus the sum of the first 16 bytes) in byte 16. From andrewrabert/python-pulsar-mouse-tool, which also backs the "HID: pulsar" driver in review for Linux; the Kysona M600 and VXE Dragonfly R1 Pro use the same protocol but their ids are not claimed here. The ATK/VXE control panel of the OpenMouse project (@openmouse/protocol, drivers/atk) lists the R1 Pro Max receiver as 3554:f58a and reads it with the same command 0x04 frame, opening the collection with usage page 0xFF02 and usage 0x0002 - the R1 Pro Max dongle has five other interface-1 collections and the first of them is not the one that answers, so that collection is now preferred; a collection whose output report cannot carry the 17-byte frame is skipped, because Windows refuses that write and the refusal looks exactly like a device that is switched off. The framing is also in G-Wolves' own web driver (mouse.xyz), whose Compx class sends the same report-0x08 frame with a checksum of 0x55 minus the sum of the payload. The R1 Pro Max is confirmed on hardware on both of its transports, by the reporter of #87: this provider read the mouse on its stock 1 kHz receiver, on the `ff02:0002` collection, and on its cable the level agreed with ATK's own panel (hub.atk.pro) with the charging flag following the cable in both directions, so the cable id (3554:F58C) is read on hardware as well rather than only claimed from their report. A frame whose checksum does not match is refused rather than shown. The X2 CrazyLight Mini (#164) was tested by its reporter on both of its transports with this same frame - the dongle and the cable both answered command 0x04 with valid checksums, the cable reporting charging - so both of its ids (3710:5406, 3710:3414) are claimed from that report; the app-side reading was confirmed on their run of this branch in #164 - the dongle read 20 %, the same raw level as their own test, and the cable read while charging. The ATK X1 Pro 1K dongle (373B:101A, #230) and the ATK Fire X 8K (373B:101B) list the same ff02:0002 control collection and are read with the same frame; the AULA F75 (3554:FA09) moved to its own 20-byte reader (`providers/aula_f75.py`) and is no longer claimed here. The Corsair Sabre v2 Pro Ultralight (1B1C:2B2A, #290) is the same exchange too:
 its receiver publishes ff02:0002 and no ff42 at all, so it is read here rather than by
 the bragi path. The Teevolution Terra Pro (3554:F523, #300) is the same exchange behind the 'RapidSync' product string, with its keyboard collection on interface 2. The ATK X1 Pro is confirmed on hardware by @gnrlk3nobi in #230: it read immediately, the level stayed within about 5 % of ATK HUB in both states (the two apps sample at different moments, so the sign flips), and the charging state followed the cable. The keyboard receiver and the Fire X 8K are still waiting for their testers.
 
@@ -397,6 +416,25 @@ itself is open the dongle stops answering this request - the app keeps the
 last value on a greyed icon, so live readings want CAM closed.
 
 ## Mice and keyboards
+
+### ATK Zero (8K)
+
+**Connection:** 8K receiver (`373B:1155`, "Wireless mouse 8k dongle-L1") or USB cable (`373B:1154`).
+
+The Zero uses the Nordic 54L15 64-byte register protocol on `0xFF05:0x0001`,
+report id `0x08`; it does not answer the older 17-byte Compx frame. The
+exchange, from zeon256/atkzero-battery and the ATK web HUB:
+
+    request  08 <sum> 72 02 00 <bank> <addr> <len> 00 ...
+    reply    08 72 00 3A 00 <addr> <len> <value> ...
+
+Bank `1` is the 2.4 GHz receiver, bank `0` the cable. Register `0x07` is the
+battery percentage and register `0x0F` is the charger (1 while charging). A
+reply with a non-zero status or a different echoed register is a sleeping mouse,
+not a 0 % reading; the provider then keeps the last real level greyed. If the
+charger register does not answer, the level is still shown but the charger is
+reported as unknown. Both transports share one icon. **Test build 1 pending** on
+the reporter's Zero.
 
 ### ATK V75X
 

@@ -13,6 +13,10 @@ and the project follows [Semantic Versioning](https://semver.org/).
   and Exit HaloBattery hover colors, with themed pressed feedback.
 
 ### Added
+- Battery support for the AULA F75 keyboard (`3554:fa09`, 20-byte `0x13/0x4A`
+  receiver exchange) and the ATK Zero mouse (`373b:1155` receiver,
+  `373b:1154` cable; 64-byte `0x72` register protocol, battery `0x07` and
+  charger `0x0F`). Test build 1, unverified on hardware.
 - A fading app splash with a soft icon shadow and theme-matched startup background
   while the settings window loads and restores its saved view.
 - Open the existing What's new window from About, directly below the version.

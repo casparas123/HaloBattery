@@ -107,6 +107,8 @@ MESSAGES = {
     "provider.atk_keyboard": "ATK V75X 键盘",
     "provider.atk_nearlink": "ATK X1 Nearlink 鼠标",
     "provider.aula": "AULA F87 Pro V2C 键盘",
+    "provider.aula_f75": "AULA F75",
+    "provider.atk_zero": "ATK Zero",
     "provider.dareu": "DAREU 鼠标",
     "provider.eweadn": "EWEADN / 前行者 鼠标",
     "provider.endgame_4k": "Endgame Gear 4K 鼠标（XM2w / OP1w）",

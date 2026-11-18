@@ -1,5 +1,7 @@
 from .base import DeviceStatus, Provider  # noqa: F401
 from .aula import AulaProvider  # noqa: F401
+from .aula_f75 import AulaF75Provider  # noqa: F401
+from .atk_zero import AtkZeroProvider  # noqa: F401
 from .alienware import AlienwareProvider  # noqa: F401
 from .barracuda import BarracudaProvider  # noqa: F401
 from .barracuda_x import BarracudaXProvider  # noqa: F401

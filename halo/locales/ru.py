@@ -105,6 +105,8 @@ MESSAGES = {
     "provider.atk_keyboard": "Клавиатура ATK V75X",
     "provider.atk_nearlink": "Мыши ATK X1 Nearlink",
     "provider.aula": "Клавиатуры AULA F87 Pro V2C",
+    "provider.aula_f75": "AULA F75",
+    "provider.atk_zero": "ATK Zero",
     "provider.dareu": "Мыши DAREU",
     "provider.eweadn": "Мыши EWEADN / 前行者",
     "provider.endgame_4k": "Мыши Endgame Gear 4K (XM2w / OP1w)",

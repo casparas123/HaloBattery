@@ -273,28 +273,12 @@ class PulsarTest(unittest.TestCase):
         self.assertEqual(71, d.level)
         self.assertEqual([(0xFF02, 0x0002)], bus.written())
 
-    def test_the_aula_f75_keyboard_is_read_and_keeps_its_keyboard_icon(self):
-        # #247: the F75's receiver publishes a keyboard collection and the same
-        # ff02:0002 control collection, so the same frame is asked - only the
-        # pictogram differs from the mice of this file
+    def test_the_aula_f75_is_left_to_its_own_provider(self):
+        # #457: the F75's newer firmware uses a 20-byte 0x13/0x4A exchange,
+        # so providers/aula_f75.py claims 3554:fa09 instead of this file.
         bus = self.one_receiver(vid=0x3554, pid=0xFA09, replies=[reply(64)], shape=F75_SHAPE)
-        found = P.PulsarProvider().poll()
-        self.assertEqual(1, len(found))
-        d = found[0]
-        self.assertEqual("pulsar:3554fa09", d.key)
-        self.assertEqual("Compx 2.4 GHz keyboard", d.name)
-        self.assertEqual(64, d.level)
-        self.assertEqual("keyboard", d.kind)
-        self.assertEqual([(0xFF02, 0x0002)], bus.written())
-
-    def test_a_keyboard_that_stops_answering_keeps_its_keyboard_kind(self):
-        self.one_receiver(vid=0x3554, pid=0xFA09, replies=[reply(64)], shape=F75_SHAPE)
-        provider = P.PulsarProvider()
-        self.assertEqual("keyboard", provider.poll()[0].kind)
-        kept = provider.poll()
-        self.assertEqual(1, len(kept))
-        self.assertEqual("keyboard", kept[0].kind)
-        self.assertTrue(any("keeping 64%" in line for line in provider.diagnostics()))
+        self.assertEqual([], P.PulsarProvider().poll())
+        self.assertEqual([], bus.written())
 
     def test_the_r1_pro_max_on_its_cable_is_read(self):
         # the reporter's second report: the wired mouse is 3554:f58c, product string

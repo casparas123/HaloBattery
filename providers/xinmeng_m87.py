@@ -3,14 +3,16 @@
 The M87 is the same 0x0C45/FEFE dongle family as the EWEADN X87.  Its vendor
 channel is usage page 0xFF60 / usage 0x0061, 32-byte packets with report id 0:
 
-    request   00 | AA 10 18 00 00 00 01 00 ...     read the device-info block
-    reply     55 10 18 ...  <level at byte 17> ...
+    request   AA 10 18 00 00 00 00 00 ...     info block, first 24 bytes
+    request   AA 10 08 18 00 00 01 00 ...     info block, bytes 24..31
+    reply     55 10 <len> <offset> ...        data starts at byte 8
 
 That is the protocol implemented by marcelowbr/eweadn-x87 (the reverse-engineered
-web HUB for the X87): commands 0x1X read, the info block keeps the battery at
-offset 17; the reply starts with 0x55 and echoes the command.  The same dongle is
-sold as a generic "2.4G Dongle", so the product string cannot identify the model;
-the answer does echo the wired product id (0x8006 for the M87/X87 family).
+web HUB for the X87): commands 0x1X read, the info block is 32 bytes and is read
+in two chunks (24 + 8 bytes), and the battery is at **payload** offset 17.  The
+same dongle is sold as a generic "2.4G Dongle", so the product string cannot
+identify the model; the answer echoes the wired product id (0x8006 for the
+M87/X87 family).
 
 The wired PID 0x8006 is also the charging signal: while the keyboard is on its
 cable it enumerates as its own HID device.  The receiver protocol has no charge
@@ -52,19 +54,27 @@ READ_TIMEOUT_MS = 180
 ASLEEP_KEEP = 300
 
 
-def _payload() -> bytes:
-    """The 32-byte X87 info request; byte 6 marks the last (only) block."""
+def _packet(length: int, offset: int, last: bool) -> bytes:
+    """One 32-byte X87 info request packet."""
     p = bytearray(REPORT_SIZE)
     p[0] = PACKET_START
     p[1] = CMD_INFO
-    p[2] = 0x18
-    p[6] = 1
+    p[2] = length
+    p[3] = offset & 0xFF
+    p[4] = (offset >> 8) & 0xFF
+    p[5] = 0
+    p[6] = 1 if last else 0
     return bytes(p)
 
 
+def make_requests() -> List[bytes]:
+    """The two packets that read the 32-byte info block."""
+    return [_packet(24, 0, False), _packet(8, 24, True)]
+
+
 def make_request() -> bytes:
-    """The request with hidapi's report id in front: 00 | AA 10 18 ..."""
-    return bytes([REPORT_ID]) + _payload()
+    """Backward-compatible first packet, with hidapi's report id in front."""
+    return bytes([REPORT_ID]) + make_requests()[0]
 
 
 def _unframe(resp) -> Optional[bytes]:
@@ -79,15 +89,23 @@ def _unframe(resp) -> Optional[bytes]:
     return None
 
 
-def parse_info(resp) -> Optional[Tuple[int, int, int, bool]]:
-    """(level, vendor_no, product_no, charging) from the info block, or None.
-
-    The receiver answers only when the keyboard is awake; a short or a foreign
-    reply is refused rather than shown as 0 %.
-    """
+def parse_chunk(resp) -> Optional[Tuple[int, bytes]]:
+    """(payload offset, payload bytes) from one info reply, or None."""
     p = _unframe(resp)
     if p is None or p[1] != CMD_INFO:
         return None
+    length = p[2]
+    offset = p[3] | (p[4] << 8)
+    if length == 0 or length > 24 or 8 + length > REPORT_SIZE:
+        return None
+    return offset, p[8:8 + length]
+
+
+def parse_info(data) -> Optional[Tuple[int, int, int, bool]]:
+    """(level, vendor_no, product_no, charging) from the assembled 32-byte payload."""
+    if not data or len(data) < 18:
+        return None
+    p = list(data[:32])
     level = p[LEVEL_INDEX]
     if level > 100:
         return None
@@ -174,22 +192,42 @@ class XinmengM87Provider(Provider):
                 dev.set_nonblocking(True)
             except Exception:
                 pass
-            for _ in range(ATTEMPTS):
+            # The X87 HUB drains stale input reports before a read; without
+            # this the first answer can be a queued packet from the last poll.
+            for _ in range(8):
                 try:
-                    dev.write(make_request())
+                    if not dev.read(REPORT_SIZE + 1, 0):
+                        break
                 except Exception:
-                    # Some hidapi builds want the unnumbered 32-byte report.
+                    break
+            data = bytearray(REPORT_SIZE)
+            for packet in make_requests():
+                payload = None
+                for _ in range(ATTEMPTS):
                     try:
-                        dev.write(_payload())
-                    except Exception as e:
-                        self._diag.append(f"  write: {e}")
-                        return None
-                r = dev.read(REPORT_SIZE + 1, READ_TIMEOUT_MS)
-                if r:
+                        dev.write(bytes([REPORT_ID]) + packet)
+                    except Exception:
+                        # Some hidapi builds want the unnumbered 32-byte report.
+                        try:
+                            dev.write(packet)
+                        except Exception as e:
+                            self._diag.append(f"  write: {e}")
+                            return None
+                    r = dev.read(REPORT_SIZE + 1, READ_TIMEOUT_MS)
+                    if not r:
+                        continue
                     self._diag.append(f"  reply: {hexdump(r, 24)}")
-                    got = parse_info(r)
-                    if got is not None:
-                        return got
+                    parsed = parse_chunk(r)
+                    if parsed is not None:
+                        payload = parsed
+                        break
+                if payload is None:
+                    return None
+                offset, chunk = payload
+                if offset >= REPORT_SIZE:
+                    return None
+                data[offset:offset + len(chunk)] = chunk[:REPORT_SIZE - offset]
+            return parse_info(data)
         except Exception as e:  # pragma: no cover - hidapi raises OSError
             self._diag.append(f"  error: {e}")
         finally:

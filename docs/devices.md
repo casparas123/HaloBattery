@@ -70,8 +70,8 @@
 | [VGN Dragonfly 4K (receiver and cable)](protocols.md#pulsar-x2-v2-mini-pulsar-x2-crazylight-mini-atk-vxe-r1-se-vxe-r1-pro-max) | 4K dongle or USB cable | confirmed (receiver) |
 | [WLmouse Beast X and Beast X Mini Pro](protocols.md#wlmouse-beast-x-and-beast-x-mini-pro) | 8K or 1K receiver, or USB cable | likely |
 | [WLmouse Beast X Max](protocols.md#wlmouse-beast-x-max) | 8K receiver and USB cable | yes |
-| [Xinmeng M87](protocols.md#xinmeng-m87-24-ghz) | 2.4 GHz receiver (`0c45:fefe`) or USB cable (`0c45:8006`) | no; test build 1 pending |
-| [Xinmeng Zero 3](protocols.md#xinmeng-zero-3-24-ghz) | 2.4 GHz receiver (`3151:5045`) or USB cable (`3151:5043`) | no; test build 1 pending |
+| [Xinmeng M87](protocols.md#xinmeng-m87-24-ghz) | 2.4 GHz receiver (`0c45:fefe`) or USB cable (`0c45:8006`) | no; test build 2 pending |
+| [Xinmeng Zero 3](protocols.md#xinmeng-zero-3-24-ghz) | 2.4 GHz receiver (`3151:5045`) or USB cable (`3151:5043`) | no; test build 2 pending |
 | [Xbox-compatible controllers (other models)](protocols.md#xbox-compatible-controllers-other-models) | USB or the Xbox wireless adapter | likely |
 
 **PlayStation controllers over Bluetooth:** a DualShock 4 or DualSense sends its battery level over Bluetooth only in its "full report" mode. Switching a controller into that mode makes it invisible to games that use DirectInput until it is turned off and on again (#96), so the app does not switch it: the level shows while Steam or a game has already put the controller in that mode, and otherwise the icon shows the controller without a level. If you do not play such games, turn on **Preferences > PlayStation full mode (Bluetooth)** to always see the level. Over USB the level is always shown.

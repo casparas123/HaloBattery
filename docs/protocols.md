@@ -599,20 +599,27 @@ the level only rather than inventing a charger state.
 The M87 is the 0C45:FEFE dongle family also used by the EWEADN X87. Its vendor
 collection is `0xFF60:0x0061` on interface 3, 32-byte packets with report id 0:
 
-    request  00 | AA 10 18 00 00 00 01 00 ...      read the device-info block
-    reply    55 10 18 ...  <level at byte 17> ...
+    request  00 | AA 10 18 00 00 00 00 00 ...      info block, first 24 bytes
+    request  00 | AA 10 08 18 00 00 01 00 ...      info block, bytes 24..31
+    reply    55 10 <len> <offset LE> ...           data starts at byte 8
 
 The exchange is the one in [marcelowbr/eweadn-x87](https://github.com/marcelowbr/eweadn-x87),
-reverse-engineered from EWEADN's web HUB; the dongle answers with `0x55` and echoes command
-`0x10`, and the info block also carries the wired product id (`0x8006` for this family).
-The product string cannot identify the model - it is the generic "2.4G Dongle" - so the
-provider queries the vendor block rather than trusting the name. Attack Shark's X66 shares
-the receiver id but has its own provider and product string, and is left alone here.
+reverse-engineered from EWEADN's web HUB. The 32-byte info block is read in **two
+chunks** - `AA 10 18 00 00 00 00 00` then `AA 10 08 18 00 00 01 00` - because
+packet byte 2 is the chunk length and bytes 3-4 are its little-endian offset; a
+single "24-byte block marked last" request never reaches the battery. Each reply
+starts with `0x55`, echoes command `0x10`, and carries its own offset in bytes
+3-4; the data starts at byte 8. After both chunks are assembled the battery is at
+**payload byte 17**, not at byte 17 of the raw reply. The block also carries the
+wired product id (`0x8006` for this family). The product string cannot identify
+the model - it is the generic "2.4G Dongle" - so the provider queries the vendor
+block rather than trusting the name. Attack Shark's X66 shares the receiver id
+but has its own provider and product string, and is left alone here.
 
 The block has **no charging bit**. The keyboard's wired USB identity (`0C45:8006`) is used as
 the charging signal while the cable is connected; on the receiver alone the charger is
 reported as unknown rather than guessed, because a charge-only cable does not have to
-enumerate. **Test build 1 pending** on the reporter's M87.
+enumerate. **Test build 2 pending** on the reporter's M87.
 
 ### Xinmeng Zero 3 (2.4 GHz)
 
@@ -632,10 +639,12 @@ is a zeroed 64-byte report with `0xF7` in byte 0, and the HUB parses the answer 
     byte 7  USB mode
 
 This is the `buildReceiverGetStatus` / `parseReceiverStatus` exchange in
-[hub.urx.co.in](https://hub.urx.co.in/) (inspected 2026-11-18). A disconnected mouse is
-refused rather than shown as a stale 0 %. The status has **no charging bit**; the wired
-identity (`3151:5043`) is used as the charging signal when present, and on the receiver
-alone charging is reported as unknown. **Test build 1 pending** on the reporter's Zero 3.
+[hub.urx.co.in](https://hub.urx.co.in/) (inspected 2026-11-18). The **receiver** is
+queried even when the cable is plugged in; the wired id only supplies charging,
+because the wired identity echoes a zeroed status with `connected=0` and would
+otherwise show 0 %. A disconnected mouse (`byte 4 = 1`) or a reply with no
+connected devices is refused rather than shown as a stale 0 %. **Test build 2
+pending** on the reporter's Zero 3.
 
 ### Logitech (more HID++ 2.0 devices and G-series headsets)
 

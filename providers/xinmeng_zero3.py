@@ -70,7 +70,9 @@ def parse_status(resp) -> Optional[Tuple[int, int, int]]:
         r = r[1:]
     if len(r) < 8:
         return None
-    if r[4] == 1:
+    if r[4] == 1 or r[6] == 0:
+        # Disconnected, or the wired identity echoing the request: neither is
+        # a receiver status with a level.
         return None
     level = r[2]
     if level > 100:
@@ -107,7 +109,10 @@ class XinmengZero3Provider(Provider):
             elif pid == RECEIVER_PID and vendor:
                 receiver = d
 
-        target = wired or receiver
+        # The receiver is the status source even when the cable is plugged in;
+        # the wired id is only the charging signal (and echoes zeroes instead
+        # of a receiver status).
+        target = receiver or wired
         if target is None:
             return []
 

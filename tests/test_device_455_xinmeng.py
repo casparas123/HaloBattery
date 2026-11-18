@@ -20,13 +20,25 @@ from providers import xinmeng_m87 as M  # noqa: E402
 from providers import xinmeng_zero3 as Z  # noqa: E402
 
 
-def m87_info(level=73, product=0x8006):
+def m87_data(level=73, product=0x8006):
     p = [0x00] * 32
-    p[0], p[1], p[2] = 0x55, 0x10, 0x18
     p[12], p[13] = 0x45, 0x0C
     p[14], p[15] = product & 0xFF, product >> 8
     p[17] = level
     return p
+
+
+def m87_chunk(data, offset, length):
+    r = [0x00] * 32
+    r[0], r[1], r[2] = 0x55, 0x10, length
+    r[3], r[4] = offset & 0xFF, offset >> 8
+    r[8:8 + length] = data[offset:offset + length]
+    return r
+
+
+def m87_replies(level=73, product=0x8006):
+    data = m87_data(level, product)
+    return [m87_chunk(data, 0, 24), m87_chunk(data, 24, 8)]
 
 
 def z_status(level=54, disconnected=0, usb=1, devices=1):
@@ -87,6 +99,8 @@ class FakeDev:
         return len(data)
 
     def read(self, size, timeout_ms=0):
+        if timeout_ms == 0:
+            return []
         return self.replies.pop(0) if self.replies else []
 
     def send_feature_report(self, data):
@@ -100,28 +114,35 @@ class FakeDev:
 
 
 class M87ParseTests(unittest.TestCase):
-    def test_the_request_is_the_x87_info_block(self):
-        req = M.make_request()
-        self.assertEqual(len(req), 33)
-        self.assertEqual(req[0], 0)
-        self.assertEqual((req[1], req[2], req[3], req[7]), (0xAA, 0x10, 0x18, 1))
+    def test_the_request_is_the_two_chunk_x87_info_block(self):
+        requests = M.make_requests()
+        self.assertEqual([(r[2], r[3], r[6]) for r in requests],
+                         [(24, 0, 0), (8, 24, 1)])
+        self.assertEqual((requests[0][0], requests[0][1]), (0xAA, 0x10))
+        self.assertEqual(len(requests[0]), 32)
 
     def test_the_captured_shape_reads_level_and_product(self):
-        self.assertEqual(M.parse_info(m87_info(73)), (73, 0x0C45, 0x8006, False))
+        self.assertEqual(M.parse_info(m87_data(73)), (73, 0x0C45, 0x8006, False))
+
+    def test_each_reply_carries_its_offset_and_payload(self):
+        data = m87_data(41)
+        self.assertEqual(M.parse_chunk(m87_chunk(data, 0, 24)), (0, bytes(data[:24])))
+        self.assertEqual(M.parse_chunk(m87_chunk(data, 24, 8)), (24, bytes(data[24:])))
 
     def test_the_reply_may_keep_or_drop_the_report_id(self):
-        self.assertEqual(M.parse_info(m87_info(41))[0], 41)
-        self.assertEqual(M.parse_info([0] + m87_info(41))[0], 41)
+        reply = [0] + m87_chunk(m87_data(41), 0, 24)
+        self.assertEqual(M.parse_chunk(reply)[1], bytes(m87_data(41)[:24]))
 
     def test_a_foreign_or_short_answer_is_refused(self):
-        bad = m87_info()
+        bad = m87_chunk(m87_data(), 0, 24)
         bad[0] = 0xAA
-        self.assertIsNone(M.parse_info(bad))
-        bad = m87_info()
+        self.assertIsNone(M.parse_chunk(bad))
+        bad = m87_chunk(m87_data(), 0, 24)
         bad[1] = 0x11
-        self.assertIsNone(M.parse_info(bad))
-        self.assertIsNone(M.parse_info(m87_info(101)))
-        self.assertIsNone(M.parse_info([0x55, 0x10]))
+        self.assertIsNone(M.parse_chunk(bad))
+        self.assertIsNone(M.parse_info(m87_data(101)))
+        self.assertIsNone(M.parse_info([]))
+        self.assertIsNone(M.parse_chunk([0x55, 0x10]))
 
 
 class M87PollTests(unittest.TestCase):
@@ -139,16 +160,17 @@ class M87PollTests(unittest.TestCase):
         return p.poll(), p.diagnostics()
 
     def test_the_receiver_is_read_and_charging_is_unknown(self):
-        fake = FakeDev([m87_info(73)])
+        fake = FakeDev(m87_replies(73))
         out, diag = self.poll(fake, m87_entries())
         self.assertEqual([(s.key, s.name, s.level, s.charging, s.online, s.kind,
                            s.charging_known) for s in out],
                          [("xinmeng:m87", "Xinmeng M87", 73, False, True, "keyboard", False)])
         self.assertEqual({p for p, _ in fake.sent}, {b"m87-receiver"})
+        self.assertEqual(len(fake.sent), 2)
         self.assertTrue(any("73%" in line for line in diag))
 
     def test_the_wired_id_is_the_charging_signal(self):
-        fake = FakeDev([m87_info(73)])
+        fake = FakeDev(m87_replies(73))
         out, _ = self.poll(fake, m87_entries(wired=True))
         self.assertEqual(out[0].level, 73)
         self.assertTrue(out[0].charging)
@@ -156,7 +178,7 @@ class M87PollTests(unittest.TestCase):
         self.assertEqual({p for p, _ in fake.sent}, {b"m87-wired"})
 
     def test_the_x66_is_left_to_its_own_provider(self):
-        out, _ = self.poll(FakeDev([m87_info()]), m87_entries(product="X66 2.4G"))
+        out, _ = self.poll(FakeDev(m87_replies()), m87_entries(product="X66 2.4G"))
         self.assertEqual(out, [])
 
     def test_a_missing_answer_keeps_an_icon_without_a_level(self):
@@ -178,6 +200,9 @@ class Zero3ParseTests(unittest.TestCase):
 
     def test_a_disconnected_mouse_is_refused(self):
         self.assertIsNone(Z.parse_status(z_status(54, disconnected=1)))
+
+    def test_a_wired_echo_with_no_connected_devices_is_refused(self):
+        self.assertIsNone(Z.parse_status(z_status(0, disconnected=0, devices=0)))
 
     def test_a_foreign_or_short_answer_is_refused(self):
         self.assertIsNone(Z.parse_status([]))

@@ -64,8 +64,10 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 - **MCHOSE K99 V3** keyboard on its 2.4 GHz receiver (`3837:3033`), read with the
   64-byte generic-desktop report (`55 03 00 38 38 ...` → `AA 03 00 38 ...`, level
-  at byte 8). Test build 1, unverified on hardware; the charger byte is logged but
-  its semantics are not documented.
+  at byte 8). On Windows the frame is sent behind hidapi's unnumbered-report `00`;
+  the first test build sent the bare 64-byte frame, so hidapi read `55` as a report
+  id and the keyboard never answered. Test build 2, unverified on hardware; the
+  charger byte is logged but its semantics are not documented.
 
 - **MCHOSE X9** headset on its 2.4 GHz dongle (`3837:6045`), read with M HUB's own
   BLK battery query (`65 01` on report `0x55`). Confirmed on hardware: the level and

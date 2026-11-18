@@ -296,7 +296,7 @@ The K99 V3 is a different protocol from the K87/K99 legacy keyboard: a fixed 64-
     request  55 03 00 38 38 00 00 00 00 ...
     reply    AA 03 00 38 ... <level at byte 8> ...
 
-The reply echoes command `0x03` and sub-command `0x38`; there is no checksum, so that echo is the framing check. Byte 6 is logged in Diagnostics, but its charge semantics are not documented, so the app reports the charger as unknown rather than inventing a state. **Test build 1 pending** on the reporter's K99 V3.
+The reply echoes command `0x03` and sub-command `0x38`; there is no checksum, so that echo is the framing check. On Windows the bare 64-byte frame must be sent behind hidapi's unnumbered-report `00`; test build 1 sent the bare frame, so hidapi treated `55` as a report id and the keyboard never answered. Byte 6 is logged in Diagnostics, but its charge semantics are not documented, so the app reports the charger as unknown rather than inventing a state. **Test build 2 pending** on the reporter's K99 V3.
 
 ### MCHOSE X9
 

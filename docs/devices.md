@@ -44,7 +44,7 @@
 | [MCHOSE A7 V2 Ultra](protocols.md#mchose-a7-v2-ultra) | 2.4 GHz receiver | no |
 | [MCHOSE G7](protocols.md#mchose-g7) | USB (chip 'YJX-CHIP') | yes |
 | [MCHOSE M7 Ultra](protocols.md#mchose-m7-ultra) | 2.4 GHz receiver | yes |
-| [MCHOSE K99 V3](protocols.md#mchose-k99-v3-24-ghz) | 2.4 GHz receiver (`3837:3033`) | no; test build 1 pending |
+| [MCHOSE K99 V3](protocols.md#mchose-k99-v3-24-ghz) | 2.4 GHz receiver (`3837:3033`) | no; test build 2 pending |
 | [MCHOSE X9](protocols.md#mchose-x9) | 2.4 GHz dongle | yes (level; charging is not readable) |
 | [Nintendo Switch Pro Controller, Joy-Con (L) / (R)](protocols.md#nintendo-switch-pro-controller-joy-con-l--r) | Bluetooth | no |
 | [NZXT Lift Elite Wireless](protocols.md#nzxt-lift-elite-wireless-1e712101) | 2.4 GHz receiver and USB cable | yes |

@@ -82,6 +82,8 @@ MESSAGES = {
     "provider.jbl": "JBL Quantum",
     "provider.keychron": "Keychron",
     "provider.urx": "URX Core75",
+    "provider.xinmeng_m87": "Xinmeng M87",
+    "provider.xinmeng_zero3": "Xinmeng Zero 3",
     "provider.lamzu": "LAMZU mice",
     "provider.lamzu_sw": "Lamzu Tachi (8K receiver)",
     "provider.lofree": "Lofree keyboards, AULA V9 mice",

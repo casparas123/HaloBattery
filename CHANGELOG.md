@@ -13,6 +13,12 @@ and the project follows [Semantic Versioning](https://semver.org/).
   and Exit HaloBattery hover colors, with themed pressed feedback.
 
 ### Added
+- Battery support for the Xinmeng M87 keyboard (`0c45:fefe` receiver, `0c45:8006`
+  cable) and the Xinmeng Zero 3 mouse (`3151:5045` receiver, `3151:5043` cable).
+  The M87 reads the EWEADN X87 device-info block and the Zero 3 reads Rongyuan's
+  status query; both protocols expose a level but no charge bit, so charging is
+  inferred from the wired USB identity when it is present and is reported as
+  unknown on the receiver alone. Test build 1, unverified on hardware.
 - A fading app splash with a soft icon shadow and theme-matched startup background
   while the settings window loads and restores its saved view.
 - Open the existing What's new window from About, directly below the version.

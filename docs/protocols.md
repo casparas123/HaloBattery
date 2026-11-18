@@ -592,6 +592,51 @@ percentage matched URX HUB. The charging state is **not exposed**: a second prob
 the charging cable in returned byte-identical replies (`08 00 07 4c ...`), so the app shows
 the level only rather than inventing a charger state.
 
+### Xinmeng M87 (2.4 GHz)
+
+**Connection:** 2.4 GHz receiver (0C45:FEFE, generic **"2.4G Dongle"**) or USB cable (0C45:8006).
+
+The M87 is the 0C45:FEFE dongle family also used by the EWEADN X87. Its vendor
+collection is `0xFF60:0x0061` on interface 3, 32-byte packets with report id 0:
+
+    request  00 | AA 10 18 00 00 00 01 00 ...      read the device-info block
+    reply    55 10 18 ...  <level at byte 17> ...
+
+The exchange is the one in [marcelowbr/eweadn-x87](https://github.com/marcelowbr/eweadn-x87),
+reverse-engineered from EWEADN's web HUB; the dongle answers with `0x55` and echoes command
+`0x10`, and the info block also carries the wired product id (`0x8006` for this family).
+The product string cannot identify the model - it is the generic "2.4G Dongle" - so the
+provider queries the vendor block rather than trusting the name. Attack Shark's X66 shares
+the receiver id but has its own provider and product string, and is left alone here.
+
+The block has **no charging bit**. The keyboard's wired USB identity (`0C45:8006`) is used as
+the charging signal while the cable is connected; on the receiver alone the charger is
+reported as unknown rather than guessed, because a charge-only cable does not have to
+enumerate. **Test build 1 pending** on the reporter's M87.
+
+### Xinmeng Zero 3 (2.4 GHz)
+
+**Connection:** 2.4 GHz receiver (3151:5045, **"2.4G Wireless Mouse"**) or USB cable (3151:5043).
+
+The receiver is Rongyuan's family, called `rongyuan` in URX HUB's web driver. Its vendor
+collection is `0xFFFF:0x0002` on interface 1, feature report id 0, 64 bytes. The status query
+is a zeroed 64-byte report with `0xF7` in byte 0, and the HUB parses the answer as:
+
+    byte 0  data ready (1)
+    byte 1  keyboard battery
+    byte 2  mouse battery          <- Zero 3 level
+    byte 3  keyboard disconnected
+    byte 4  mouse disconnected
+    byte 5  set-report ready
+    byte 6  connected devices
+    byte 7  USB mode
+
+This is the `buildReceiverGetStatus` / `parseReceiverStatus` exchange in
+[hub.urx.co.in](https://hub.urx.co.in/) (inspected 2026-11-18). A disconnected mouse is
+refused rather than shown as a stale 0 %. The status has **no charging bit**; the wired
+identity (`3151:5043`) is used as the charging signal when present, and on the receiver
+alone charging is reported as unknown. **Test build 1 pending** on the reporter's Zero 3.
+
 ### Logitech (more HID++ 2.0 devices and G-series headsets)
 
 **Connection:** Lightspeed, Unifying or Bolt receiver

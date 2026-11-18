@@ -36,6 +36,8 @@ from .base import DeviceStatus, Provider, hexdump, log
 
 VID = 0x3554
 PID = 0xFA09
+WIRED_VID = 0x258A             # the F75's USB cable identity, "Gaming Keyboard"
+WIRED_PID = 0x010C
 PAGE, USAGE = 0xFF02, 0x0002
 
 REPORT_ID = 0x13
@@ -106,6 +108,7 @@ class AulaF75Provider(Provider):
         self._diag.append(f"[AULA F75] pid=3554:{PID:04x} "
                           f"iface={d.get('interface_number')} "
                           f"{PAGE:04x}:{USAGE:04x} output={length}")
+        wired = self._wired_cable_present()
 
         got = None
         if length == 17:
@@ -119,6 +122,16 @@ class AulaF75Provider(Provider):
 
         if got is None:
             self._diag.append("  no answer (keyboard off, asleep, or asleep on its cable)")
+            if wired:
+                # The F75 does not put a charging flag in its receiver reply on
+                # every firmware, but its wired USB identity is present while
+                # the cable is in.  Use that presence as the cable signal and
+                # keep the last real level; this is the only cable evidence the
+                # keyboard exposes when the receiver is silent.
+                self._diag.append("  wired identity 258a:010c present; charging inferred")
+                return [DeviceStatus(KEY, NAME, self._last_level, True, True,
+                                     "aula_f75", kind="keyboard",
+                                     wake_on_input=True, charging_known=True)]
             # The receiver is still there, so keep the keyboard visible.  A
             # greyed last level beats an icon that vanishes when the link
             # drops; the charger stays unknown because no state was read.
@@ -128,12 +141,37 @@ class AulaF75Provider(Provider):
                                  charging_known=False)]
 
         level, charging, charging_known = got
+        if wired and not charging:
+            self._diag.append("  wired identity 258a:010c present; charging inferred")
+            charging, charging_known = True, True
         self._diag.append(f"  -> {level}%{' (charging)' if charging else ''}"
                           f"{'' if charging_known else ' (charger unknown)'}")
         if level is not None:
             self._last_level = level
         return [DeviceStatus(KEY, NAME, level, charging, True, "aula_f75",
                              kind="keyboard", charging_known=charging_known)]
+
+    def _wired_cable_present(self) -> bool:
+        """The F75's wired USB identity, present while the cable is in.
+
+        Only checked after the AULA receiver has been found, so a generic
+        Sino Wealth keyboard on its own is never claimed as an F75.  The
+        identity has no battery query; its presence is used solely as the
+        cable signal.
+        """
+        try:
+            infos = hidlist.enumerate(WIRED_VID)
+        except Exception as e:      # pragma: no cover
+            log.warning("hid.enumerate(258a): %s", e)
+            return False
+        for d in infos:
+            if (d.get("product_id") == WIRED_PID
+                    and d.get("usage_page") == 0xFF00
+                    and d.get("usage") == 0x0001):
+                self._diag.append(f"  wired identity 258a:{WIRED_PID:04x} "
+                                  f"'{d.get('product_string') or ''}' present")
+                return True
+        return False
 
     def _read_f75(self, path) -> Optional[Tuple[Optional[int], bool, bool]]:
         dev = hid.device()  # type: ignore[union-attr]

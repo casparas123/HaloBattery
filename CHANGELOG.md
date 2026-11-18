@@ -17,9 +17,10 @@ and the project follows [Semantic Versioning](https://semver.org/).
   receiver exchange) and the ATK Zero mouse (`373b:1155` receiver,
   `373b:1154` cable; 64-byte `0x72` register protocol, battery `0x07` and
   charger `0x0F`). Both confirmed by @xenom0rphe; the ATK shows charging from
-  its charger register, while the F75's cable state is only reported by its
-  receiver. When the receiver stops answering, the F75 stays visible with its
-  last level instead of disappearing; its wired mode has no battery query.
+  its charger register. The F75's receiver does not set its cable state on this
+  firmware, so the provider uses the wired `258a:010c` identity as the cable
+  signal when the AULA receiver is also present, keeping the last level. When
+  the receiver stops answering, the F75 stays visible instead of disappearing.
 - A fading app splash with a soft icon shadow and theme-matched startup background
   while the settings window loads and restores its saved view.
 - Open the existing What's new window from About, directly below the version.

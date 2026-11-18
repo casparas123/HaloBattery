@@ -308,12 +308,14 @@ earlier F75 firmware.
 
 The receiver is the only part that reports a cable state, and it reports
 `0x10` only when it sees the cable. On the reporter's F75 it kept answering
-`0x01` with the cable connected, so there was no charging flag to show; the
-wired USB identity (`258a:010c`) has a different protocol and no battery or
-charging query. The provider now keeps the keyboard icon and its last level
-visible, greyed out, when the receiver stops answering, instead of removing the
-icon. Battery is confirmed by the reporter; cable charging is not reported by
-this keyboard's firmware.
+`0x01` with the cable connected, so there was no charging flag to show. The
+wired USB identity (`258a:010c`, "Gaming Keyboard") has a different protocol
+and no battery or charging query, but it is present while the cable is in; the
+provider uses that presence as the cable signal when the AULA receiver is also
+present. That gives a charging state with the last real level, and when the
+receiver stops answering the keyboard stays visible instead of disappearing.
+This cable signal is inferred from the wired identity, not a battery reply;
+the receiver's `0x10` state remains the direct signal when it appears.
 
 ### Pulsar X2 V2 Mini, Pulsar X2 CrazyLight Mini, ATK VXE R1 SE+, VXE R1 Pro Max
 

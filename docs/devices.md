@@ -14,7 +14,7 @@
 | [ASUS ROG Harpe II Ace / Harpe II Extreme](protocols.md#asus-rog-harpe-ii-ace--harpe-ii-extreme) | 2.4 GHz receiver or USB cable | Harpe II Ace on its receiver |
 | [ATK V75X](protocols.md#atk-v75x) | 2.4 GHz receiver and USB cable | author-confirmed battery and charging on both |
 | [ATK Zero](protocols.md#atk-zero-8k) | 8K receiver (`373b:1155`) or USB cable (`373b:1154`) | yes (battery and charging, tested by @xenom0rphe) |
-| [AULA F75](protocols.md#aula-f75-24-ghz) | 2.4 GHz receiver (`3554:fa09`) | yes (battery, tested by @xenom0rphe); cable charging is not reported by the keyboard |
+| [AULA F75](protocols.md#aula-f75-24-ghz) | 2.4 GHz receiver (`3554:fa09`) | yes (battery, tested by @xenom0rphe); cable charging inferred from the wired identity |
 | [Audeze Maxwell](protocols.md#audeze-maxwell) | 2.4 GHz dongle or USB-C cable | yes |
 | [Bluetooth devices, tested on the 1MORE SonoFlow headset (users also report Audio-Technica and JBL Tune 760NC headphones working)](protocols.md#bluetooth-devices-tested-on-the-1more-sonoflow-headset) | Bluetooth (on by default, can be turned off in the menu) | yes |
 | [Corsair Dark Core RGB Pro SE](protocols.md#corsair-dark-core-rgb-pro-se) | 2.4 GHz dongle | yes |

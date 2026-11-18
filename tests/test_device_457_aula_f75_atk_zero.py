@@ -36,6 +36,12 @@ def f75_entries(output_length=20):
              "output_length": output_length}]
 
 
+def wired_entries():
+    return [{"vendor_id": 0x258A, "product_id": 0x010C, "interface_number": 1,
+             "usage_page": 0xFF00, "usage": 0x0001, "path": b"f75-wired",
+             "product_string": "Gaming Keyboard"}]
+
+
 class FakeDev:
     def __init__(self, replies=None):
         self.replies = list(replies or [])
@@ -147,6 +153,38 @@ class F75PollTests(unittest.TestCase):
         out = provider.poll()
         self.assertEqual((out[0].level, out[0].online, out[0].charging,
                           out[0].charging_known), (97, False, False, False))
+
+    def test_the_wired_identity_turns_silence_into_charging(self):
+        fake = FakeDev([])
+        F.hid = types.SimpleNamespace(device=lambda: fake)
+        F.hidlist.enumerate = lambda vid=0: (
+            f75_entries() if vid == 0x3554 else
+            wired_entries() if vid == 0x258A else [])
+        F.compx.output_length = lambda path: 20
+        provider = F.AulaF75Provider()
+        provider._last_level = 97
+        out = provider.poll()
+        self.assertEqual((out[0].level, out[0].charging, out[0].charging_known,
+                          out[0].online), (97, True, True, True))
+        self.assertTrue(any("wired identity 258a:010c" in line for line in provider.diagnostics()))
+
+    def test_the_wired_identity_overrides_an_on_battery_reply(self):
+        fake = FakeDev([f75_reply(100, 0x01)])
+        F.hid = types.SimpleNamespace(device=lambda: fake)
+        F.hidlist.enumerate = lambda vid=0: (
+            f75_entries() if vid == 0x3554 else
+            wired_entries() if vid == 0x258A else [])
+        F.compx.output_length = lambda path: 20
+        out = F.AulaF75Provider().poll()
+        self.assertEqual((out[0].level, out[0].charging, out[0].charging_known),
+                         (100, True, True))
+
+    def test_a_wired_keyboard_without_an_aula_receiver_is_not_claimed(self):
+        fake = FakeDev([])
+        F.hid = types.SimpleNamespace(device=lambda: fake)
+        F.hidlist.enumerate = lambda vid=0: wired_entries() if vid == 0x258A else []
+        F.compx.output_length = lambda path: 20
+        self.assertEqual(F.AulaF75Provider().poll(), [])
 
 
 # --- ATK Zero ---------------------------------------------------------------

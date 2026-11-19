@@ -130,6 +130,7 @@ MESSAGES = {
     "provider.machenike": "Machenike L7",
     "provider.moondrop": "MOONDROP GM01 Pro",
     "provider.ninjutso_sprime": "Ninjutso / Sprime mice",
+    "provider.aula_f108": "Клавиатуры AULA F108 Pro",
     "provider.dareu": "Мыши DAREU",
     "provider.eweadn": "Мыши EWEADN / 前行者",
     "provider.eweadn_ydx": "EWEADN X23 Pro",

@@ -11,6 +11,7 @@ charging field is unknown.
 """
 from __future__ import annotations
 
+import hashlib
 from typing import List, Optional, Sequence
 
 try:
@@ -39,6 +40,8 @@ def make_request() -> bytes:
 def parse_reply(report: Optional[Sequence[int]]) -> Optional[int]:
     if not report:
         return None
+    if any(type(value) is not int or not 0 <= value <= 255 for value in report):
+        return None
     # hidapi can strip the zero report ID from the input buffer.
     if len(report) == REPORT_LEN and report[0] == 0:
         report = report[1:]
@@ -50,17 +53,53 @@ def parse_reply(report: Optional[Sequence[int]]) -> Optional[int]:
     return None
 
 
+def receiver_path(path) -> Optional[bytes]:
+    """Normalize a Windows collection path, without using an optional serial."""
+    if isinstance(path, bytes):
+        try:
+            path = path.decode("utf-8")
+        except UnicodeError:
+            return None
+    if not isinstance(path, str) or not path or "\0" in path:
+        return None
+    try:
+        return path.casefold().encode("utf-8")
+    except UnicodeError:
+        return None
+
+
 class AulaF108Provider(Provider):
     name = "aula_f108"
 
     def __init__(self):
         self._diag: List[str] = []
+        self._legacy_aliases = {}
+
+    def legacy_key_aliases(self):
+        """Cached metadata only; never guess which of two receivers had the old key."""
+        return dict(self._legacy_aliases)
 
     def _read(self, path) -> Optional[int]:
         dev = hid.device()
         try:
             dev.open_path(path)
-            if dev.write(make_request()) != REPORT_LEN:
+            metadata = getattr(dev, "get_report_lengths", None)
+            expected_write = REPORT_LEN
+            if metadata is not None and not callable(metadata):
+                self._diag.append("  invalid report metadata; not querying")
+                return None
+            if callable(metadata):
+                caps = metadata()
+                if (not isinstance(caps, dict)
+                        or any(type(caps.get(kind)) is not int or caps[kind] < REPORT_LEN
+                               for kind in ("input", "output"))):
+                    self._diag.append("  incompatible report contract; not querying")
+                    return None
+                # Native write pads to the collection's largest output report;
+                # its successful byte count can exceed this canonical 33-byte query.
+                expected_write = caps["output"]
+            sent = dev.write(make_request())
+            if type(sent) is not int or sent != expected_write:
                 self._diag.append("  battery request was not written in full")
                 return None
             for _ in range(READ_ATTEMPTS):
@@ -83,6 +122,7 @@ class AulaF108Provider(Provider):
 
     def poll(self) -> List[DeviceStatus]:
         self._diag = []
+        self._legacy_aliases = {}
         if hid is None:
             return []
         try:
@@ -91,19 +131,32 @@ class AulaF108Provider(Provider):
             log.warning("hid.enumerate(aula_f108): %s", e)
             return []
 
+        eligible = {}
         for d in infos:
-            if (d.get("product_id") != PID
-                    or (d.get("product_string") or "").strip().casefold() != PRODUCT.casefold()
+            product = d.get("product_string")
+            if (d.get("vendor_id") != VID or d.get("product_id") != PID
+                    or not isinstance(product, str)
+                    or product.strip().casefold() != PRODUCT.casefold()
                     or d.get("interface_number") != INTERFACE
                     or (d.get("usage_page"), d.get("usage")) != (USAGE_PAGE, USAGE)):
                 continue
+            path = receiver_path(d.get("path"))
+            if path is not None:
+                eligible.setdefault(path, d)
+        out = []
+        for path, d in sorted(eligible.items()):
             self._diag.append(f"[AULA] {NAME} {VID:04x}:{PID:04x} iface={INTERFACE} "
                               f"{USAGE_PAGE:04x}:{USAGE:04x}")
             level = self._read(d["path"])
             if level is not None:
-                return [DeviceStatus(f"aula_f108:{PID:04x}", NAME, level, source=self.name,
-                                     kind="keyboard", charging_known=False)]
-        return []
+                key = f"aula_f108:{PID:04x}:" + hashlib.sha256(b"path:" + path).hexdigest()
+                out.append(DeviceStatus(key, NAME, level, source=self.name,
+                                        kind="keyboard", charging_known=False))
+        # Count eligible receivers, not just successful reads: a silent sibling
+        # makes the historical shared key ambiguous too.
+        if len(eligible) == 1 and len(out) == 1:
+            self._legacy_aliases[f"aula_f108:{PID:04x}"] = out[0].key
+        return out
 
     def diagnostics(self) -> List[str]:
         return list(self._diag)

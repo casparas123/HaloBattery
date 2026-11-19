@@ -86,9 +86,10 @@ PIDS = {
     0xFA65: ("Inphic In9 Pro", (0x95, 0x90, 0x93, 0x99, 0x3F)),
     0xFA60: ("Attack Shark X11 / R1 / X3 Max", (0x55, 0x10, 0x4E)),
 }
-# A model code seen on a receiver renames the tray icon, so a mouse sold under
-# another brand on a shared receiver is not called by the first brand's model.
-MODEL_NAMES = {0x3F: "Delux M900 Pro"}
+# PR #407, pinned 675198a6b37bb221, Delux M900 Pro receiver capture:
+# 1D57:FA65, input 03 3F 40 01 4A = 74%. This adds a passive observed
+# model, not a request or a claim about its FA60 sibling.
+MODEL_NAMES = {(0xFA65, 0x3F): "Delux M900 Pro"}
 
 REPORT_ID = 0x03                    # hidapi hands it back first on Windows
 CMD_BATTERY = 0x40
@@ -104,9 +105,9 @@ LEVEL_MIN, LEVEL_MAX = 1, 100
 
 READ_SIZE = 100                     # the vendor app's read buffer
 READ_TIMEOUT_MS = 250
-READ_ATTEMPTS = 12                  # ~3 s: the Delux M900 Pro announces every 2.0 s
-                                    # (measured: 1.68 s to the first frame, then an exact
-                                    # 2.00 s cadence), so a 1.25 s window missed it
+READ_ATTEMPTS = 5                   # ~1.2 s on the remembered collection
+# The Delux/FA65 reports can be farther apart; keep FA60's existing budget.
+PID_READ_ATTEMPTS = {0xFA65: 12, 0xFA60: READ_ATTEMPTS}
 SWEEP_ATTEMPTS = 2                  # ... and per collection while looking
 MAX_CANDIDATES = 4
 FRAME_HISTORY = 12                  # frames kept per receiver for the diagnostics
@@ -206,6 +207,7 @@ class InphicProvider(Provider):
         self._hist: Dict[int, List[str]] = {}                      # pid -> recent frames
         self._model: Dict[int, int] = {}                           # pid -> model code seen
         self._swept: Dict[int, float] = {}                         # pid -> last sweep
+        self._model: Dict[int, int] = {}                           # observed valid frame only
 
     def _remember(self, pid: int, r, got) -> None:
         """Keep the last few frames per receiver for the diagnostics file (#228).
@@ -246,6 +248,7 @@ class InphicProvider(Provider):
                                      else "  (not a battery frame)"))
                 if got is None:
                     continue
+                self._model[pid] = r[1] if r[0] == REPORT_ID else r[0]
                 if got[0] is not None:
                     # a level frame after a charging one: the level is fresh and the
                     # cable is still in (#228 follow-up - the first frame used to end
@@ -317,7 +320,8 @@ class InphicProvider(Provider):
             # The vendor app's own collection gets the full window while looking
             # for it; the rest only get a short listen before moving on.
             patience = (d.get("usage_page"), d.get("usage")) == STATUS_USAGE
-            attempts = READ_ATTEMPTS if is_chosen or patience else SWEEP_ATTEMPTS
+            attempts = (PID_READ_ATTEMPTS.get(pid, READ_ATTEMPTS)
+                        if is_chosen or patience else SWEEP_ATTEMPTS)
             self._diag.append(f"  listening on iface={d.get('interface_number')} "
                               f"usage={d.get('usage_page', 0):04x}:{d.get('usage', 0):04x}")
             got = self._listen(d, attempts, models, pid)
@@ -326,6 +330,7 @@ class InphicProvider(Provider):
                     self._chosen[pid] = d["path"]
                 break
 
+        name = MODEL_NAMES.get((pid, self._model.get(pid)), name)
         if got is not None:
             level, charging = got
             display = MODEL_NAMES.get(self._model.get(pid), name)

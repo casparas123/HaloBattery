@@ -159,6 +159,8 @@ from providers import (AmInfinityProvider, AstroProvider, AsusProvider,  # noqa:
                        KeychronProvider, LamzuProvider, LofreeProvider, LogitechProvider,
                        LogitechCenturionProvider, LogitechG435RtkProvider,
                        MchoseProvider, NintendoProvider, NzxtProvider, PlayStationProvider, PulsarProvider,
+                       LogitechCenturionProvider,
+                       MchoseProvider, MchoseK99Provider, NintendoProvider, NzxtProvider, PlayStationProvider, PulsarProvider,
                        RazerProvider, SteelSeriesEliteProvider, SteelSeriesProvider,
                        VaxeeProvider, WLmouseProvider, XInputProvider, SteamProvider, EndgameWEProvider,
                        AjazzProvider, AtkKeyboardProvider, AtkNearlinkProvider, AulaF108Provider,
@@ -260,6 +262,7 @@ PROVIDER_LABELS = {
     "logitech_g435_rtk": "Logitech G435 LIGHTSPEED (046D:0ACB)",
     "mchose": "MCHOSE mice",
     "attackshark_x66": "ATTACKSHARK X66",
+    "mchose_k99": "MCHOSE K99 V3",
     "mchose_kb": "MCHOSE keyboards",
     "mchose_v9": "MCHOSE V9 Pro",
     "monsgeek": "MonsGeek keyboards",
@@ -308,6 +311,8 @@ def make_providers(jbl_listen_first: float = 0.0) -> list:
             EweadnProvider(), MchoseKbProvider(), Endgame4kProvider(), PlantronicsProvider(), HyperXNgenuityProvider(), AlienwareProvider(), DjiProvider(), GloriousProvider(), Gs3075tProvider(), LamzuSinowealthProvider(), UrxProvider()]
             EweadnProvider(), MchoseKbProvider(), Endgame4kProvider(), PlantronicsProvider(), HyperXNgenuityProvider(), AlienwareProvider(), DjiProvider(), DarmosharkProvider(), GloriousProvider(), LamzuSinowealthProvider(), UrxProvider()]
             EweadnProvider(), MchoseKbProvider(), Endgame4kProvider(), PlantronicsProvider(), HyperXNgenuityProvider(), AlienwareProvider(), DjiProvider(), GloriousProvider(), LamzuSinowealthProvider(), UrxProvider(), NinjutsoSoraV3Provider()]
+            EweadnProvider(), MchoseKbProvider(), Endgame4kProvider(), PlantronicsProvider(), HyperXNgenuityProvider(), AlienwareProvider(), DjiProvider(), GloriousProvider(), LamzuSinowealthProvider(), UrxProvider(),
+            MchoseK99Provider()]
 
 
 # ---------------------------------------------------------------- config
@@ -2252,7 +2257,7 @@ class App:
                 continue          # turned off in Preferences > Device types: not opened at all
             if isinstance(p, PlayStationProvider):
                 p.switch_bluetooth = bool(self.cfg.get("playstation_full_mode", False))
-            if isinstance(p, AtkKeyboardProvider):
+            if isinstance(p, (AtkKeyboardProvider, MchoseK99Provider)):
                 p.activity.wake = self.wake.set
             try:
                 found = p.poll()
@@ -2911,6 +2916,7 @@ class App:
         self.stop_evt.set()
         for provider in self.providers:
             if isinstance(provider, (AtkKeyboardProvider, Endgame4kProvider)):
+            if isinstance(provider, (AtkKeyboardProvider, MchoseK99Provider)):
                 provider.close()
         self.history.save(force=True)
         if self.cfg.get("status_file"):

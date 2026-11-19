@@ -444,6 +444,17 @@ A newer MCHOSE exchange that does not answer the inverted 0x06 frame (every feat
 
 The vendor collection (usage page 0xFF01; the sibling 0xFF0B never answers): feature report 0x11 (the shorter report, tried first) or 0x12 with command 0x06, every payload byte inverted, which returns `53 52 31 00 02 05 07 00 09 64 00 64` — vid 0x5253, model 0x31, firmware, flags, then the level and the charging byte (1 while charging). The request has to be repeated for each read, and the receiver only relays a real value while the mouse is awake: asleep it answers with zeros, so a silent mouse keeps its last level on a greyed icon. On the cable the mouse answers on its own PID (5253:0031, the number it reports as its model id) and the receiver goes quiet: both connections share one icon, and whichever one reports charging wins
 
+### MCHOSE K99 V3 (2.4 GHz)
+
+**Connection:** 2.4 GHz receiver (3837:3033, "MCHOSE K99 V3 2.4G"), generic-desktop HID collection `0x0001:0x0000` on interface 1.
+
+The K99 V3 uses M HUB's **GLW func-config** read on the id-less 64-byte generic-desktop collection (usage `0x0001:0x0000`, with `0xFF31:0x0074` as the fallback that answers the same frames):
+
+    request  00 | 55 05 00 38 38 00 00 00 ...     read 56 bytes at offset 0
+    reply    AA 05 00 <checksum> 38 00 00 00 ...  payload starts at byte 8
+
+The request header is flag `0x55`, command `0x05`, reserved, checksum, size and little-endian offset; for a read with no payload the checksum is size + offset = `0x38`. The reply carries the same fields and its checksum covers size + offset + payload. The battery byte is **payload offset 32**: bit 7 is charging, bits 0-6 are the percentage. The earlier `55 03 00 38 38` query returned a different info frame (52 % in the reporter's diagnostics while M HUB showed 90 %), so it is not used. Protocol from [krisgfx9/Wireless-Device-Battery-Monitor PR #1957](https://github.com/krisgfx9/Wireless-Device-Battery-Monitor/pull/1957), recovered from M HUB's own web driver and confirmed on a G75 V2 on the same `3837:3033` receiver. Confirmed on the reporter's K99 V3 (@Kolomhon, #458): the level agreed with M HUB within its 10 % display step, and the charging bit followed the cable. The query is only sent shortly after real keyboard input, like the ATK keyboard provider: on an idle keyboard the request itself can wake the keyboard, and the wake can reach the desktop as input (#458 follow-up).
+
 ### Pulsar X2 V2 Mini, Pulsar X2 CrazyLight Mini, ATK VXE R1 SE+, VXE R1 Pro Max
 
 **Connection:** 2.4 GHz dongle (3554:F508, 373B:1085, 3554:F58A, 3554:F505, 3710:5406) and USB cable (3554:F507, 3554:F58F, 3554:F58C, 3554:F506, 3710:3414)

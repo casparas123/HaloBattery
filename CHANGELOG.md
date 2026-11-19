@@ -93,6 +93,15 @@ and the project follows [Semantic Versioning](https://semver.org/).
   1053 reading keeps the Cyclone 2 name. **Confirmed on hardware** by the
   reporter on 2026-11-14 (86 %, charging, matching GameSir Connect).
 
+- **MCHOSE K99 V3** keyboard on its 2.4 GHz receiver (`3837:3033`), read with the
+  GLW func-config query M HUB uses (`00 | 55 05 00 38 38 ...` → `AA 05 00 ...`,
+  battery at payload byte 32; bit 7 charging). The earlier `55 03 00 38 38`
+  query returned a different info frame and a wrong level (52 % while M HUB
+  showed 90 %), so it was replaced. Confirmed on hardware by @Kolomhon in #458:
+  the level agreed with M HUB within its 10 % display step, and the charging bit
+  followed the cable. Polling is now paused until real keyboard input, so an
+  idle keyboard is not woken by the battery query.
+
 ### Fixed
 - Prepare the held XM2w 4K/v2 reader with the sourced A1 status exchange,
   validated replies and isolated HID transactions. Keep normal 4K polling

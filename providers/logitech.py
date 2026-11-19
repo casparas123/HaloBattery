@@ -93,6 +93,14 @@ RECEIVERS = {
 # Reuse existing read-only HID++ queries; restrict collection fallback to these IDs.
 PRO_X3_HIDPP_IDS = {0xC54F, 0xC0A9}
 
+# HID++ 1.0 devices whose receiver product id identifies the model. The MX
+# Revolution's receiver (0xC525) reports only as "USB Receiver" and the paired
+# device has no feature table to read a name from, so without this table the
+# icon appears as the generic "Logitech device" (#449).
+HIDPP10_MODELS = {
+    0xC525: ("Logitech MX Revolution", "mouse"),
+}
+
 # headsets with HID++ battery (feature 0x1F20), from HeadsetControl's device list.
 # The value is the name to show when the headset does not report one.
 HEADSETS = {
@@ -484,6 +492,8 @@ class LogitechProvider(Provider):
                 self._ids[slot] = (name, kind, unit)
         if pid in HEADSETS:
             name, kind = name or HEADSETS[pid], "headset"
+        if pid in HIDPP10_MODELS:
+            name, kind = HIDPP10_MODELS[pid]
         name = name or "Logitech device"
         for feature in BATTERY_FEATURES:
             fi = ch.feature_index(idx, feature)
@@ -583,6 +593,9 @@ class LogitechProvider(Provider):
             if level is None:
                 continue
             name = self._ids.get(slot, ("",))[0] or "Logitech device"
+            kind = ""
+            if pid in HIDPP10_MODELS:
+                name, kind = HIDPP10_MODELS[pid]
             self._diag.append(f"  idx={idx} '{name}': register {reg:02x}: "
                               f"{approx or f'{level}%'}{' (charging)' if chg else ''}")
             prefix = instance + ":" if multi else ""
@@ -592,7 +605,7 @@ class LogitechProvider(Provider):
                 self._last.pop(old, None)
             self._slot_key[slot] = key
             return DeviceStatus(key, name, level, chg, True, "logitech",
-                                approx=approx, kind="",
+                                approx=approx, kind=kind,
                                 ui_message="state.approx_grade" if approx else "",
                                 ui_params={"level": level, "grade": STATUS_LEVELS[r[0]][1]} if approx else {})
         return None

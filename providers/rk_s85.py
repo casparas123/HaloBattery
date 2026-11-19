@@ -28,7 +28,9 @@ from . import hidlist
 from .base import DeviceStatus, Provider, hexdump, log
 
 VID = 0x258A
-PID = 0x0150
+PID = 0x0150                 # 2.4 GHz receiver
+CABLE_PID = 0x0193           # the keyboard on its USB cable
+PIDS = (PID, CABLE_PID)
 NAME = "Royal Kludge S85"
 KEY = "rk:s85"
 CONTROL_USAGE = (0xFF02, 0x0002)
@@ -41,7 +43,7 @@ ASLEEP_KEEP = 300
 
 
 def is_s85(info: dict) -> bool:
-    return (info.get("product_id") == PID
+    return (info.get("product_id") in PIDS
             and (info.get("usage_page"), info.get("usage")) == CONTROL_USAGE)
 
 
@@ -114,15 +116,34 @@ class RkS85Provider(Provider):
         control = [d for d in infos if is_s85(d)]
         if not control:
             return []
-        self._diag.append(f"[RK S85] pid={PID:04x} control collection")
-        parsed = self._read(control[0]["path"])
-        if parsed is not None:
-            level, linked = parsed
-            self._last = (level, time.time())
-            self._diag.append(f"  -> {level}% linked={linked}")
-            return [DeviceStatus(KEY, NAME, level, False, linked, "rk_s85",
-                                 kind="keyboard", charging_known=False,
-                                 via="2.4 GHz receiver")]
+        # The cable id is the charging signal: when the keyboard is plugged into
+        # USB it switches from the receiver to 0193 and the receiver can stop
+        # answering.  Ask the cable first, then the receiver.
+        groups = {}
+        for d in control:
+            groups.setdefault(d["product_id"], []).append(d)
+        cable = CABLE_PID in groups
+        order = [CABLE_PID, PID] if cable else [PID]
+        for pid in order:
+            group = groups.get(pid)
+            if not group:
+                continue
+            self._diag.append(f"[RK S85] pid={pid:04x} "
+                              f"{'USB cable' if pid == CABLE_PID else '2.4 GHz receiver'}")
+            parsed = self._read(group[0]["path"])
+            if parsed is not None:
+                level, linked = parsed
+                self._last = (level, time.time())
+                charging = pid == CABLE_PID
+                self._diag.append(f"  -> {level}% charging={charging} linked={linked}")
+                return [DeviceStatus(KEY, NAME, level, charging, True, "rk_s85",
+                                     kind="keyboard", charging_known=pid == CABLE_PID,
+                                     via="USB cable" if pid == CABLE_PID else "2.4 GHz receiver")]
+        if cable:
+            level = self._last[0] if self._last else None
+            return [DeviceStatus(KEY, NAME, level, True, True, "rk_s85",
+                                 kind="keyboard", charging_known=True,
+                                 via="USB cable")]
         if self._last and time.time() - self._last[1] < ASLEEP_KEEP:
             return [DeviceStatus(KEY, NAME, self._last[0], False, False, "rk_s85",
                                  kind="keyboard", charging_known=False,

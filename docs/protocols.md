@@ -734,7 +734,9 @@ sleeping keyboard can answer after it is woken.
 The protocol comes from the open-source
 `Rainbow132/2.4G-wireless-device-battery-level-acquisition` notes.  It is not
 yet confirmed on S85 hardware.  The receiver has no charging query, so the
-level is reported with charging unknown rather than guessed.
+level is reported with charging unknown rather than guessed.  On the USB cable
+the keyboard switches to `258a:0193`; that wired presence is the charging
+signal, and the same read-only query is used for the level.
 
 ### Keychron Ultra-Link 8K, Keychron M5
 

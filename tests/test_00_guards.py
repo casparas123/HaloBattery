@@ -50,8 +50,6 @@ class GuardTests(unittest.TestCase):
         with self.assertRaises(AssertionError):
             serial.Serial("COM1", 115200)
 
-<<<<<<< HEAD
-=======
     @unittest.skipIf(serial is None, "pyserial is not installed")
     def test_serial_aliases_and_subclasses_cannot_open_a_port(self):
         import importlib
@@ -66,14 +64,11 @@ class GuardTests(unittest.TestCase):
         with self.assertRaisesRegex(AssertionError, "real serial port"):
             port.open()
 
->>>>>>> origin/pr/474
     def test_real_usb_is_blocked(self):
         import usb.core
         with self.assertRaises(AssertionError):
             usb.core.find(idVendor=0x2CA3, idProduct=0x4011)
 
-<<<<<<< HEAD
-=======
     def test_native_usb_backend_is_blocked(self):
         import libusb_package
         with self.assertRaisesRegex(AssertionError, "native USB backend"):
@@ -88,7 +83,6 @@ class GuardTests(unittest.TestCase):
         find.assert_not_called()
 
     @unittest.skipIf(serial is None, "pyserial is not installed")
->>>>>>> origin/pr/474
     def test_the_sony_provider_cannot_reach_a_port_through_the_guard(self):
         # the provider calls these by attribute, so the guard covers the provider itself
         from providers import sony_inzone

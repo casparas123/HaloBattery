@@ -150,7 +150,7 @@ from pystray import Menu, MenuItem as Item  # noqa: E402
 from halo import app_icon, flyout, history, icons, tray_history, updates, whatsnew, winevents  # noqa: E402
 from halo import i18n, tray_dpi  # noqa: E402
 from providers import hidlist  # noqa: E402
-from providers import (AmInfinityProvider, AstroProvider, AsusProvider,  # noqa: E402
+from providers import (AmInfinityProvider, AresonProvider, FantechProvider, MsiProvider, WraithProvider, ArbiterProvider, AstroProvider, AsusProvider,  # noqa: E402
                        AudezeProvider, BarracudaProvider, BarracudaXProvider, BluetoothProvider, CorsairProvider,
                        DeviceStatus, DjiProvider, DarmosharkProvider,
                        EightBitDoProvider,
@@ -162,6 +162,8 @@ from providers import (AmInfinityProvider, AstroProvider, AsusProvider,  # noqa:
                        MchoseProvider, NintendoProvider, NzxtProvider, PlayStationProvider, PulsarProvider,
                        LogitechCenturionProvider,
                        MchoseProvider, MchoseK99Provider, NintendoProvider, NzxtProvider, PlayStationProvider, PulsarProvider,
+                       LogitechCenturionProvider,
+                       MachenikeProvider, MchoseProvider, MoondropProvider, NintendoProvider, NinjutsoSprimeProvider, NzxtProvider, PlayStationProvider, PulsarProvider,
                        RazerProvider, SteelSeriesEliteProvider, SteelSeriesProvider,
                        VaxeeProvider, WLmouseProvider, XInputProvider, SteamProvider, EndgameWEProvider,
                        AjazzProvider, AtkKeyboardProvider, AtkNearlinkProvider, AulaF108Provider,
@@ -228,6 +230,11 @@ PROVIDER_LABELS = {
     "audeze": "Audeze Maxwell",
     "aula": "AULA F87 Pro V2C keyboards",
     "aula_f108": "AULA F108 Pro keyboards",
+    "areson": "Areson / Redragon mice",
+    "arbiter": "Arbiter Studio mice",
+    "machenike": "Machenike L7",
+    "moondrop": "MOONDROP GM01 Pro",
+    "ninjutso_sprime": "Ninjutso / Sprime mice",
     "barracuda": "Razer Barracuda Pro",
     "barracuda_x": "Razer Barracuda X",
     "cherry": "CHERRY MX 3.0S Wireless",
@@ -238,6 +245,7 @@ PROVIDER_LABELS = {
     "dareu": "DAREU mice",
     "eweadn": "EWEADN / 前行者 mice",
     "eweadn_ydx": "EWEADN X23 Pro",
+    "fantech": "Fantech Helios Go XD5",
     "finalmouse": "Finalmouse UltralightX",
     "fractal": "Fractal Scape",
     "glorious": "Glorious Model O Wireless",
@@ -270,6 +278,7 @@ PROVIDER_LABELS = {
     "mchose_kb": "MCHOSE keyboards",
     "mchose_v9": "MCHOSE V9 Pro",
     "monsgeek": "MonsGeek keyboards",
+    "msi": "MSI mice",
     "nintendo": "Nintendo Switch controllers",
     "ninjutso_sora_v3": "Ninjutso Sora V3",
     "nzxt": "NZXT mice",
@@ -290,6 +299,7 @@ PROVIDER_LABELS = {
     "turtlebeach": "Turtle Beach headsets",
     "vaxee": "VAXEE mice",
     "wlmouse": "WLmouse",
+    "wraith": "Wraith W1",
     "xinput": "Xbox-compatible controllers",
     "zowie": "ZOWIE mice",
 }
@@ -301,6 +311,7 @@ def make_providers(jbl_listen_first: float = 0.0) -> list:
             HyperXAlpha2Provider(), HyperXCloud3Provider(), HyperXCloudCoreProvider(), HyperXProvider(),
             KeychronProvider(), PulsarProvider(),
             JblProvider(listen_first=jbl_listen_first), JblHidV3Provider(), CherryProvider(), CoolerMasterProvider(), RoyalKludgeProvider(), ZowieProvider(), FractalProvider(), LogitechProvider(), SteelSeriesProvider(), XInputProvider(),
+            AresonProvider(), ArbiterProvider(), FantechProvider(), MsiProvider(), WraithProvider(), MachenikeProvider(), MoondropProvider(), NinjutsoSprimeProvider(), JblProvider(listen_first=jbl_listen_first), LogitechProvider(), SteelSeriesProvider(), XInputProvider(),
             PlayStationProvider(), EightBitDoProvider(), BarracudaProvider(), BarracudaXProvider(), NintendoProvider(),
             AsusProvider(), GWolvesProvider(), AulaProvider(), AulaF108Provider(), LofreeProvider(),
             AstroProvider(), CorsairProvider(),

@@ -88,6 +88,10 @@ and the project follows [Semantic Versioning](https://semver.org/).
   reporter on 2026-11-14 (86 %, charging, matching GameSir Connect).
 
 ### Fixed
+- Prepare the held XM2w 4K/v2 reader with the sourced A1 status exchange,
+  validated replies and isolated HID transactions. Keep normal 4K polling
+  disabled while persistent status-0x08 recovery remains unresolved; confirmed
+  XM2we support is unchanged.
 
 - A battery level that is not a number from 0 to 100 is never shown, whichever
   device type reports it. The device keeps its icon with the level unknown, and

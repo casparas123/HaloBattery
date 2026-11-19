@@ -13,6 +13,9 @@ and the project follows [Semantic Versioning](https://semver.org/).
   and Exit HaloBattery hover colors, with themed pressed feedback.
 
 ### Added
+- Percentage in the icon: devices that only report coarse battery steps now
+  show the same `NN` number as exact devices, without a `~` marker. The tooltip
+  and status file still say "about NN%".
 - A fading app splash with a soft icon shadow and theme-matched startup background
   while the settings window loads and restores its saved view.
 - Corsair M65 RGB Ultra Wireless (`1B1C:1BA6` SLIPSTREAM receiver or

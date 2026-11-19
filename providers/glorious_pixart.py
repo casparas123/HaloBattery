@@ -17,7 +17,9 @@ no charge bit in the reply, and byte 3 = 0x01 in discharging captures, so it is
 not treated as one.
 
 The first trigger (report id 0x03) can take several seconds on the receiver;
-later polls try the same id first and use a shorter timeout.  Nothing is
+later polls try the same id first and use a shorter timeout.  When the wired
+pid and the receiver are both present, the wired collection is tried first so
+a receiver that still answers cannot hide the charging state.  Nothing is
 written to the device.
 """
 from __future__ import annotations
@@ -109,7 +111,11 @@ class GloriousD2Provider(Provider):
         if cable:
             self._diag.append(f"  on the cable: {PID_CABLE:04x}")
 
-        for group, plugged in ((receiver, False), (cable, True)):
+        # The cable is the charging signal and wins when both ids are present:
+        # the receiver can still answer while the mouse is plugged in, and must
+        # not hide the cable state. A cable-only reading falls back to the
+        # receiver only when the wired collection has no answer.
+        for group, plugged in ((cable, True), (receiver, False)):
             trigger, inp = collections(group)
             if trigger is None or inp is None:
                 if group:
@@ -134,8 +140,9 @@ class GloriousD2Provider(Provider):
             return [DeviceStatus(KEY, NAME, level, True, True, "glorious", kind="mouse")]
         if self._last and time.time() - self._last[1] < ASLEEP_KEEP:
             return [DeviceStatus(KEY, NAME, self._last[0], False, False,
-                                 "glorious", kind="mouse")]
-        return [DeviceStatus(KEY, NAME, None, False, False, "glorious", kind="mouse")]
+                                 "glorious", kind="mouse", wake_on_input=True)]
+        return [DeviceStatus(KEY, NAME, None, False, False, "glorious", kind="mouse",
+                             wake_on_input=True)]
 
     def _read_cross(self, trigger_path, input_path) -> Optional[int]:
         """GetFeature trigger on col01, read the reply on col05, no writes."""

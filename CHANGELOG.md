@@ -16,7 +16,10 @@ and the project follows [Semantic Versioning](https://semver.org/).
 - Glorious Model D2 Wireless (`093A:824D` receiver / `093A:824A` cable):
   read the split Pixart receiver with GloriousBatteryMonitor-Go's CandidateF
   (GetFeature trigger on `ff00:0001`, reply on `ff00:ff00`), with the wired
-  pid as the charging signal. Test build 2, awaiting hardware confirmation.
+  pid as the charging signal. Level and charging confirmed on hardware by
+  @azgoodaz; test build 3 adds wake-on-input after sleep, and test build 4
+  prefers the wired collection when both ids are present; those last two
+  behaviours are awaiting confirmation.
 - A fading app splash with a soft icon shadow and theme-matched startup background
   while the settings window loads and restores its saved view.
 - Open the existing What's new window from About, directly below the version.

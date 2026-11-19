@@ -132,6 +132,22 @@ class PollTests(unittest.TestCase):
         out = self.make(fake, infos=entries(G.PID_CABLE)).poll()
         self.assertEqual((out[0].level, out[0].charging, out[0].online), (80, True, True))
 
+    def test_the_cable_wins_when_the_receiver_is_also_present(self):
+        both = [
+            {"path": b"trigger-cable", "interface_number": 1, "product_id": G.PID_CABLE,
+             "usage_page": 0xFF00, "usage": 0x0001, "product_string": "Model D 2 Wireless"},
+            {"path": b"input-cable", "interface_number": 1, "product_id": G.PID_CABLE,
+             "usage_page": 0xFF00, "usage": 0xFF00, "product_string": "Model D 2 Wireless"},
+            {"path": b"trigger-receiver", "interface_number": 1, "product_id": G.PID_RECEIVER,
+             "usage_page": 0xFF00, "usage": 0x0001, "product_string": "Model D 2 Wireless"},
+            {"path": b"input-receiver", "interface_number": 1, "product_id": G.PID_RECEIVER,
+             "usage_page": 0xFF00, "usage": 0xFF00, "product_string": "Model D 2 Wireless"},
+        ]
+        fake = FakeHid([reading(70), reading(80)])
+        out = self.make(fake, infos=both).poll()
+        self.assertEqual([(s.level, s.charging, s.online) for s in out], [(70, True, True)])
+        self.assertEqual(fake.reads[0][0], b"input-cable")
+
     def test_the_cable_alone_keeps_the_last_level_and_says_charging(self):
         fake = FakeHid([reading(80)])
         provider = self.make(fake)
@@ -153,9 +169,11 @@ class PollTests(unittest.TestCase):
         out = provider.poll()
         self.assertEqual([(80, False, False)],
                          [(s.level, s.charging, s.online) for s in out])
+        self.assertTrue(out[0].wake_on_input)
         self.now[0] += G.ASLEEP_KEEP + 1
         out = provider.poll()
         self.assertEqual([(None, False)], [(s.level, s.online) for s in out])
+        self.assertTrue(out[0].wake_on_input)
 
     def test_no_receiver_reports_nothing(self):
         provider = self.make(FakeHid([]), infos=[])

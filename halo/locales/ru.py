@@ -91,6 +91,7 @@ MESSAGES = {
     "provider.playstation": "Контроллеры PlayStation",
     "provider.plantronics": "Гарнитуры Plantronics (адаптер BT600)",
     "provider.pulsar": "Мыши Pulsar / ATK VXE / Redragon",
+    "provider.rk_s85": "Royal Kludge S85",
     "provider.razer": "Мыши и гарнитуры Razer",
     "provider.steelseries": "SteelSeries",
     "provider.steelseries_elite": "SteelSeries Arctis Nova Elite",

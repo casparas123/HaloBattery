@@ -45,6 +45,7 @@ from .turtlebeach import TurtleBeachProvider  # noqa: F401
 from .urx import UrxProvider  # noqa: F401
 from .skullcandy import SkullcandyProvider  # noqa: F401
 from .rapoo import RapooProvider  # noqa: F401
+from .rk_s85 import RkS85Provider  # noqa: F401
 from .ajazz import AjazzProvider  # noqa: F401
 from .sony_inzone import SonyInzoneProvider  # noqa: F401
 from .atk_nearlink import AtkNearlinkProvider  # noqa: F401

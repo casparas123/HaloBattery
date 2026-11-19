@@ -93,6 +93,7 @@ MESSAGES = {
     "provider.playstation": "PlayStation 控制器",
     "provider.plantronics": "Plantronics 耳機（BT600 轉接器）",
     "provider.pulsar": "Pulsar / ATK VXE / Redragon 滑鼠",
+    "provider.rk_s85": "Royal Kludge S85",
     "provider.razer": "Razer 滑鼠與耳機",
     "provider.steelseries": "SteelSeries",
     "provider.steelseries_elite": "SteelSeries Arctis Nova Elite",

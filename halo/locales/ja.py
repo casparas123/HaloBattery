@@ -93,6 +93,7 @@ MESSAGES = {
     "provider.playstation": "PlayStation コントローラー",
     "provider.plantronics": "Plantronics ヘッドセット（BT600 アダプター）",
     "provider.pulsar": "Pulsar / ATK VXE / Redragon マウス",
+    "provider.rk_s85": "Royal Kludge S85",
     "provider.razer": "Razer マウスとヘッドセット",
     "provider.steelseries": "SteelSeries",
     "provider.steelseries_elite": "SteelSeries Arctis Nova Elite",

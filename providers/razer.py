@@ -22,7 +22,7 @@ from typing import Dict, List, Optional, Tuple
 
 import hid
 
-from . import blackshark, blackshark2020, blackshark_v3, hidlist
+from . import blackshark, blackshark2020, blackshark_mtk, blackshark_v3, hidlist
 from .base import DeviceStatus, Provider, hexdump, log
 
 RAZER_VID = 0x1532
@@ -396,6 +396,11 @@ class RazerProvider(Provider):
             if pid == BARRACUDA_X_CABLE_PID:
                 self._diag.append("  skipped: Barracuda X (2022) on its cable; "
                                   "battery is read from receiver 0552")
+                continue
+            if pid in blackshark_mtk.PIDS:
+                # The MediaTek receiver (0565) and cable headset (056E) answer report 2
+                # on 0xFF14, not PA; providers/blackshark_mtk.py reads them (#85, #86).
+                self._diag.append("  skipped: read by the blackshark_mtk provider (MediaTek report 2)")
                 continue
             if not maybe_wireless(pid, name):
                 self._diag.append("  skipped: not a known wireless device")

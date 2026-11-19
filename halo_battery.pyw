@@ -151,7 +151,7 @@ from halo import app_icon, flyout, history, icons, tray_history, updates, whatsn
 from halo import i18n, tray_dpi  # noqa: E402
 from providers import hidlist  # noqa: E402
 from providers import (  # noqa: E402
-    Provider, AulaProvider, AulaF108Provider, NinjutsoSprimeProvider, MoondropProvider, MsiProvider, 
+    Provider, BlackSharkMtkProvider, AulaProvider, AulaF108Provider, NinjutsoSprimeProvider, MoondropProvider, MsiProvider, 
     MachenikeProvider, ArbiterProvider, AresonProvider, AlienwareProvider, BarracudaProvider, 
     BarracudaXProvider, AudezeProvider, RazerProvider, WLmouseProvider, WraithProvider, MchoseProvider, 
     MchoseK99Provider, MchoseV9Provider, BluetoothProvider, XInputProvider, LogitechProvider, 
@@ -231,6 +231,7 @@ PROVIDER_LABELS = {
     "barracuda": "Razer Barracuda Pro",
     "barracuda_x": "Razer Barracuda X",
     "cherry": "CHERRY MX 3.0S Wireless",
+    "blackshark_mtk": "Razer BlackShark V2 HyperSpeed",
     "corsair": "Corsair headsets",
     "coolermaster": "Cooler Master mice",
     "dji": "DJI Mic Mini 2",
@@ -313,6 +314,7 @@ def make_providers(jbl_listen_first: float = 0.0) -> list:
             SteamProvider(), EndgameWEProvider(),
             MchoseV9Provider(), DareuProvider(), ShieldProvider(), LamzuAtlantisProvider(),
             InphicProvider(), TurtleBeachProvider(), SkullcandyProvider(), RapooProvider(), AjazzProvider(),
+            BlackSharkMtkProvider(),
             IRocksProvider(),
             SonyInzoneProvider(), AtkNearlinkProvider(), FinalmouseProvider(), AtkKeyboardProvider(),
             HyperXAlphaWirelessProvider(), JabraProvider(), HyperXCloudFlightProvider(), MonsGeekProvider(),

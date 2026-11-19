@@ -15,6 +15,9 @@ and the project follows [Semantic Versioning](https://semver.org/).
 ### Added
 - A fading app splash with a soft icon shadow and theme-matched startup background
   while the settings window loads and restores its saved view.
+- Corsair M65 RGB Ultra Wireless (`1B1C:1BA6` SLIPSTREAM receiver or
+  `1B1C:1BB5` USB cable): battery level and charging state, confirmed on
+  hardware in [#411](https://github.com/HeyOkay/HaloBattery/issues/411).
 - Open the existing What's new window from About, directly below the version.
 - Sony INZONE H9 II (`054C:0FA8`) support over its receiver's `FF04:0001` HID
   control channel, using the read-only status query from

@@ -137,6 +137,12 @@ and the project follows [Semantic Versioning](https://semver.org/).
 - **Wraith W1 / W1 Freestyle** on the shared PixArt ids: model check and pushed
   status report, level and charging. Unverified in the app.
 
+- **MCHOSE X9** headset on its 2.4 GHz dongle (`3837:6045`), read with M HUB's own
+  BLK battery query (`65 01` on report `0x55`). Confirmed on hardware: the level and
+  the discharging state on the dongle. On its cable the headset leaves the dongle and
+  appears as `3837:6044`, which M HUB does not read: nothing is sent to it, and no
+  charging state is shown.
+
 ### Fixed
 - Prepare the held XM2w 4K/v2 reader with the sourced A1 status exchange,
   validated replies and isolated HID transactions. Keep normal 4K polling
@@ -147,6 +153,9 @@ and the project follows [Semantic Versioning](https://semver.org/).
   device type reports it. The device keeps its icon with the level unknown, and
   the refused value is written to the log once. Until now each device type had
   to check this itself, and a missed check showed a wrong percentage.
+
+- A MCHOSE headset unplugged in the middle of a poll no longer hides the other MCHOSE
+  devices for that poll.
 
 - Bring the existing Settings window to the foreground when a tray icon is
   double-clicked, restoring it if minimized.

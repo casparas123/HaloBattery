@@ -50,6 +50,7 @@ from .cherry import CherryProvider  # noqa: F401
 from .coolermaster import CoolerMasterProvider  # noqa: F401
 from .royal_kludge import RoyalKludgeProvider  # noqa: F401
 from .zowie import ZowieProvider  # noqa: F401
+from .kraken_v4 import KrakenV4Provider  # noqa: F401
 from .dji import DjiProvider  # noqa: F401
 from .darmoshark import DarmosharkProvider  # noqa: F401
 from .lamzu import LamzuAtlantisProvider, LamzuProvider  # noqa: F401

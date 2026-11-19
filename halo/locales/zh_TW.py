@@ -75,6 +75,7 @@ MESSAGES = {
     "provider.corsair": "Corsair 耳機",
     "provider.dji": "DJI Mic Mini 2",
     "provider.gwolves": "G-Wolves 滑鼠",
+    "provider.io_aurora": "IO Aurora",
     "provider.glorious": "Glorious Model O Wireless",
     "provider.hyperx": "HyperX Cloud II Wireless",
     "provider.hyperx_alpha2": "HyperX Cloud Alpha 2",

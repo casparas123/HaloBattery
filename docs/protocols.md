@@ -257,6 +257,19 @@ Packets are paced at least 10 ms apart, as NGENUITY does. A full battery on the 
 
 Claimed from [#304](https://github.com/HeyOkay/HaloBattery/issues/304)'s collection list - `03F0:0D97` publishes exactly `ff00:0001` on interface 2 - and the reference project's dongle is `03F0:0F98`, while `0x0D97` appears in the device-information reply of that hardware. **Unverified on this app's side** until the reporter runs the test build.
 
+### IO Aurora
+
+The IO Aurora receiver (`3554:fb08`, product `IO Aurora Receiver`) exposes the
+CompX control collection `ff02:0002` on interface 1.  Its battery query is the
+shared CompX report-8 protocol: a 17-byte output report `08 04 ... <checksum>`
+with the level at byte 6 and the power/cable flag at byte 7, read back as a
+17-byte input report (with a feature-report fallback).  The request is
+read-only; settings and firmware commands are never sent.
+
+The protocol is shared with the Lamzu Thorn/Atlantis family and is taken from
+the open-source `lavandiI/lamzu-battery` implementation.  It is **not yet
+confirmed on IO Aurora hardware**; the first test build is with the reporter.
+
 ### LAMZU Maya X
 
 **Connection:** 8K dongle (373E:001E) or USB cable (373E:001C)

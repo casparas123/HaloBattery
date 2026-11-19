@@ -26,6 +26,7 @@
 | [Delux M900 Pro](protocols.md#delux-m900-pro) | 2.4 GHz receiver (1D57:FA65) | yes (level, on the owner's unit) |
 | [G-Wolves HSK Pro ACE and the other models with a receiver of their own](protocols.md#g-wolves-hsk-pro-ace-and-the-other-models-with-a-receiver-of-their-own) | The model's own receiver or USB cable | no |
 | [G-Wolves WARG, HTS Plus (Pro), HTXU, Lycan, Fenrir Pro / Asym, HTX Mini](protocols.md#g-wolves-warg-hts-plus-pro-htxu-lycan-fenrir-pro--asym-htx-mini) | 8K receiver or USB cable | no |
+| [GANSS GS3075T](protocols.md#ganss-gs3075t) | 2.4 GHz receiver (0C45:FEFE) | yes (level and charging) |
 | [GameSir G7 Pro; FlyDigi Vader Pro (tested by users)](protocols.md#gamesir-g7-pro-flydigi-vader-pro) | 2.4 GHz receiver (shows up as an Xbox controller) | yes |
 | [GameSir G7 Pro 8K (Aimlabs and other editions)](protocols.md#gamesir-g7-pro-8k) | 2.4 GHz dongle, USB cable or charging dock (shows up as an Xbox 360 controller); one controller in both XInput and Windows.Gaming.Input | yes (Aimlabs edition) |
 | [GameSir Cyclone 2](protocols.md#gamesir-g7-pro-8k) | 2.4 GHz receiver (`3537:100b`) or charging identity (`3537:0575`); both show up as an Xbox 360 controller | receiver and charging confirmed by reporter (86 %, matching GameSir Connect) |

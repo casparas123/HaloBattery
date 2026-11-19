@@ -1,6 +1,23 @@
-"""AJAZZ AJ179 V2 MAX over its 2.4 GHz receiver (249a:5c2f), without AJAZZ's software.
+"""AJAZZ AJ179 V2 MAX and AJ159 PRO receivers, without AJAZZ's software.
 
-The receiver carries the level two ways, both recorded from the vendor's own
+AJ159 PRO (3151:402d), interface 2 / FFFF:0002: SET_FEATURE report 0,
+opcode F7 and zero payload, wait 30 ms, GET_FEATURE 05; Windows level byte 3.
+Independent source: Aiacos/ajazz-control-center at
+03a29f7a90dd32057ca7cd0d6e6fa8f13d5400f3, src/devices/mouse/src/aj_series.cpp
+L225-264, L290-312 and docs/research/reverse-engineering/capture-evidence.md
+L54-91 (captured on 3151:5007):
+https://github.com/Aiacos/ajazz-control-center/blob/03a29f7a90dd32057ca7cd0d6e6fa8f13d5400f3/src/devices/mouse/src/aj_series.cpp#L225-L312
+Same-target confirmation: #289, test4 at commit
+95ac6df038f1ec3d27653c89be0d2fdfc43d5253; the owner's diagnostics L46-50
+records 05 00 00 46 01 00 01 02 (70%), GET05/33 refused then GET05/65 accepted:
+https://github.com/HeyOkay/HaloBattery/issues/289#issuecomment-6899703056
+https://github.com/user-attachments/files/34882030/diagnostics.txt
+Zero means unknown (source L245-248), not an empty battery; charging is unknown.
+Feature sizes come from opened collection caps. Legacy HIDAPI uses 65 bytes;
+its short SET padding is documented in hidapi73d292a windows/hid.c L1189-1213.
+No AJ179 output query or GET_FEATURE F7 is used for this target. Kysona remains held.
+
+The AJ179 receiver carries the level two ways, both recorded from the vendor's own
 app (AJAZZ Driver 1.0.7.3) in the reporter's USBPcap captures in #74:
 
   * the app's very first startup read - command 0x10 - is answered by an info
@@ -267,6 +284,47 @@ class AjazzProvider(Provider):
         # the AJ159 PRO target keeps its own state (#289)
         self._alt: Dict[int, dict] = {}   # pid -> chosen path / last / charging
 
+    def _ask_aj159(self, d: dict) -> Tuple[Optional[int], bool]:
+        """One sourced F7/05 exchange on AJ159's confirmed control collection."""
+        if (d.get("vendor_id", 0x3151) != 0x3151 or d.get("product_id") != 0x402D
+                or d.get("interface_number") != 2
+                or (d.get("usage_page"), d.get("usage")) != (0xFFFF, 0x0002)):
+            return None, False
+        dev = hid.device()
+        try:
+            dev.open_path(d["path"])
+            metadata = getattr(dev, "get_report_lengths", None)
+            length = 65  # Windows GET05/65 succeeded in the owner's test4 diagnostics.
+            if callable(metadata):
+                caps = metadata()
+                length = caps.get("feature") if isinstance(caps, dict) else None
+            if type(length) is not int or not 4 <= length <= 32768:
+                self._diag.append("    AJ159: no usable feature report size")
+                return None, False
+            poll = bytes((0x00, 0xF7)) + bytes(length - 2)
+            wrote = dev.send_feature_report(poll)
+            if type(wrote) is not int or wrote != length:
+                self._diag.append(f"    AJ159: incomplete feature poll ({wrote!r}/{length})")
+                return None, False
+            time.sleep(0.03)
+            reply = dev.get_feature_report(0x05, length)
+            level = parse_aj159_status(reply)
+            try:
+                preview = hexdump(reply, 12)
+            except (TypeError, ValueError):
+                preview = "invalid feature reply"
+            self._diag.append(f"    AJ159 report 05 len={length}: {preview}"
+                              + (f" -> {level}%" if level is not None else " (no current level)"))
+            return level, True
+        except (OSError, ValueError) as error:
+            self._diag.append(f"    AJ159 feature exchange: {error}")
+            return None, False
+        finally:
+            try:
+                dev.close()
+            except Exception:
+                pass
+
     def _ask(self, d: dict) -> Tuple[Optional[Tuple[int, str, Optional[bool]]], bool]:
         """Send the vendor app's read and listen briefly.
 
@@ -432,7 +490,7 @@ class AjazzProvider(Provider):
         out: List[DeviceStatus] = []
         cache: Dict[int, List[dict]] = {}
         for vid, pid, name in ALT_TARGETS:
-            if (vid, pid) not in ENABLED_ALT_TARGETS:
+            if (vid, pid) != (0x3151, 0x402D) or (vid, pid) not in ENABLED_ALT_TARGETS:
                 continue
             if vid not in cache:
                 try:
@@ -465,11 +523,7 @@ class AjazzProvider(Provider):
                     if accepted:
                         state["chosen"] = d["path"]
             if got is not None:
-                level, _kind, charging = got
-                if charging is None:
-                    charging = state["charging"]
-                else:
-                    state["charging"] = charging
+                level, charging = got, False
                 state["last"] = (level, time.time())
                 out.append(DeviceStatus(key, name, level, charging, True, "ajazz",
                                         kind="mouse", charging_known=False))

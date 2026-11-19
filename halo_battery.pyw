@@ -65,6 +65,13 @@ else:
     # must not override its bundled packages (for example an older halo/ folder).
     sys.path.insert(0, BASE_DIR)
 
+if __name__ == "__main__":
+    # Held-device diagnostics must precede profile/log/backend/app startup.
+    from halo.device_diagnostics import dispatch as _dispatch_device_diagnostics
+    _diagnostic_exit = _dispatch_device_diagnostics(sys.argv[1:])
+    if _diagnostic_exit is not None:
+        raise SystemExit(_diagnostic_exit)
+
 APPDATA_DIR = os.environ.get("APPDATA", os.path.expanduser("~"))
 PORTABLE_MARKER = "portable.txt"   # next to the app: keep settings and the log in its folder
 
@@ -172,6 +179,7 @@ from providers import (  # noqa: E402
 )
 from providers.bluetooth import BluetoothWatcher  # noqa: E402
 from providers.jbl import PROBE_LISTEN_S as JBL_PROBE_LISTEN_S  # noqa: E402
+from halo.provider_policy import available_provider_labels, provider_available  # noqa: E402
 
 # Development-only escape hatch for controlled comparisons; the Windows app
 # uses the bounded native transport by default, without a bundle marker.
@@ -335,7 +343,7 @@ def make_providers(jbl_listen_first: float = 0.0) -> list:
             InphicProvider(), TurtleBeachProvider(), SkullcandyProvider(), RapooProvider(), AjazzProvider(),
             BlackSharkMtkProvider(),
             IRocksProvider(),
-            SonyInzoneProvider(), AtkNearlinkProvider(), FinalmouseProvider(), AtkKeyboardProvider(),
+            SonyInzoneProvider(), SonyH9IIProvider(), AtkNearlinkProvider(), FinalmouseProvider(), AtkKeyboardProvider(),
             HyperXAlphaWirelessProvider(), JabraProvider(), HyperXCloudFlightProvider(), MonsGeekProvider(),
             EweadnProvider(), MchoseKbProvider(), Endgame4kProvider(), PlantronicsProvider(), HyperXNgenuityProvider(), AlienwareProvider(), DjiProvider(), GloriousProvider(), LamzuSinowealthProvider(), UrxProvider(),
             AulaF108Provider(), NinjutsoSprimeProvider(), MoondropProvider(), MsiProvider(),
@@ -1685,7 +1693,7 @@ class App:
         """Dependencies for the UI controller, without importing this entry module."""
         return dict(defaults=DEFAULTS, valid_setting=_valid_setting, save_config=save_config,
                     autostart_enabled=autostart_enabled, set_autostart=set_autostart,
-                    remove_status_file=remove_status_file, provider_labels=PROVIDER_LABELS,
+                    remove_status_file=remove_status_file, provider_labels=available_provider_labels(PROVIDER_LABELS),
                     controller_brands=CONTROLLER_BRANDS, controller_pictograms=CONTROLLER_PICTOGRAMS,
                     device_state=device_state, device_kind=badge_for, version=VERSION, data_dir=DATA_DIR, status_path=STATUS_PATH,
                     repo=updates.REPO, has_translation=lambda key: key in i18n.LANGUAGES["en"].catalog)
@@ -1945,7 +1953,7 @@ class App:
 
         def provider_items():
             labels = [(name, tr("provider." + name) if "provider." + name in i18n.LANGUAGES["en"].catalog
-                       else label) for name, label in PROVIDER_LABELS.items()]
+                       else label) for name, label in available_provider_labels(PROVIDER_LABELS).items()]
             for name, label in sorted(labels, key=lambda kv: kv[1].lower()):
                 yield Item(label, flip_provider(name), checked=provider_on(name))
 
@@ -2252,6 +2260,8 @@ class App:
     def toggle_provider(self, name: str) -> None:
         """Turn one device type on or off. Off, its devices are not opened at all, and
         their icons go away at once rather than after the next two polls."""
+        if not provider_available(name, PROVIDER_LABELS):
+            raise ValueError("unavailable provider")
         with self.lock:
             off = self.disabled_providers()
             if name in off:

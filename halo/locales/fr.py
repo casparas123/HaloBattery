@@ -103,6 +103,7 @@ MESSAGES = {
     "provider.logitech": "Logitech",
     "provider.logitech_centurion": "Logitech G PRO X 2 LIGHTSPEED",
     "provider.logitech_g435_rtk": "Logitech G435 LIGHTSPEED (046D:0ACB)",
+    "provider.logitech_centurion": "Logitech PRO X 2 / PRO X 3 LIGHTSPEED",
     "provider.mchose": "Souris MCHOSE",
     "provider.attackshark_x66": "ATTACKSHARK X66",
     "provider.mchose_k99": "MCHOSE K99 V3",

@@ -1,114 +1,115 @@
-"""Status-only XM2w reader based on Vole PROTOCOL.md sections 1-3 at
-4ba29dea54b4628df03cfe2f94f4576c124afd80 and mouse-battery-monitor
-ENDGAME.md at 25871cce3a8266d8d2bc05b0ca81fbb74b3a38b4.
-See docs/protocols.md for sources and model-specific evidence.
+"""Held XM2w A1 status exchange, not the XM2we 17-byte protocol.
 
-No configuration/blob, pairing, firmware, or WE-family commands are allowed.
+Sources: johanneszab/vole re/PROTOCOL.md sections 1-3 at
+4ba29dea54b4628df03cfe2f94f4576c124afd80:
+https://github.com/johanneszab/vole/blob/4ba29dea54b4628df03cfe2f94f4576c124afd80/re/PROTOCOL.md
+and stuffz/mouse-battery-monitor docs/ENDGAME.md at
+25871cce3a8266d8d2bc05b0ca81fbb74b3a38b4.
+Only 0E identity and B4 battery are allowed; no probe or recovery sequence.
+Success has no sourced command/target echo. Agreement cannot prove freshness.
 """
-import threading
 import time
 
-VID = 0x3367
-MODELS = {0x1968: 'XM2w 4k', 0x1982: 'XM2w 4k v2'}
-RECEIVER = 0x1970
+VID, RECEIVER = 0x3367, 0x1970
+MODELS = {0x1968: "XM2w 4k", 0x1982: "XM2w 4k v2"}
+REPORT, REPORT_LEN = 0xA1, 64
+IDENTITY, BATTERY = 0x0E, 0xB4
+# Pacing policy: the B4 reference waits 350 ms; Vole documents command sleeps
+# of 150-360 ms. This is not a guarantee of response freshness or recovery.
+COMMAND_WAIT = 0.350
+BUSY_READS = 4
+TRANSACTION_BUDGET = 6.0
 
 
-class ProtocolError(Exception):
+class ProtocolError(ValueError):
     pass
 
 
-class DeviceStatusError(ProtocolError):
+class StatusError(ProtocolError):
     def __init__(self, status):
         self.status = status
-        super().__init__(f'device status 0x{status:02x}; payload not used')
+        super().__init__(f"device status 0x{status:02x}; payload not used")
 
 
-def frame(command, target=0):
-    if (command, target) not in {(0x0E, 0), (0xB4, 0)}:
-        raise ValueError('command/target outside status-only allowlist')
-    return bytes([0xA1, command, target] + [0] * 61)
+def request(command, target=0):
+    if (type(command) is not int or type(target) is not int
+            or command not in (IDENTITY, BATTERY) or target != 0):
+        raise ValueError("only identity/battery requests with target zero are allowed")
+    return bytes((REPORT, command, 0, 0)) + bytes(60)
 
 
 def response(data):
-    try:
-        data = bytes(data)
-    except (TypeError, ValueError, OverflowError) as exc:
-        raise ProtocolError('invalid response bytes') from exc
-    # Janlhin's 2026-11-05 Windows logs contain both 63 and 64 bytes WITH A1.
-    # Accept only these observed lengths; never invent an ID or pad missing data.
-    # Preserve the explicit report ID; do not infer one from a short buffer.
-    if len(data) not in (63, 64) or data[0] != 0xA1:
-        raise ProtocolError('expected observed 63/64-byte report with explicit 0xA1')
+    # Both lengths including explicit A1 are observed layouts; never pad or
+    # insert an ID. Status validation cannot correlate a successful response.
+    if (not isinstance(data, (bytes, bytearray, list, tuple)) or len(data) not in (63, 64)
+            or any(type(byte) is not int or not 0 <= byte <= 255 for byte in data)
+            or data[0] != REPORT):
+        raise ProtocolError("expected explicit A1 report of 63 or 64 bytes")
+    data = bytes(data)
     if data[1] != 1:
-        raise DeviceStatusError(data[1])
+        raise StatusError(data[1])
     return data
 
 
 def identity(data):
     data = response(data)
-    vid = int.from_bytes(data[16:18], 'little')
-    pid = int.from_bytes(data[18:20], 'little')
+    vid = int.from_bytes(data[16:18], "little")
+    pid = int.from_bytes(data[18:20], "little")
     if vid != VID or pid not in MODELS:
-        raise ProtocolError('unrecognized/held mouse identity; battery query refused')
-    return {'model': MODELS[pid], 'mouse_pid': f'{pid:04x}',
-            'firmware_bytes': data[22:24].hex(' ')}
+        raise ProtocolError("unsupported mouse identity; battery not requested")
+    return pid, data[22:24].hex(" ")
 
 
-def battery(data, wired):
-    data = response(data)
-    value = data[16]
-    # No explicit charging flag is decoded here; voltage does not calibrate capacity.
-    if not wired and value > 100:
-        raise ProtocolError('wireless percentage outside 0..100')
-    return {'raw_battery_byte': value,
-            'percentage': None if wired else value,
-            'charging': None,
-            'charging_basis': 'unknown; no explicit flag decoded',
-            'wired_presentation_hint': ('full' if value >= 100 else 'charging') if wired else None,
-            'hint_basis': 'vendor wired presentation rule, not a measured charging flag',
-            'undecoded_bytes': data[17:19].hex(' ')}
-
-
-def candidates(inventory):
-    """Only the named family's config collection, never WE or an FF02 input."""
-    result, seen = [], set()
-    for info in inventory:
-        if (info.get('vendor_id') != VID or
-                info.get('product_id') not in {*MODELS, RECEIVER} or
-                (info.get('usage_page'), info.get('usage')) != (0xFF01, 2)):
-            continue
-        path = info.get('path')
-        if not path or path in seen:
-            continue
-        seen.add(path)
-        result.append(info)
-    return result
+def battery(data):
+    level = response(data)[16]
+    if not 0 <= level <= 100:
+        raise ProtocolError("battery byte outside 0..100")
+    return level
 
 
 class Reader:
-    def __init__(self, device, sleep=time.sleep):
-        self.device, self.sleep = device, sleep
-        self.events = []
-        self.lock = threading.Lock()
+    """One sequential owner with bounded busy reads and a transaction budget."""
+    def __init__(self, device, *, clock=None, sleep=None):
+        self.device = device
+        self.clock = clock if clock is not None else time.monotonic
+        self.sleep = sleep if sleep is not None else time.sleep
+        self.deadline = self.clock() + TRANSACTION_BUDGET
+        self.command = None
+        self.reply_count = 0
+        self.last_length = 0
+        self.last_status = None
 
-    def exchange(self, command, target=0):
-        request = frame(command, target)
-        with self.lock:
-            event = {'command': f'{command:02x}', 'target': target,
-                     'request': request.hex(' '), 'replies': []}
-            self.events.append(event)
-            if self.device.send_feature_report(request) != len(request):
-                raise ProtocolError('feature send failed/short; no read attempted')
-            self.sleep(0.17)
-            # Read the held response again on busy; do not pipeline/resend.
-            for attempt in range(4):
-                raw = bytes(self.device.get_feature_report(0xA1, 64))
-                event['replies'].append(raw.hex(' '))
-                try:
-                    # No sourced command/target echo: success does not prove freshness.
-                    return response(raw)
-                except DeviceStatusError as exc:
-                    if exc.status != 3 or attempt == 3:
-                        raise
-                    self.sleep(0.2 * (attempt + 1))
-        raise ProtocolError('unreachable')
+    def _check(self):
+        if self.clock() >= self.deadline:
+            raise ProtocolError("status transaction budget exhausted")
+
+    def _wait(self, delay):
+        if self.clock() + delay >= self.deadline:
+            raise ProtocolError("status transaction budget exhausted")
+        self.sleep(delay)
+        self._check()
+
+    def exchange(self, command):
+        frame = request(command)
+        self._check()
+        self.command, self.reply_count = command, 0
+        self.last_length, self.last_status = 0, None
+        if self.device.send_feature_report(frame) != REPORT_LEN:
+            raise ProtocolError("feature request was not written in full")
+        self._wait(COMMAND_WAIT)
+        for attempt in range(BUSY_READS):
+            self._check()
+            data = self.device.get_feature_report(REPORT, REPORT_LEN)
+            self.reply_count += 1
+            self.last_length = len(data) if isinstance(data, (bytes, bytearray, list, tuple)) else 0
+            self.last_status = (data[1] if self.last_length > 1
+                                and type(data[1]) is int and 0 <= data[1] <= 255 else None)
+            self._check()
+            try:
+                return response(data)
+            except StatusError as error:
+                if error.status != 3 or attempt + 1 == BUSY_READS:
+                    raise
+                # The source re-reads busy responses, without re-sending.
+                self._wait(.2 * (attempt + 1))
+        raise ProtocolError("no usable response")

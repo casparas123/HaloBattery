@@ -73,6 +73,7 @@ MESSAGES = {
     "provider.barracuda_x": "Razer Barracuda X",
     "provider.corsair": "Corsair headsets",
     "provider.dji": "DJI Mic Mini 2",
+    "provider.darmoshark": "Darmoshark N5",
     "provider.gwolves": "G-Wolves mice",
     "provider.glorious": "Glorious Model O Wireless",
     "provider.gs3075t": "GANSS GS3075T keyboards",

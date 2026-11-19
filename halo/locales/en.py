@@ -143,6 +143,7 @@ MESSAGES = {
     "provider.mchose_v9": "MCHOSE V9 Pro",
     "provider.monsgeek": "MonsGeek keyboards",
     "provider.msi": "MSI mice",
+    "provider.redsquare": 'Red Square Alumix TKL keyboard',
     "provider.rapoo": "Rapoo mice and keyboards",
     "provider.shield": "NVIDIA SHIELD controllers",
     "provider.skullcandy": "Skullcandy headsets",

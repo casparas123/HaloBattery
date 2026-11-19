@@ -144,6 +144,7 @@ MESSAGES = {
     "provider.mchose_v9": "MCHOSE V9 Pro",
     "provider.monsgeek": "MonsGeek 鍵盤",
     "provider.msi": "MSI mice",
+    "provider.redsquare": 'Red Square Alumix TKL 鍵盤',
     "provider.rapoo": "Rapoo 滑鼠和鍵盤",
     "provider.shield": "NVIDIA SHIELD 控制器",
     "provider.skullcandy": "Skullcandy 耳機",

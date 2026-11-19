@@ -34,6 +34,9 @@ class ParseTest(unittest.TestCase):
         self.assertIsNone(R.parse_reply(bad))
 
 
+CABLE = dict(INFO, product_id=R.CABLE_PID, product_string="RK S85")
+
+
 class FakeDevice:
     def __init__(self, replies):
         self.replies = list(replies)
@@ -74,6 +77,12 @@ class PollTest(unittest.TestCase):
                          [("rk:s85", "Royal Kludge S85", 54, True, "keyboard")])
         self.assertEqual([R.REQUEST], dev.writes)
         self.assertTrue(out[0].charging_known is False)
+
+    def test_the_cable_id_is_charging_and_preferred(self):
+        dev = FakeDevice([reply(53)])
+        out = self.poll([INFO, CABLE], dev)
+        self.assertEqual([(s.level, s.charging, s.online, s.via) for s in out],
+                         [(53, True, True, "USB cable")])
 
     def test_a_wrong_product_or_collection_is_not_opened(self):
         dev = FakeDevice([reply()])

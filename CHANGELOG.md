@@ -16,6 +16,9 @@ and the project follows [Semantic Versioning](https://semver.org/).
 - A fading app splash with a soft icon shadow and theme-matched startup background
   while the settings window loads and restores its saved view.
 - Open the existing What's new window from About, directly below the version.
+- Sony INZONE H9 II (`054C:0FA8`) support over its receiver's `FF04:0001` HID
+  control channel, using the read-only status query from
+  marcinjakubowski/zoneout; confirmed on hardware by the reporter in #387.
 - Russian localization, including native settings, tray menus, notifications,
   Windows language detection and Russian plural forms.
 - EWEADN X23 Pro battery on its 2.4 GHz receiver (04F3:026F), using the

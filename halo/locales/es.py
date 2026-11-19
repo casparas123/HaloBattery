@@ -126,6 +126,7 @@ MESSAGES = {
     "provider.playstation": "Mandos PlayStation",
     "provider.plantronics": "Auriculares Plantronics (adaptador BT600)",
     "provider.pulsar": "Ratones Pulsar / ATK VXE / Redragon",
+    "provider.rk_s85": "Royal Kludge S85",
     "provider.razer": "Ratones y auriculares Razer",
     "provider.steelseries": "SteelSeries",
     "provider.steelseries_elite": "SteelSeries Arctis Nova Elite",

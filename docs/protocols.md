@@ -722,6 +722,20 @@ than waking an idle keyboard; a failed listener also leaves queries paused.
 No protocol or sleep-setting writes are introduced. Physical sleep still needs
 an idle test on the keyboard; absence of battery requests alone is not a power measurement.
 
+### Royal Kludge S85
+
+The Royal Kludge S85's SINOWEALTH 2.4 GHz receiver (`258a:0150`) exposes the
+keyboard control collection `ff02:0002`.  The read-only CompX keyboard power
+query is a 20-byte output report `13 05 01 ... 19`; the receiver acknowledges it
+first, then sends a status frame `13 0a ...` with the level at byte 6 and the
+link state at byte 7.  The provider repeats the query for a short window so a
+sleeping keyboard can answer after it is woken.
+
+The protocol comes from the open-source
+`Rainbow132/2.4G-wireless-device-battery-level-acquisition` notes.  It is not
+yet confirmed on S85 hardware.  The receiver has no charging query, so the
+level is reported with charging unknown rather than guessed.
+
 ### Keychron Ultra-Link 8K, Keychron M5
 
 **Connection:** 2.4 GHz receiver (3434:D028) and USB cable (3434:D048)

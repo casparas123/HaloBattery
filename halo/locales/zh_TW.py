@@ -78,6 +78,7 @@ MESSAGES = {
     "provider.royal_kludge": "Royal Kludge MG6 Pro",
     "provider.zowie": "ZOWIE mice",
     "provider.blackshark_mtk": "Razer BlackShark V2 HyperSpeed",
+    "provider.blackshark_v3x": "Razer BlackShark V3 X HyperSpeed",
     "provider.corsair": "Corsair 耳機",
     "provider.dji": "DJI Mic Mini 2",
     "provider.darmoshark": "Darmoshark N5",

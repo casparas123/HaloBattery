@@ -151,7 +151,7 @@ from halo import app_icon, flyout, history, icons, tray_history, updates, whatsn
 from halo import i18n, tray_dpi  # noqa: E402
 from providers import hidlist  # noqa: E402
 from providers import (  # noqa: E402
-    Provider, BlackSharkMtkProvider, AulaProvider, AulaF108Provider, NinjutsoSprimeProvider, MoondropProvider, MsiProvider, 
+    Provider, BlackSharkMtkProvider, BlackSharkV3XProvider, AulaProvider, AulaF108Provider, NinjutsoSprimeProvider, MoondropProvider, MsiProvider, 
     MachenikeProvider, ArbiterProvider, AresonProvider, AlienwareProvider, BarracudaProvider, 
     BarracudaXProvider, AudezeProvider, RazerProvider, WLmouseProvider, WraithProvider, MchoseProvider, 
     MchoseK99Provider, MchoseV9Provider, BluetoothProvider, XInputProvider, LogitechProvider, 
@@ -232,6 +232,7 @@ PROVIDER_LABELS = {
     "barracuda_x": "Razer Barracuda X",
     "cherry": "CHERRY MX 3.0S Wireless",
     "blackshark_mtk": "Razer BlackShark V2 HyperSpeed",
+    "blackshark_v3x": "Razer BlackShark V3 X HyperSpeed",
     "corsair": "Corsair headsets",
     "coolermaster": "Cooler Master mice",
     "dji": "DJI Mic Mini 2",
@@ -303,7 +304,7 @@ PROVIDER_LABELS = {
 
 def make_providers(jbl_listen_first: float = 0.0) -> list:
     # jbl_listen_first: only --probe passes it, so its single poll waits for a JBL level
-    return [RazerProvider(), AudezeProvider(), WLmouseProvider(), MchoseProvider(),
+    return [RazerProvider(), BlackSharkV3XProvider(), AudezeProvider(), WLmouseProvider(), MchoseProvider(),
             HyperXAlpha2Provider(), HyperXCloud3Provider(), HyperXProvider(),
             KeychronProvider(), PulsarProvider(),
             JblProvider(listen_first=jbl_listen_first), LogitechProvider(), SteelSeriesProvider(), XInputProvider(),

@@ -110,6 +110,7 @@ MESSAGES = {
     "provider.aula_f108": "AULA F108 Pro 键盘",
     "provider.dareu": "DAREU 鼠标",
     "provider.eweadn": "EWEADN / 前行者 鼠标",
+    "provider.eweadn_ydx": "EWEADN X23 Pro",
     "provider.endgame_4k": "Endgame Gear 4K 鼠标（XM2w / OP1w）",
     "provider.finalmouse": "Finalmouse UltralightX",
     "provider.hyperx_alpha_wireless": "HyperX Cloud Alpha Wireless",

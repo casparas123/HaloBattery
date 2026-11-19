@@ -18,6 +18,8 @@ and the project follows [Semantic Versioning](https://semver.org/).
 - Open the existing What's new window from About, directly below the version.
 - Russian localization, including native settings, tray menus, notifications,
   Windows language detection and Russian plural forms.
+- EWEADN X23 Pro battery on its 2.4 GHz receiver (04F3:026F), using the
+  official YDX status read without output reports or SET_FEATURE commands.
 - License-only Iconify eligibility without independent brand/logo/Bluetooth
   name filters. Search all reviewed names with 50-candidate pages, round arrow
   and number buttons, predecoded neighboring previews and bounded parallel

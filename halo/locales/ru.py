@@ -108,6 +108,7 @@ MESSAGES = {
     "provider.aula_f108": "Клавиатуры AULA F108 Pro",  # 설정에 표시할 장치 이름
     "provider.dareu": "Мыши DAREU",
     "provider.eweadn": "Мыши EWEADN / 前行者",
+    "provider.eweadn_ydx": "EWEADN X23 Pro",
     "provider.endgame_4k": "Мыши Endgame Gear 4K (XM2w / OP1w)",
     "provider.finalmouse": "Finalmouse UltralightX",
     "provider.hyperx_alpha_wireless": "HyperX Cloud Alpha Wireless",

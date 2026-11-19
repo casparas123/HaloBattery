@@ -53,6 +53,8 @@ LEVEL_INDEX = 8
 
 RF_DELAY_S = 0.10                  # the SetFeature -> RF -> GetFeature round trip
 READ_ATTEMPTS = 2                  # a waking mouse answers 0xA2 first; retry once
+PASSIVE_READS = 8                  # after a refused trigger, listen for a pushed answer
+PASSIVE_TIMEOUT_MS = 80
 ASLEEP_KEEP = 300
 
 # Wired ids of the same model, from GloriousBatteryMonitor-Go's DeviceDatabase.cs. Charging
@@ -127,6 +129,21 @@ class GloriousProvider(Provider):
             if parsed is not None:
                 break
         if parsed is None:
+            # Some receivers keep the battery answer on a sibling input collection
+            # and refuse every feature write.  Listen briefly on each vendor
+            # collection after the trigger attempts before declaring the mouse
+            # asleep; this is read-only and helps a receiver that pushes the
+            # status asynchronously.
+            for d in pick(mine):
+                parsed = self._read_passive(d["path"])
+                if parsed is not None:
+                    break
+            if parsed is not None:
+                level, charging = parsed
+                charging = charging or bool(wired)
+                self._last = (level, time.time())
+                self._diag.append(f"  -> {level}%{' charging' if charging else ''} (passive)")
+                return [DeviceStatus(KEY, NAME, level, charging, True, "glorious", kind="mouse")]
             self._diag.append("  no battery answer (asleep, off, or not this collection)")
             if wired:
                 # The mouse is on the cable: it is present and charging, but the receiver
@@ -201,6 +218,35 @@ class GloriousProvider(Provider):
                 dev.close()
             except Exception:
                 pass
+
+    def _read_passive(self, path) -> Optional[Tuple[int, bool]]:
+        """Read a battery frame the receiver may push without a feature write."""
+        dev = hid.device()  # type: ignore[union-attr]
+        try:
+            dev.open_path(path)
+        except (OSError, IOError) as e:
+            self._diag.append(f"    passive open: {e}")
+            return None
+        try:
+            read = getattr(dev, "read", None)
+            if read is None:
+                return None
+            for _ in range(PASSIVE_READS):
+                r = read(65, PASSIVE_TIMEOUT_MS)
+                if not r:
+                    continue
+                self._diag.append(f"    passive reply: {hexdump(r, 12)}")
+                parsed = parse_reply(r)
+                if parsed is not None:
+                    return parsed
+        except (OSError, IOError, ValueError) as e:
+            self._diag.append(f"    passive read: {e}")
+        finally:
+            try:
+                dev.close()
+            except Exception:
+                pass
+        return None
 
     def diagnostics(self) -> List[str]:
         return list(self._diag)

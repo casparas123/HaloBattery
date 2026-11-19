@@ -36,6 +36,13 @@ The mouse is the same generation the web driver is named for, so the push is
 expected there - charging included: both ids feed the same icon, and a reading
 that reports charging wins over one that does not.
 
+The VT9 Pro in issue #109 (`24ae:185a`) is a 2023 receiver with a different
+push: `bb b0 42 20 03 01 64` about every three seconds, byte 5 the state and
+byte 6 the level. The receiver lists its `ff00:0002` collection twice, so that
+model is scanned on every collection path (including the keyboard and the
+duplicate), not just the first two vendor usages; the live test build is the
+check of which collection Windows actually delivers it on.
+
 The keyboard does not use the report-7 shape: its receiver pushes a 0xBD
 status frame - marker 0xBD, status variant 0x01, the state byte (1 on battery,
 2 charging) at index 7 and the level at index 8. That layout is read from
@@ -67,6 +74,7 @@ VT7_RECEIVER = 0x1413      # the mouse's 2.4 GHz receiver
 VT7_CABLE = 0x4613         # ... and the same mouse on its charging cable
 V700DIY_KEYBOARD = 0x4824  # the keyboard on its cable / plugged in
 V700DIY_RECEIVER = 0x1924  # ... and its own 2.4 GHz receiver
+VT9_PRO_RECEIVER = 0x185A  # the VT9 Pro in issue #109 (a 2023 receiver)
 # pid -> (name, kind, the id its icon is keyed on): both states of one device
 # share an icon, and a reading that reports charging wins in the merge below.
 PIDS = {
@@ -75,6 +83,7 @@ PIDS = {
     V700DIY_RECEIVER: ("Rapoo V700DIY-98", "keyboard", V700DIY_KEYBOARD),
     V700DIY_KEYBOARD: ("Rapoo V700DIY-98", "keyboard", V700DIY_KEYBOARD),
     0x14A9: ("Rapoo VT9 Pro V2", "mouse", 0x14A9),
+    VT9_PRO_RECEIVER: ("Rapoo VT9 Pro", "mouse", VT9_PRO_RECEIVER),
 }
 
 VENDOR_PAGE = 0xFF00
@@ -130,14 +139,42 @@ def parse_bd(r) -> Optional[Reading]:
     return level, state == CHARGING
 
 
+BB_MARKER = 0xBB
+BB_FLAGS = 0xB0
+BB_CHARGE_INDEX = 5
+BB_LEVEL_INDEX = 6
+
+
+def parse_bb(r) -> Optional[Reading]:
+    """(level, charging) from the VT9 Pro's 0xBB push, or None.
+
+    The 2023 VT9 Pro receiver pushes a 7-byte frame about every 3 seconds:
+    `bb b0 42 20 03 01 64` - byte 5 is the state (1 on battery, 2 charging)
+    and byte 6 the level. This is the frame in the reporter's #109 capture.
+    """
+    if not r or len(r) <= BB_LEVEL_INDEX:
+        return None
+    if r[0] != BB_MARKER or r[1] != BB_FLAGS:
+        return None
+    state = r[BB_CHARGE_INDEX]
+    if state not in (ON_BATTERY, CHARGING):
+        return None
+    level = r[BB_LEVEL_INDEX]
+    if not 0 <= level <= 100:
+        return None
+    return level, state == CHARGING
+
+
 def parse_report(r) -> Optional[Reading]:
     """(level, charging) from a battery push, or None when it is not one.
 
-    Two shapes answer: the report-7 status the mouse pushes and the keyboard's
-    0xBD status - see parse_bd.
+    Three shapes answer: the report-7 status the newer mice push, the
+    keyboard's 0xBD status, and the 0xBB status of the 2023 VT9 Pro.
     """
     if r and r[0] == BD_MARKER:
         return parse_bd(r)
+    if r and r[0] == BB_MARKER:
+        return parse_bb(r)
     if not r or len(r) <= LEVEL_INDEX:
         return None
     if r[0] != REPORT_ID:
@@ -151,7 +188,8 @@ def parse_report(r) -> Optional[Reading]:
     return level, status == CHARGING
 
 
-def candidates(ifaces: List[dict]) -> List[dict]:
+def candidates(ifaces: List[dict], all_paths: bool = False,
+               allow_keyboard: bool = False) -> List[dict]:
     """The collections to listen on, best first: vendor page, then the rest.
 
     Report 7 rides one of the device's vendor collections, but which of them
@@ -159,6 +197,12 @@ def candidates(ifaces: List[dict]) -> List[dict]:
     a candidate except the plain mouse and keyboard ones (the OS owns those).
     The same usage listed twice is one collection; the vendor usages are kept
     in a fixed order.
+
+    The VT9 Pro in #109 needs two exceptions: its battery push is a 0xBB frame,
+    and the receiver exposes two collections with the same ff00:0002 usage.
+    ``all_paths`` keeps both paths and ``allow_keyboard`` admits the keyboard
+    collection, because the capture does not say which collection carries the
+    push and Windows splits one endpoint into several collection handles.
     """
     def rank(d: dict) -> tuple:
         page = d.get("usage_page", 0)
@@ -172,9 +216,12 @@ def candidates(ifaces: List[dict]) -> List[dict]:
     seen = set()
     out = []
     for d in ifaces:
-        if (d.get("usage_page"), d.get("usage")) in (MOUSE_USAGE, KEYBOARD_USAGE):
+        usage = (d.get("usage_page"), d.get("usage"))
+        if usage == MOUSE_USAGE:
             continue
-        key = (d.get("usage_page"), d.get("usage"))
+        if usage == KEYBOARD_USAGE and not allow_keyboard:
+            continue
+        key = d.get("path") if all_paths else usage
         if key in seen:
             continue
         seen.add(key)
@@ -241,7 +288,11 @@ class RapooProvider(Provider):
             self._meta[key] = (name, kind)
             self._diag.append(f"[Rapoo] pid={pid:04x} '{name}' "
                               f"'{(mine[0].get('product_string') or '').strip()}'")
-            order = candidates(mine)
+            order = candidates(
+                mine,
+                all_paths=pid == VT9_PRO_RECEIVER,
+                allow_keyboard=pid == VT9_PRO_RECEIVER,
+            )
             if self._chosen.get(pid):
                 order = sorted(order, key=lambda d: d["path"] != self._chosen[pid])
             # a device that has stayed silent is listened on its first candidate
@@ -249,7 +300,8 @@ class RapooProvider(Provider):
             quiet = self._quiet.get(pid, 0)
             deep = self._chosen.get(pid) is None and (
                 quiet == 0 or quiet % QUIET_RESCAN_EVERY == 0)
-            budget = order[:MAX_CANDIDATES] if deep else order[:1]
+            limit = 6 if pid == VT9_PRO_RECEIVER else MAX_CANDIDATES
+            budget = order[:limit] if deep else order[:1]
             got = None
             for n, d in enumerate(budget):
                 self._diag.append(f"  listening on iface={d.get('interface_number')} "

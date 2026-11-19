@@ -207,6 +207,12 @@ source; their settings and battery history remain compatible.
   the app shows the level only.
 - Windows installer `HaloBattery-<version>-setup.exe` (Inno Setup, `installer/HaloBattery.iss`), built with every release and pre-release. It installs per user to `%LOCALAPPDATA%\Programs\HaloBattery` without an admin prompt, adds a Start menu entry, an optional desktop icon and an optional "Start with Windows" entry, and registers an uninstaller in Settings → Apps. Uninstalling closes the app, removes its autostart and notification registry entries, and asks before deleting the settings. Installing any version over another upgrades or repairs the one install in place (one folder, one uninstall entry, no leftover library files); an older setup asks before downgrading, and refuses when run silently unless `/ALLOWDOWNGRADE` is given. The in-app updater keeps working for installed copies and updates the version shown in Settings → Apps.
 - **Razer Viper V4 Pro** (`1532:00E5` on the cable, `1532:00E6` through the receiver) added to the Razer mouse table with transaction id `0x1F`, the id OpenRazer uses for it (openrazer/openrazer#2751). Confirmed on hardware by @amlidos in [#333](https://github.com/HeyOkay/HaloBattery/issues/333): the icon appears through the receiver, the level matches Synapse, and the charging state follows the cable.
+- **Rapoo VT9 Pro** (`24ae:185a`, issue #109) - the 2023 receiver pushes a
+  7-byte `bb b0 42 20 03 01 64` status frame every three seconds; byte 5 is the
+  state (1 on battery, 2 charging) and byte 6 the level. The receiver lists
+  `ff00:0002` twice, so the VT9 Pro scan keeps every collection path (including
+  the duplicate and the keyboard collection) instead of the first two vendor
+  usages. Test build only; the reporter has not confirmed it yet.
 - **Rapoo VT9 Pro V2** (`24ae:14a9`) - the receiver publishes the same `ff00:000e`
   vendor collection the VT7 is read on, so it joins that table entry. Unverified on
   hardware; a test build is out for [#235](https://github.com/HeyOkay/HaloBattery/issues/235).

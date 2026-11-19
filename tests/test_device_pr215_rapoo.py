@@ -32,6 +32,10 @@ REFERENCE = [0x07, 0x02, 0x01, 0xD0, 0x07, 0xD0, 0x07, 0x01, 0x64, 0x00, 0x01, 0
 BD_REFERENCE = [0xBD, 0x01, 0x00, 0x07, 0x00, 0x46, 0x00, 0x01, 0x54, 0xAD, 0xCF, 0x7D]
 
 
+# the VT9 Pro's own 0xBB frame, byte for byte from the reporter's #109 capture
+BB_REFERENCE = [0xBB, 0xB0, 0x42, 0x20, 0x03, 0x01, 0x64]
+
+
 class FakeCollection:
     """frames: what the device pushes, in order; an entry of None reads as silence."""
 
@@ -87,6 +91,19 @@ def keyboard_entries(pid=R.V700DIY_KEYBOARD, prefix=b"kb"):
     return [{"product_id": pid, "interface_number": i, "usage_page": p, "usage": u,
              "path": prefix + b"-%d-%04x-%d" % (i, p, n),
              "product_string": "Rapoo Gaming Keyboard"}
+            for n, (i, p, u) in enumerate(shape)]
+
+
+def vt9_entries(prefix=b"vt9pro"):
+    # the #109 receiver: ff00:0002 appears twice, ff00:000e once, plus the
+    # non-vendor collections; Windows gives each collection its own path
+    shape = [(0, 0x0001, 0x02), (1, 0xFF00, 0x02), (1, 0x0001, 0x80),
+             (1, 0x000C, 0x01), (1, 0x0001, 0x06), (1, 0xFF00, 0x0E),
+             (1, 0xFF00, 0x02)]
+    return [{"product_id": R.VT9_PRO_RECEIVER, "interface_number": i,
+             "usage_page": p, "usage": u,
+             "path": prefix + b"-%d-%04x-%d" % (i, p, n),
+             "product_string": "Rapoo Gaming Device"}
             for n, (i, p, u) in enumerate(shape)]
 
 
@@ -186,6 +203,37 @@ class PollTest(unittest.TestCase):
         s = out[0]
         self.assertEqual((s.key, s.name, s.level, s.charging, s.online, s.source, s.kind),
                          ("rapoo:1413", "Rapoo VT7 (Gen-2)", 100, False, True, "rapoo", "mouse"))
+
+    def test_the_vt9_pros_0xbb_frame_reads_100_on_battery(self):
+        self.assertEqual(R.parse_report(BB_REFERENCE), (100, False))
+        charging = BB_REFERENCE.copy()
+        charging[R.BB_CHARGE_INDEX] = 0x02
+        charging[R.BB_LEVEL_INDEX] = 0x50
+        self.assertEqual(R.parse_report(charging), (80, True))
+
+    def test_the_vt9_pro_is_read_on_its_own_receiver(self):
+        entries = vt9_entries()
+        out = self.poll(entries, first_vendor(entries, frame=BB_REFERENCE))
+        self.assertEqual([(s.key, s.name, s.level, s.kind) for s in out],
+                         [("rapoo:185a", "Rapoo VT9 Pro", 100, "mouse")])
+
+    def test_the_vt9_pro_can_answer_on_the_second_ff000002_collection(self):
+        # #109: the receiver lists ff00:0002 twice; the old reader deduped them
+        # and never opened the second collection, where the 0xBB push can ride
+        entries = vt9_entries()
+        second = [e for e in entries
+                  if (e["usage_page"], e["usage"]) == (0xFF00, 0x0002)][1]
+        cols = {e["path"]: FakeCollection((BB_REFERENCE,) if e["path"] == second["path"] else ())
+                for e in entries}
+        out = self.poll(entries, cols)
+        self.assertEqual([(s.key, s.level) for s in out], [("rapoo:185a", 100)])
+        self.assertEqual(self.provider._chosen[R.VT9_PRO_RECEIVER], second["path"])
+
+    def test_the_vt9_pro_candidates_include_the_repeated_path(self):
+        usages = [(d["usage_page"], d["usage"]) for d in
+                  R.candidates(vt9_entries(), all_paths=True, allow_keyboard=True)]
+        self.assertEqual(usages.count((0xFF00, 0x0002)), 2)
+        self.assertIn((0x0001, 0x0006), usages)
 
     def test_the_vt9_pro_v2_is_read_on_the_same_exchange(self):
         # #235: 24ae:14a9 'Rapoo Gaming Device' publishes ff00:000e, the collection the

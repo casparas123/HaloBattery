@@ -40,6 +40,11 @@ NAME = "Glorious Model O Wireless"
 KEY = f"glorious:{PID:04x}"
 
 BATTERY_COMMAND = [0x00, 0x00, 0x02, 0x02, 0x00, 0x83]
+# The reference monitor probes all of these report ids on a receiver whose
+# first answer is not the battery frame.  Some Model O firmware/receivers
+# answer 0x00 with a stale status report and only answer the battery query on
+# another id; keep 0x00 first so existing units do not change behaviour.
+PROBE_REPORT_IDS = (0x00, 0x04, 0x03, 0x02, 0x01)
 STATUS_ASLEEP = 0xA4
 STATUS_AWAKE = 0xA1
 FUNC_INDEX = 6
@@ -58,10 +63,10 @@ ASLEEP_KEEP = 300
 WIRED_PIDS = {0x2011: "Model O"}
 
 
-def make_request(length: int) -> List[int]:
+def make_request(length: int, report_id: int = 0x00) -> List[int]:
     """The captured query as a feature report of `length` bytes (id + body)."""
     frame = [0x00] * max(length, 1 + len(BATTERY_COMMAND))
-    frame[0] = 0x00
+    frame[0] = report_id & 0xFF
     frame[1:1 + len(BATTERY_COMMAND)] = BATTERY_COMMAND
     return frame
 
@@ -130,8 +135,9 @@ class GloriousProvider(Provider):
                 return [DeviceStatus(KEY, NAME, level, True, True, "glorious", kind="mouse")]
             if self._last and time.time() - self._last[1] < ASLEEP_KEEP:
                 return [DeviceStatus(KEY, NAME, self._last[0], False, False, "glorious",
-                                     kind="mouse")]
-            return [DeviceStatus(KEY, NAME, None, False, False, "glorious", kind="mouse")]
+                                     kind="mouse", wake_on_input=True)]
+            return [DeviceStatus(KEY, NAME, None, False, False, "glorious", kind="mouse",
+                                 wake_on_input=True)]
         level, charging = parsed
         charging = charging or bool(wired)
         self._last = (level, time.time())
@@ -139,6 +145,25 @@ class GloriousProvider(Provider):
         return [DeviceStatus(KEY, NAME, level, charging, True, "glorious", kind="mouse")]
 
     def _ask(self, path, length: int) -> Optional[Tuple[int, bool]]:
+        """Ask for the battery on every report id the reference monitor probes.
+
+        Report id 0x00 is tried first.  A receiver that answers it with a
+        non-battery status frame (some Model O firmware does this) is asked
+        again with the other ids before giving up.  Feature reports are tried
+        first; output/input reports are the reference's fallback for a
+        collection that does not expose a feature channel.
+        """
+        for rid in PROBE_REPORT_IDS:
+            self._diag.append(f"    report id={rid:#04x}")
+            parsed = self._ask_report(path, length, rid, feature=True)
+            if parsed is not None:
+                return parsed
+            parsed = self._ask_report(path, length, rid, feature=False)
+            if parsed is not None:
+                return parsed
+        return None
+
+    def _ask_report(self, path, length: int, report_id: int, *, feature: bool) -> Optional[Tuple[int, bool]]:
         dev = hid.device()  # type: ignore[union-attr]
         try:
             dev.open_path(path)
@@ -146,26 +171,36 @@ class GloriousProvider(Provider):
             self._diag.append(f"    open: {e}")
             return None
         try:
-            for _ in range(READ_ATTEMPTS):
-                sent = dev.send_feature_report(bytes(make_request(length)))
+            request = bytes(make_request(length, report_id))
+            if feature:
+                sent = dev.send_feature_report(request)
                 if sent is not None and sent < 0:
-                    self._diag.append(f"    feature write refused ({sent})")
+                    self._diag.append(f"    feature id={report_id:#04x} write refused ({sent})")
                     return None
                 time.sleep(RF_DELAY_S)
-                r = dev.get_feature_report(0x00, length)
-                if r:
-                    self._diag.append(f"    reply: {hexdump(r, 12)}")
-                parsed = parse_reply(r)
-                if parsed is not None:
-                    return parsed
+                r = dev.get_feature_report(report_id, length)
+            else:
+                write = getattr(dev, "write", None)
+                read = getattr(dev, "read", None)
+                if write is None or read is None:
+                    return None
+                sent = write(request)
+                if sent is not None and sent < 0:
+                    self._diag.append(f"    output id={report_id:#04x} write refused ({sent})")
+                    return None
+                time.sleep(RF_DELAY_S)
+                r = read(length, 500)
+            if r:
+                self._diag.append(f"    id={report_id:#04x} reply: {hexdump(r, 12)}")
+            return parse_reply(r)
         except (OSError, IOError, ValueError) as e:
-            self._diag.append(f"    error: {e}")
+            self._diag.append(f"    id={report_id:#04x} error: {e}")
+            return None
         finally:
             try:
                 dev.close()
             except Exception:
                 pass
-        return None
 
     def diagnostics(self) -> List[str]:
         return list(self._diag)

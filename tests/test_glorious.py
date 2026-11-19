@@ -118,6 +118,15 @@ class PollTest(unittest.TestCase):
                            "mouse")])
         self.assertEqual([bytes(G.make_request(65))], dev.sent)
 
+    def test_a_non_battery_first_reply_retries_another_report_id(self):
+        # Some Model O receivers answer report id 0 with a status frame; the
+        # reference monitor probes the other ids before giving up.
+        not_battery = reply(75)
+        not_battery[6] = 0x81
+        out, dev = self.poll([not_battery, CAPTURED_75])
+        self.assertEqual(75, out[0].level)
+        self.assertGreater(len(dev.sent), 1)
+
     def test_charging_is_reported(self):
         out, _dev = self.poll([CAPTURED_75_CHARGING])
         self.assertTrue(out[0].charging)

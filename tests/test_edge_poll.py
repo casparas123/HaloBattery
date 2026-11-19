@@ -2,7 +2,12 @@
 descriptors. One provider that raises costs the user every device of that provider for the
 cycle (the poll loop logs it and moves on), so each must degrade to "no devices".
 
-hid.enumerate and hid.device are replaced: no real HID device is touched.
+hid.enumerate and hid.device are replaced: no real HID device is touched. The list of
+serial ports is replaced by an empty one too: the Sony INZONE provider reads its dongle
+over a COM port, and with the real list a poll here wrote to the developer's own headset.
+Raw USB is replaced as well, and before the providers are built: the DJI provider has a
+reader thread that searches the USB bus for its receiver and claims an interface on it.
+All of this holds when this file is run on its own, without the guards of test_00_guards.
 
 Run from the repository root:
 
@@ -10,6 +15,8 @@ Run from the repository root:
 """
 import os
 import sys
+import threading
+import time
 import unittest
 from unittest import mock
 
@@ -34,19 +41,41 @@ def raising(*args, **kwargs):
     raise OSError("hidapi: enumerate failed")
 
 
+def stop_readers(providers):
+    """End every background reader a provider started, and wait for it. A reader left
+    running would retry after the replacements are gone, against the real USB bus."""
+    for provider in providers:
+        reader = getattr(provider, "_receiver", None)
+        if reader is None:
+            continue
+        reader.stop()
+        # Not join() or is_alive(): the DJI reader keeps its stop flag in `_stop`, which
+        # on Python 3.12 hides the Thread method of that name that both of them call.
+        deadline = time.monotonic() + 5
+        while reader in threading.enumerate() and time.monotonic() < deadline:
+            time.sleep(0.01)
+
+
 class PollWithoutDevicesTests(unittest.TestCase):
     def check(self, enumerate_function, device_class):
-        providers = [p for p in hb.make_providers() if p.name not in NOT_HID]
-        self.assertGreater(len(providers), 40)
         with mock.patch("hid.enumerate", enumerate_function), \
                 mock.patch("providers.hidlist.enumerate", enumerate_function), \
-                mock.patch("hid.device", device_class):
-            for provider in providers:
-                with self.subTest(provider=provider.name):
-                    result = provider.poll()
-                    self.assertIsInstance(result, list)
-                    self.assertEqual([], [r for r in result if r.level is not None and not 0 <= r.level <= 100])
-                    self.assertIsInstance(provider.diagnostics(), list)
+                mock.patch("hid.device", device_class), \
+                mock.patch("serial.tools.list_ports.comports", lambda *a, **k: []), \
+                mock.patch("usb.core.find", lambda *a, **k: None), \
+                mock.patch("providers.dji.libusb_package", None):
+            built = hb.make_providers()          # inside: the DJI reader may start here
+            try:
+                providers = [p for p in built if p.name not in NOT_HID]
+                self.assertGreater(len(providers), 40)
+                for provider in providers:
+                    with self.subTest(provider=provider.name):
+                        result = provider.poll()
+                        self.assertIsInstance(result, list)
+                        self.assertEqual([], [r for r in result if r.level is not None and not 0 <= r.level <= 100])
+                        self.assertIsInstance(provider.diagnostics(), list)
+            finally:
+                stop_readers(built)              # while USB is still replaced
 
     class Unopenable:
         """What hidapi does when another app holds the device: the object exists, opening fails."""
@@ -67,6 +96,11 @@ class PollWithoutDevicesTests(unittest.TestCase):
 
     def test_odd_descriptors_that_cannot_be_opened(self):
         self.check(odd_descriptors, self.Unopenable)
+
+    def test_no_usb_reader_is_left_running(self):
+        from providers import dji
+        self.check(lambda *a, **k: [], self.Unopenable)
+        self.assertEqual([], [t for t in threading.enumerate() if isinstance(t, dji._Receiver)])
 
 
 if __name__ == "__main__":

@@ -86,6 +86,11 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A battery level that is not a number from 0 to 100 is never shown, whichever
+  device type reports it. The device keeps its icon with the level unknown, and
+  the refused value is written to the log once. Until now each device type had
+  to check this itself, and a missed check showed a wrong percentage.
+
 - Bring the existing Settings window to the foreground when a tray icon is
   double-clicked, restoring it if minimized.
 

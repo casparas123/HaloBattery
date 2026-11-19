@@ -150,35 +150,26 @@ from pystray import Menu, MenuItem as Item  # noqa: E402
 from halo import app_icon, flyout, history, icons, tray_history, updates, whatsnew, winevents  # noqa: E402
 from halo import i18n, tray_dpi  # noqa: E402
 from providers import hidlist  # noqa: E402
-from providers import (AmInfinityProvider, AresonProvider, FantechProvider, MsiProvider, WraithProvider, ArbiterProvider, AstroProvider, AsusProvider,  # noqa: E402
-                       AudezeProvider, BarracudaProvider, BarracudaXProvider, BluetoothProvider, CorsairProvider,
-                       DeviceStatus, DjiProvider, DarmosharkProvider,
-                       EightBitDoProvider,
-                       GWolvesProvider, HyperXAlpha2Provider, HyperXCloud3Provider, HyperXCloud3SProvider,
-                       HyperXCloudCoreProvider, HyperXProvider, JblProvider,
-                       CherryProvider, CoolerMasterProvider, HyperXProvider, JblProvider, JblHidV3Provider, RoyalKludgeProvider, ZowieProvider, FractalProvider,
-                       KeychronProvider, LamzuProvider, LofreeProvider, LogitechProvider,
-                       LogitechCenturionProvider, LogitechG435RtkProvider,
-                       MchoseProvider, NintendoProvider, NzxtProvider, PlayStationProvider, PulsarProvider,
-                       LogitechCenturionProvider,
-                       MchoseProvider, MchoseK99Provider, NintendoProvider, NzxtProvider, PlayStationProvider, PulsarProvider,
-                       LogitechCenturionProvider,
-                       MachenikeProvider, MchoseProvider, MoondropProvider, NintendoProvider, NinjutsoSprimeProvider, NzxtProvider, PlayStationProvider, PulsarProvider,
-                       RazerProvider, SteelSeriesEliteProvider, SteelSeriesProvider,
-                       VaxeeProvider, WLmouseProvider, XInputProvider, SteamProvider, EndgameWEProvider,
-                       AjazzProvider, AtkKeyboardProvider, AtkNearlinkProvider, AulaF108Provider,
-                       AulaProvider, DareuProvider,
-                       AjazzProvider, AtkKeyboardProvider, AtkNearlinkProvider, AttackSharkX66Provider, AulaProvider, DareuProvider,
-                       EweadnProvider, FinalmouseProvider, HyperXAlphaWirelessProvider, HyperXCloudFlightProvider,
-                       AjazzProvider, AtkKeyboardProvider, AtkNearlinkProvider, AulaProvider, DareuProvider,
-                       EweadnProvider, EweadnYdxProvider, FinalmouseProvider, HyperXAlphaWirelessProvider, HyperXCloudFlightProvider,
-                       InphicProvider, JabraProvider, LamzuAtlantisProvider, MchoseKbProvider, MchoseV9Provider, MonsGeekProvider, RapooProvider, ShieldProvider, SkullcandyProvider, SonyInzoneProvider, TurtleBeachProvider, Endgame4kProvider, PlantronicsProvider, HyperXNgenuityProvider, IRocksProvider, AlienwareProvider, GloriousProvider, LamzuSinowealthProvider, UrxProvider)
-                       InphicProvider, JabraProvider, LamzuAtlantisProvider, MchoseKbProvider, MchoseV9Provider, MonsGeekProvider, RapooProvider, ShieldProvider, SkullcandyProvider, SonyInzoneProvider, SonyH9IIProvider, TurtleBeachProvider, Endgame4kProvider, PlantronicsProvider, HyperXNgenuityProvider, IRocksProvider, AlienwareProvider, GloriousProvider, LamzuSinowealthProvider, UrxProvider)
-                       InphicProvider, JabraProvider, LamzuAtlantisProvider, MchoseKbProvider, MchoseV9Provider, MonsGeekProvider, RapooProvider, ShieldProvider, SkullcandyProvider, SonyInzoneProvider, TurtleBeachProvider, Endgame4kProvider, PlantronicsProvider, HyperXNgenuityProvider, IRocksProvider, AlienwareProvider, GloriousProvider, Gs3075tProvider, LamzuSinowealthProvider, UrxProvider)
-                       InphicProvider, AttackSharkR5Provider, JabraProvider, LamzuAtlantisProvider, MchoseKbProvider, MchoseV9Provider, MonsGeekProvider, RapooProvider, ShieldProvider, SkullcandyProvider, SonyInzoneProvider, TurtleBeachProvider, Endgame4kProvider, PlantronicsProvider, HyperXNgenuityProvider, IRocksProvider, AlienwareProvider, GloriousProvider, LamzuSinowealthProvider, UrxProvider)
-                       InphicProvider, JabraProvider, LamzuAtlantisProvider, MchoseKbProvider, MchoseV9Provider, MonsGeekProvider, RapooProvider, ShieldProvider, SkullcandyProvider, SonyInzoneProvider, TurtleBeachProvider, Endgame4kProvider, PlantronicsProvider, HyperXNgenuityProvider, IRocksProvider, AlienwareProvider, GloriousProvider, LamzuSinowealthProvider, UrxProvider, NinjutsoSoraV3Provider)
-                       InphicProvider, JabraProvider, LamzuAtlantisProvider, MchoseKbProvider, MchoseV9Provider, MonsGeekProvider, RapooProvider, ShieldProvider, SkullcandyProvider, SonyInzoneProvider, TurtleBeachProvider, Endgame4kProvider, PlantronicsProvider, HyperXNgenuityProvider, IRocksProvider, AlienwareProvider, GloriousProvider, LamzuSinowealthProvider, UrxProvider, KrakenV4Provider)
-                       InphicProvider, JabraProvider, LamzuAtlantisProvider, MchoseKbProvider, MchoseV9Provider, MonsGeekProvider, RapooProvider, ShieldProvider, SkullcandyProvider, SonyInzoneProvider, TurtleBeachProvider, Endgame4kProvider, PlantronicsProvider, HyperXNgenuityProvider, IRocksProvider, AlienwareProvider, GloriousProvider, LamzuSinowealthProvider, UrxProvider, RedSquareProvider)
+from providers import (  # noqa: E402
+    Provider, AulaProvider, AulaF108Provider, NinjutsoSprimeProvider, MoondropProvider, MsiProvider, 
+    MachenikeProvider, ArbiterProvider, AresonProvider, AlienwareProvider, BarracudaProvider, 
+    BarracudaXProvider, AudezeProvider, RazerProvider, WLmouseProvider, WraithProvider, MchoseProvider, 
+    MchoseK99Provider, MchoseV9Provider, BluetoothProvider, XInputProvider, LogitechProvider, 
+    LogitechG435RtkProvider, LogitechCenturionProvider, SteelSeriesProvider, SteelSeriesEliteProvider, 
+    JblProvider, JblHidV3Provider, KeychronProvider, PulsarProvider, DareuProvider, HyperXProvider, 
+    HyperXAlpha2Provider, HyperXCloud3Provider, HyperXCloudCoreProvider, HyperXCloud3SProvider, 
+    PlayStationProvider, EightBitDoProvider, NintendoProvider, ShieldProvider, AsusProvider, 
+    GloriousProvider, Gs3075tProvider, LamzuSinowealthProvider, GWolvesProvider, LofreeProvider, 
+    AstroProvider, CorsairProvider, CherryProvider, CoolerMasterProvider, RoyalKludgeProvider, 
+    ZowieProvider, KrakenV4Provider, DjiProvider, DarmosharkProvider, LamzuAtlantisProvider, LamzuProvider, 
+    VaxeeProvider, AmInfinityProvider, NzxtProvider, SteamProvider, InphicProvider, AttackSharkR5Provider, 
+    IRocksProvider, TurtleBeachProvider, UrxProvider, SkullcandyProvider, RapooProvider, AjazzProvider, 
+    SonyInzoneProvider, SonyH9IIProvider, AtkNearlinkProvider, FantechProvider, FinalmouseProvider, 
+    FractalProvider, AtkKeyboardProvider, AttackSharkX66Provider, HyperXAlphaWirelessProvider, 
+    JabraProvider, HyperXCloudFlightProvider, HyperXNgenuityProvider, MonsGeekProvider, EweadnProvider, 
+    EweadnYdxProvider, MchoseKbProvider, EndgameWEProvider, Endgame4kProvider, PlantronicsProvider, 
+    NinjutsoSoraV3Provider, RedSquareProvider, DeviceStatus,
+)
 from providers.bluetooth import BluetoothWatcher  # noqa: E402
 from providers.jbl import PROBE_LISTEN_S as JBL_PROBE_LISTEN_S  # noqa: E402
 
@@ -312,33 +303,49 @@ PROVIDER_LABELS = {
 def make_providers(jbl_listen_first: float = 0.0) -> list:
     # jbl_listen_first: only --probe passes it, so its single poll waits for a JBL level
     return [RazerProvider(), AudezeProvider(), WLmouseProvider(), MchoseProvider(),
-            HyperXAlpha2Provider(), HyperXCloud3Provider(), HyperXCloudCoreProvider(), HyperXProvider(),
+            HyperXAlpha2Provider(), HyperXCloud3Provider(), HyperXProvider(),
             KeychronProvider(), PulsarProvider(),
-            JblProvider(listen_first=jbl_listen_first), JblHidV3Provider(), CherryProvider(), CoolerMasterProvider(), RoyalKludgeProvider(), ZowieProvider(), FractalProvider(), LogitechProvider(), SteelSeriesProvider(), XInputProvider(),
-            AresonProvider(), ArbiterProvider(), FantechProvider(), MsiProvider(), WraithProvider(), MachenikeProvider(), MoondropProvider(), NinjutsoSprimeProvider(), JblProvider(listen_first=jbl_listen_first), LogitechProvider(), SteelSeriesProvider(), XInputProvider(),
+            JblProvider(listen_first=jbl_listen_first), LogitechProvider(), SteelSeriesProvider(), XInputProvider(),
             PlayStationProvider(), EightBitDoProvider(), BarracudaProvider(), BarracudaXProvider(), NintendoProvider(),
-            AsusProvider(), GWolvesProvider(), AulaProvider(), AulaF108Provider(), LofreeProvider(),
-            AstroProvider(), CorsairProvider(),
+            AsusProvider(), GWolvesProvider(), AulaProvider(), LofreeProvider(), AstroProvider(), CorsairProvider(),
             LamzuProvider(), VaxeeProvider(), AmInfinityProvider(),
-            SteelSeriesEliteProvider(), LogitechCenturionProvider(), LogitechG435RtkProvider(), HyperXCloud3SProvider(), NzxtProvider(),
+            SteelSeriesEliteProvider(), LogitechCenturionProvider(), HyperXCloud3SProvider(), NzxtProvider(),
             SteamProvider(), EndgameWEProvider(),
             MchoseV9Provider(), DareuProvider(), ShieldProvider(), LamzuAtlantisProvider(),
-            InphicProvider(), AttackSharkR5Provider(), TurtleBeachProvider(), SkullcandyProvider(), RapooProvider(), AjazzProvider(),
+            InphicProvider(), TurtleBeachProvider(), SkullcandyProvider(), RapooProvider(), AjazzProvider(),
             IRocksProvider(),
-            SonyInzoneProvider(), SonyH9IIProvider(), AtkNearlinkProvider(), FinalmouseProvider(), AtkKeyboardProvider(),
-            SonyInzoneProvider(), AtkNearlinkProvider(), FinalmouseProvider(), AtkKeyboardProvider(), AttackSharkX66Provider(),
+            SonyInzoneProvider(), AtkNearlinkProvider(), FinalmouseProvider(), AtkKeyboardProvider(),
             HyperXAlphaWirelessProvider(), JabraProvider(), HyperXCloudFlightProvider(), MonsGeekProvider(),
-            EweadnProvider(), EweadnYdxProvider(), MchoseKbProvider(), Endgame4kProvider(), PlantronicsProvider(), HyperXNgenuityProvider(), AlienwareProvider(), DjiProvider(), GloriousProvider(), LamzuSinowealthProvider(), UrxProvider()]
-            EweadnProvider(), MchoseKbProvider(), Endgame4kProvider(), PlantronicsProvider(), HyperXNgenuityProvider(), AlienwareProvider(), DjiProvider(), GloriousProvider(), Gs3075tProvider(), LamzuSinowealthProvider(), UrxProvider()]
-            EweadnProvider(), MchoseKbProvider(), Endgame4kProvider(), PlantronicsProvider(), HyperXNgenuityProvider(), AlienwareProvider(), DjiProvider(), DarmosharkProvider(), GloriousProvider(), LamzuSinowealthProvider(), UrxProvider()]
-            EweadnProvider(), MchoseKbProvider(), Endgame4kProvider(), PlantronicsProvider(), HyperXNgenuityProvider(), AlienwareProvider(), DjiProvider(), GloriousProvider(), LamzuSinowealthProvider(), UrxProvider(), NinjutsoSoraV3Provider()]
             EweadnProvider(), MchoseKbProvider(), Endgame4kProvider(), PlantronicsProvider(), HyperXNgenuityProvider(), AlienwareProvider(), DjiProvider(), GloriousProvider(), LamzuSinowealthProvider(), UrxProvider(),
-            MchoseK99Provider()]
-            EweadnProvider(), MchoseKbProvider(), Endgame4kProvider(), PlantronicsProvider(), HyperXNgenuityProvider(), AlienwareProvider(), DjiProvider(), GloriousProvider(), LamzuSinowealthProvider(), UrxProvider(), KrakenV4Provider()]
-            EweadnProvider(), MchoseKbProvider(), Endgame4kProvider(), PlantronicsProvider(), HyperXNgenuityProvider(), AlienwareProvider(), DjiProvider(), GloriousProvider(), LamzuSinowealthProvider(), UrxProvider(), RedSquareProvider()]
+            AulaF108Provider(), NinjutsoSprimeProvider(), MoondropProvider(), MsiProvider(),
+            MachenikeProvider(), ArbiterProvider(), AresonProvider(), WraithProvider(),
+            MchoseK99Provider(), LogitechG435RtkProvider(), JblHidV3Provider(), HyperXCloudCoreProvider(),
+            Gs3075tProvider(), CherryProvider(), CoolerMasterProvider(), RoyalKludgeProvider(),
+            ZowieProvider(), KrakenV4Provider(), DarmosharkProvider(), AttackSharkR5Provider(),
+            SonyH9IIProvider(), FantechProvider(), FractalProvider(), AttackSharkX66Provider(),
+            EweadnYdxProvider(), NinjutsoSoraV3Provider(), RedSquareProvider(),
+]
 
 
 # ---------------------------------------------------------------- config
+def migrate_legacy_config() -> bool:
+    """Copy settings from the old %APPDATA%\\BatteryTray folder on the first run."""
+    old = os.path.join(APPDATA_DIR, LEGACY_NAME, "config.json")
+    if os.path.exists(CONFIG_PATH) or not os.path.exists(old):
+        return False
+    try:
+        import shutil
+        shutil.copyfile(old, CONFIG_PATH)
+        return True
+    except OSError:
+        return False
+
+
+LIMITS = {"interval": (5, 3600), "low": (0, 100)}   # a hand-edited value outside is not used
+_config_lock = threading.Lock()
+
+
+
 def migrate_legacy_config() -> bool:
     """Copy settings from the old %APPDATA%\\BatteryTray folder on the first run."""
     old = os.path.join(APPDATA_DIR, LEGACY_NAME, "config.json")
@@ -2938,8 +2945,7 @@ class App:
             settings_host.close()
         self.stop_evt.set()
         for provider in self.providers:
-            if isinstance(provider, (AtkKeyboardProvider, Endgame4kProvider)):
-            if isinstance(provider, (AtkKeyboardProvider, MchoseK99Provider)):
+            if isinstance(provider, (AtkKeyboardProvider, Endgame4kProvider, MchoseK99Provider)):
                 provider.close()
         self.history.save(force=True)
         if self.cfg.get("status_file"):

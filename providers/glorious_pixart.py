@@ -51,6 +51,7 @@ INPUT_LEN = 8
 # about five seconds.  The rest are the reference's fallbacks.
 PROBES = ((0x03, 6.0), (0x00, 2.0), (0x01, 2.0), (0x02, 2.0))
 ASLEEP_KEEP = 300
+PASSIVE_TIMEOUT = 4.0                # s, before the slower GetFeature trigger
 
 
 def parse_reading(r) -> Optional[int]:
@@ -124,6 +125,16 @@ class GloriousD2Provider(Provider):
             self._diag.append(f"  candidate F: trigger iface={trigger.get('interface_number')} "
                               f"{PAGE:04x}:{TRIGGER_USAGE:04x}; input iface={inp.get('interface_number')} "
                               f"{PAGE:04x}:{INPUT_USAGE:04x}")
+            # Some D2 firmware pushes the 06 FB frame on col05 without a
+            # trigger; the reference tries that passive read first. It also
+            # leaves a receiver in a game alone when the feature channel is
+            # briefly unavailable, instead of forcing a failed GetFeature.
+            passive = self._read_passive(inp["path"])
+            if passive is not None:
+                self._last = (passive, time.time())
+                self._diag.append(f"  -> {passive}% (pushed)")
+                return [DeviceStatus(KEY, NAME, passive, bool(cable), True,
+                                     "glorious", kind="mouse")]
             level = self._read_cross(trigger["path"], inp["path"])
             if level is not None:
                 charging = plugged or bool(cable)
@@ -143,6 +154,28 @@ class GloriousD2Provider(Provider):
                                  "glorious", kind="mouse", wake_on_input=True)]
         return [DeviceStatus(KEY, NAME, None, False, False, "glorious", kind="mouse",
                              wake_on_input=True)]
+
+    def _read_passive(self, input_path) -> Optional[int]:
+        """Read a battery frame the receiver may push without a trigger."""
+        dev = hid.device()  # type: ignore[union-attr]
+        try:
+            dev.open_path(input_path)
+        except (OSError, IOError) as e:
+            self._diag.append(f"    passive input open: {e}")
+            return None
+        try:
+            reply = dev.read(INPUT_LEN, int(PASSIVE_TIMEOUT * 1000))
+            if reply:
+                self._diag.append(f"    passive reply: {hexdump(reply, 12)}")
+                return parse_reading(reply)
+        except (OSError, IOError, ValueError) as e:
+            self._diag.append(f"    passive read: {e}")
+        finally:
+            try:
+                dev.close()
+            except Exception:
+                pass
+        return None
 
     def _read_cross(self, trigger_path, input_path) -> Optional[int]:
         """GetFeature trigger on col01, read the reply on col05, no writes."""

@@ -33,8 +33,10 @@ def entries(pid=G.PID_RECEIVER):
 
 
 class FakeHid:
-    def __init__(self, replies=None, trigger_error=True):
+    def __init__(self, replies=None, trigger_error=True, passive=None):
         self.replies = list(replies or [])
+        self.passive = passive
+        self.passive_used = False
         self.trigger_error = trigger_error
         self.opened = []
         self.triggers = []
@@ -61,6 +63,9 @@ class FakeHandle:
 
     def read(self, size, timeout_ms=0):
         self.owner.reads.append((self.path, size, timeout_ms))
+        if not self.owner.passive_used:
+            self.owner.passive_used = True
+            return self.owner.passive or []
         return self.owner.replies.pop(0) if self.owner.replies else []
 
     def send_feature_report(self, data):
@@ -113,7 +118,15 @@ class PollTests(unittest.TestCase):
                          [("glorious:d2", "Glorious Model D2 Wireless",
                            80, False, True, "mouse")])
         self.assertEqual(fake.triggers[0], (0x03, 64))
-        self.assertEqual(fake.reads[0], (b"input", 8, 6000))
+        self.assertEqual(fake.reads[0], (b"input", 8, 4000))   # passive
+        self.assertEqual(fake.reads[1], (b"input", 8, 6000))   # after the trigger
+
+    def test_a_passive_col05_push_is_used_without_a_trigger(self):
+        fake = FakeHid(passive=reading(88))
+        out = self.make(fake).poll()
+        self.assertEqual([(r.level, r.online) for r in out], [(88, True)])
+        self.assertEqual(fake.triggers, [])
+        self.assertEqual(fake.reads[0][0], b"input")
 
     def test_a_rejected_trigger_still_reads_the_col05_reply(self):
         fake = FakeHid([reading(64)], trigger_error=True)

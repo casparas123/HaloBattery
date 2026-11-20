@@ -502,6 +502,33 @@ K87's `0x01` while full and off the cable stays a full status and never shows a
 ring. Level and charging confirmed in
 [#378](https://github.com/HeyOkay/HaloBattery/issues/378).
 
+### AULA F87 Pro on its Compx 2.4 GHz receiver
+
+**Connection:** Compx receiver `3554:FA09` (the same id as the AULA F75, which answers the
+Compx 17-byte frame instead).
+
+This variant answers the Sinowealth-style 20-byte `13 4A` frame rather than the Compx
+`08 04` one, on a vendor collection (`ff02:0002` first, then the other `0xFFxx` pages):
+
+    request  13 4A 00 00 ... <checksum>          checksum = sum(bytes 0..18) & 0xFF
+    reply    13 4A 01 00 02 <level> <state> ... <checksum>
+
+`level` is 1-100 on battery. `state` `0x01` means on battery and `0x10` the cable plugged
+in; while the cable is in the keyboard reports 100 regardless, so the level is reported as
+unknown and the device as charging. Any other state is refused rather than guessed.
+
+From [Radiance-Philippines/aula-f87-control](https://github.com/Radiance-Philippines/aula-f87-control)
+(`docs/PROTOCOL.md`, `aula_f87/device.py`). The level was confirmed by the reporter in
+[#360](https://github.com/HeyOkay/HaloBattery/issues/360) (91 %, matching the keyboard's
+own light bar); the charging state is still a test build.
+
+Only a collection that can carry the 20-byte frame is queried: `HidP_GetCaps` must report
+an input and output report of at least 20 bytes (report id included). Windows refuses a
+write that is too big for the collection, and the app's transport records any refused
+native call as a failed poll for the whole provider, so a probe on the wrong collection
+greys the icon even when the provider catches the error (#360, the reporter's charging run).
+
+
 ### MCHOSE A5 Pro Max
 
 **Connection:** 1K receiver (2023:F013), 4K receiver (2023:F015) or USB cable (2023:F019)

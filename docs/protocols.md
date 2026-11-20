@@ -459,9 +459,16 @@ The non-numbered 64-byte output/input pair on `ff0a:0001`. The power query is
 mouse uses `01`), with the last byte completing the report's sum to `0xA1`.
 The reply is matched by operation `0x01` and sub-command `0x01`; the legacy
 layout carries the percentage at byte 6, and the `15 19` pair at bytes 6-7 marks
-the v2 layout with the percentage at byte 11. Only 0-100 is accepted. The
-charging-state byte is not decoded, so the app shows no charging ring rather
-than guessing.
+the v2 layout with the percentage at byte 11. Only 0-100 is accepted. The state
+byte (5, or 10 on the v2 layout) follows the vendor web app's own template:
+1 and 3 show "Charging", 2 "Fully charged", 0 the percentage; any other value
+leaves charging unknown rather than guessed. Awaiting hardware confirmation of
+the charging ring.
+
+The receiver answers a query with a short acknowledgement (`1f 00 81 01`) before
+the mouse's power reply, and a sleeping mouse can answer nothing at all. The
+query is therefore sent up to three times per poll, with every frame and its
+length logged in the diagnostics.
 
 Protocol and offsets from [OpenLogi's Darmoshark driver](https://github.com/ayasaki-exs/OpenLogi/tree/feat/darmoshark-driver)
 and [ayasaki-exs/darmoshark-battery](https://github.com/ayasaki-exs/darmoshark-battery);

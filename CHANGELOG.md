@@ -550,6 +550,10 @@ source; their settings and battery history remain compatible.
 
 ### Fixed
 
+- Darmoshark N5: send the power query up to three times per poll and log every
+  frame, so a sleeping mouse or a busy receiver shows up in the diagnostics.
+- Darmoshark N5: decode the charging state from byte 5 (byte 10 on the v2
+  layout), using the mapping in the vendor web app's own template.
 - **ATK V75X receiver polling**: reuse successful readings for five minutes,
   retry failed requests after 30 seconds, and rate-limit typing-triggered wakes
   so bursts of input do not repeatedly poll every device.

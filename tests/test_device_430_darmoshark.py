@@ -77,13 +77,14 @@ class PollTests(unittest.TestCase):
         dev = FakeDevice(replies)
         D.hid = types.SimpleNamespace(device=lambda: dev)
         D.hidlist = types.SimpleNamespace(enumerate=lambda vid=0: list(INFO if infos is None else infos))
-        return D.DarmosharkProvider().poll(), dev
+        self.provider = D.DarmosharkProvider()
+        return self.provider.poll(), dev
 
-    def test_the_receiver_reads_one_icon_without_charging(self):
+    def test_the_receiver_reads_one_icon_on_battery(self):
         out, dev = self.poll([response(67)])
-        self.assertEqual([(s.key, s.name, s.level, s.charging_known, s.kind)
+        self.assertEqual([(s.key, s.name, s.level, s.charging, s.charging_known, s.kind)
                           for s in out],
-                         [("darmoshark:n5", "Darmoshark N5", 67, False, "mouse")])
+                         [("darmoshark:n5", "Darmoshark N5", 67, False, True, "mouse")])
         self.assertEqual([0x41, 0, 129, 1], list(dev.writes[0][:4]))
         self.assertTrue(dev.closed)
 
@@ -95,26 +96,55 @@ class PollTests(unittest.TestCase):
         out, _ = self.poll([])
         self.assertEqual(out, [])
 
-    def test_the_captured_430_exchange_reads_63_with_charging_unknown(self):
+    def test_a_silent_first_query_is_retried_and_reads_the_level(self):
+        # #430 test build 2: the receiver acknowledged the query (`1f 00 81 01`)
+        # and the mouse answered nothing. A second query must be sent within the
+        # same poll rather than waiting for the next one.
+        ack = bytes.fromhex("1f 00 81 01").ljust(64, b"\0")
+        captured = bytes.fromhex("41 00 8e 01 00 00 3f 00 01 02 03").ljust(64, b"\0")
+        out, dev = self.poll([ack, [], [], ack, captured])
+        self.assertEqual([s.level for s in out], [63])
+        self.assertEqual(2, len(dev.writes))
+
+    def test_three_silent_queries_say_so_in_the_diagnostics(self):
+        out, dev = self.poll([])
+        self.assertEqual(out, [])
+        self.assertEqual(3, len(dev.writes))
+        self.assertIn("no power reply after 3 queries",
+                      "\n".join(self.provider.diagnostics()))
+
+    def test_the_captured_430_exchange_reads_63_on_battery(self):
         # #430 test build 1 diagnostics: the ack `1f 00 81 01 ...`, then the power
         # reply `41 00 8e 01 00 00 3f 00 01 02 03 ...` (63 %, the mouse showed 63 %).
+        # Byte 5 is 0, which the vendor web app shows as the plain percentage.
         ack = bytes.fromhex("1f 00 81 01").ljust(64, b"\0")
         captured = bytes.fromhex("41 00 8e 01 00 00 3f 00 01 02 03").ljust(64, b"\0")
         out, _ = self.poll([ack, captured])
         self.assertEqual([(s.level, s.charging, s.charging_known) for s in out],
-                         [(63, False, False)])
+                         [(63, False, True)])
 
-    def test_the_state_byte_is_not_read_as_charging(self):
-        # The charging mapping of PR commit 4fac9bc (1/3 charging, 2 full) has no
-        # source and failed its only hardware test, so it is not used: whatever byte
-        # 5 holds, charging stays unknown.
-        for state in (0, 1, 2, 3):
+    def test_the_charging_state_follows_the_vendor_web_app(self):
+        # The web app's template shows "Charging" for 1 and 3, "Fully charged" for 2
+        # and the percentage for 0 (main.47068c4b56a18ed4.js: `1===powerState||
+        # 3===powerState` / `2===powerState`). Any other value stays unknown.
+        expected = {0: (False, True), 1: (True, True), 2: (False, True),
+                    3: (True, True), 7: (False, False)}
+        for state, (charging, known) in expected.items():
             with self.subTest(state=state):
                 frame = bytearray(response(55))
                 frame[5] = state
                 out, _ = self.poll([bytes(frame)])
                 self.assertEqual([(s.level, s.charging, s.charging_known) for s in out],
-                                 [(55, False, False)])
+                                 [(55, charging, known)])
+
+    def test_v2_state_is_read_from_byte_ten(self):
+        for state, charging in ((1, True), (2, False), (3, False)):
+            with self.subTest(state=state):
+                frame = bytearray(response(42, v2=True))
+                frame[10] = state
+                out, _ = self.poll([bytes(frame)])
+                self.assertEqual([(s.level, s.charging, s.charging_known) for s in out],
+                                 [(42, charging, True)])
 
     def test_wrong_collection_is_not_opened(self):
         out, dev = self.poll([], [dict(INFO[0], usage_page=0x0001, usage=0x0002)])

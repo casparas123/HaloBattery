@@ -1338,3 +1338,25 @@ confirmation, and this recovery has not been tested on hardware.
 **Connection:** 2.4 GHz receiver `093A:522C` or USB cable `093A:622C`; the ids are shared with Incott mice.
 
 Device-info feature report `09` / command `8F`: reply byte 3 is 18 for the W1 or 20 for the Freestyle. After that, read-only `86` button queries (0, 1, 2, 4, 3) prompt the mouse to push input report `09`, whose byte 1 is charging bit 7 plus the low 7-bit percentage. A device that does not answer 8F is left to the Incott path. Protocol from the Wraith web driver and W1 Service. **Unverified in this app.**
+
+### ROCCAT Vulcan II Mini Air
+
+**Connection:** 2.4 GHz receiver `1E7D:3AA9` (Turtle Beach-branded `1E7D:501E`). Bluetooth needs
+no entry here: the keyboard reports its level over the standard HID battery usage.
+
+The receiver's vendor collection is usage page `0xFF00`, usage `0x0001`: unnumbered 64-byte input
+reports, and a 63-byte feature report with id 7. Turtle Beach Swarm's own exchange, from the
+capture in [#429](https://github.com/HeyOkay/HaloBattery/issues/429):
+
+    SET_REPORT feature id 7, 64 bytes:   07 03 88 00 01 00 ...
+    input report, same collection:       07 04 88 00 41 <level>
+
+A frame is `07 <payload length> <command> <sub-command> <args>`; `0x41` marks a one-byte answer and
+the answer is a plain percentage (0x2b = 43 in the capture). Replies must be matched on command and
+sub-command: the same stream carries `07 04 33 01 41 7f`-style setting answers whose values also
+fall in 0-100.
+
+The keyboard pushes `09 0a 88 05 <value> ... <byte 8>` every ten seconds. The battery and charging
+captures differ in byte 8 (25-26 on battery, 36-38 on the cable), but it also rises by one every ten
+seconds on battery, so it is logged as a second candidate and not decoded. **Charging is therefore
+unknown** and **the level is unverified** until a reporter compares both candidates with Swarm.

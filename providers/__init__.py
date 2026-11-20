@@ -53,6 +53,7 @@ from .royal_kludge import RoyalKludgeProvider  # noqa: F401
 from .zowie import ZowieProvider  # noqa: F401
 from .dji import DjiProvider  # noqa: F401
 from .darmoshark import DarmosharkProvider  # noqa: F401
+from .roccat import RoccatProvider  # noqa: F401
 from .lamzu import LamzuAtlantisProvider, LamzuProvider  # noqa: F401
 from .vaxee import VaxeeProvider  # noqa: F401
 from .am_infinity import AmInfinityProvider  # noqa: F401

@@ -155,6 +155,7 @@ MESSAGES = {
     "provider.redsquare": 'Клавиатура Red Square Alumix TKL',
     "provider.msi": "Мыши MSI",
     "provider.rapoo": "Мыши и клавиатуры Rapoo",
+    "provider.roccat": "ROCCAT Vulcan II Mini Air",
     "provider.shield": "Контроллеры NVIDIA SHIELD",
     "provider.skullcandy": "Гарнитуры Skullcandy",
     "provider.sony_inzone": "Sony INZONE H9",

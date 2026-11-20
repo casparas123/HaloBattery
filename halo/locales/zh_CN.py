@@ -157,6 +157,7 @@ MESSAGES = {
     "provider.redsquare": 'Red Square Alumix TKL 键盘',
     "provider.msi": "MSI 鼠标",
     "provider.rapoo": "Rapoo 鼠标和键盘",
+    "provider.roccat": "ROCCAT Vulcan II Mini Air",
     "provider.shield": "NVIDIA SHIELD 控制器",
     "provider.skullcandy": "Skullcandy 耳机",
     "provider.sony_inzone": "Sony INZONE H9",

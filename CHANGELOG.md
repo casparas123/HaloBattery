@@ -393,6 +393,9 @@ source; their settings and battery history remain compatible.
 
 ### Added
 
+- ROCCAT Vulcan II Mini Air over its 2.4 GHz receiver (`1E7D:3AA9`), from the capture in
+  #429: the level is read from the `0x88` answer, and the ten-second status push is logged
+  as a second candidate. Level and charging are unverified.
 - **ATK V75X USB cable** (`320f:5055`): shares the receiver's icon and is preferred
   when both transports are connected. The PR author confirmed battery and charging
   on the cable; receiver support was already integrated.

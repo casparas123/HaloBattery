@@ -138,6 +138,7 @@ MESSAGES = {
     'provider.mchose_v9': 'MCHOSE V9 Pro',
     'provider.monsgeek': 'MonsGeek пернетақталары',
     'provider.rapoo': 'Rapoo тінтуірлері мен пернетақталары',
+    "provider.roccat": "ROCCAT Vulcan II Mini Air",
     'provider.shield': 'NVIDIA SHIELD контроллерлері',
     'provider.skullcandy': 'Skullcandy гарнитуралары',
     'provider.sony_inzone': 'Sony INZONE H9',

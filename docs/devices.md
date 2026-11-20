@@ -95,6 +95,7 @@
 | [Razer Pro Click V2 Vertical Edition](protocols.md#razer-wireless-mice-other-openrazer-models) | 2.4 GHz receiver or USB cable | yes |
 | [ZOWIE EC-CW, DW series and U2](protocols.md#zowie-ec-cw-dw-series-and-u2) | 2.4 GHz receiver or USB cable | unverified |
 | [Razer wireless mice (other OpenRazer models)](protocols.md#razer-wireless-mice-other-openrazer-models) | 2.4 GHz receiver or USB cable | likely |
+| [ROCCAT Vulcan II Mini Air](protocols.md#roccat-vulcan-ii-mini-air) | 2.4 GHz receiver (1E7D:3AA9) | unverified (probe build) |
 | [Red Square Alumix TKL (RSQ-20055)](protocols.md#red-square-alumix-tkl-rsq-20055) | 2.4 GHz receiver (342D:E411) | no |
 | [Sony DualSense (PS5)](protocols.md#sony-dualsense-ps5) | USB or Bluetooth | yes |
 | [Sony DualShock 4 (PS4)](protocols.md#sony-dualshock-4-ps4) | USB cable and Bluetooth | yes |

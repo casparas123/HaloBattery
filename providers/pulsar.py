@@ -105,13 +105,15 @@ from typing import Dict, List, Optional, Tuple
 
 import hid
 
-from . import atk_bitmouse, hidlist
+from . import atk_bitmouse, aula_f87, hidlist
 from .base import DeviceStatus, Provider, hexdump, log
 from .compx import (CHECKSUM_BASE, CMD_POWER, CONTROL_USAGE, PAYLOAD_HEADER, PAYLOAD_LEN,
                     POWER_INDEX, LEVEL_INDEX, VOLTAGE_SLICE, READ_ATTEMPTS, READ_TIMEOUT_MS,
                     checksum, make_request, output_length, parse_power, voltage_mv)
 
 CONTROL_INTERFACE = 1           # the tool reads its 17-byte replies on interface 1
+AULA_TIMEOUT_S = 0.75           # the F87 Pro's 13 4A answer, per vendor collection
+AULA_READ_TIMEOUT_MS = 200
 FLUSH_TIMEOUT_MS = 30
 
 SONIX_VID = 0x3710
@@ -348,6 +350,41 @@ class PulsarProvider(Provider):
                                         wired, True, "pulsar", kind="mouse"))
         return out
 
+    def _read_aula(self, infos: List[dict]):
+        """The F87 Pro's 13 4A answer on this receiver, or None (#360).
+
+        The F87 Pro shares 3554:FA09 with the F75, which answers the Compx frame
+        instead, so both are tried and the one that answers wins.
+        """
+        for d in aula_f87.candidates(infos):
+            dev = hid.device()
+            try:
+                dev.open_path(d["path"])
+                self._drain(dev)
+                sent = dev.write(aula_f87.make_request())
+                if sent is not None and sent < 0:
+                    continue
+                deadline = time.monotonic() + AULA_TIMEOUT_S
+                while time.monotonic() < deadline:
+                    r = dev.read(aula_f87.REPORT_LEN, AULA_READ_TIMEOUT_MS)
+                    if not r:
+                        continue
+                    self._diag.append(f"  aula {d.get('usage_page', 0):04x}:"
+                                      f"{d.get('usage', 0):04x} reply: {hexdump(r, 20)}")
+                    parsed = aula_f87.parse_reply(r)
+                    if parsed is not None:
+                        return parsed
+                self._diag.append(f"  no AULA answer on {d.get('usage_page', 0):04x}:"
+                                  f"{d.get('usage', 0):04x}")
+            except (OSError, IOError, ValueError) as e:
+                self._diag.append(f"  aula query error: {e}")
+            finally:
+                try:
+                    dev.close()
+                except Exception:
+                    pass
+        return None
+
     def poll(self) -> List[DeviceStatus]:
         self._diag = []
         out = self._poll_sonix()
@@ -389,6 +426,23 @@ class PulsarProvider(Provider):
                     reply = self._query(d["path"])
                     parsed = parse_power(reply)
                 if parsed is None:
+                    if (vid, pid) == (aula_f87.VID, aula_f87.PID):
+                        reading = self._read_aula(mine)
+                        if reading is not None:
+                            level, charging, known = reading
+                            state = ("on cable, charging" if charging and level is None
+                                     else f"{level}%")
+                            self._diag.append(f"[Pulsar] pid={vid:04x}:{pid:04x} "
+                                              f"'{aula_f87.NAME}': {state}")
+                            if level is not None:
+                                self._last[key] = (aula_f87.NAME, level, charging, now,
+                                                   "keyboard")
+                            found.add(key)
+                            out.append(DeviceStatus(key, aula_f87.NAME, level, charging,
+                                                    True, "pulsar", kind="keyboard",
+                                                    charging_known=known,
+                                                    wake_on_input=True))
+                            continue
                     if not reply:
                         self._diag.append("    no reply (asleep, or the mouse is idle)")
                     continue

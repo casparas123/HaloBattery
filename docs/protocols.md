@@ -469,6 +469,25 @@ the receiver and its docs were supplied by the [#430](https://github.com/HeyOkay
 reporter. **Confirmed on hardware** in #430: the receiver's power reply read
 **63%**, matching the mouse. Charging is not decoded.
 
+### AULA F87 Pro on its Compx 2.4 GHz receiver
+
+**Connection:** Compx receiver `3554:FA09` (the same id as the AULA F75, which answers the
+Compx 17-byte frame instead).
+
+This variant answers the Sinowealth-style 20-byte `13 4A` frame rather than the Compx
+`08 04` one, on a vendor collection (`ff02:0002` first, then the other `0xFFxx` pages):
+
+    request  13 4A 00 00 ... <checksum>          checksum = sum(bytes 0..18) & 0xFF
+    reply    13 4A 01 00 02 <level> <state> ... <checksum>
+
+`level` is 1-100 on battery. `state` `0x01` means on battery and `0x10` the cable plugged
+in; while the cable is in the keyboard reports 100 regardless, so the level is reported as
+unknown and the device as charging. Any other state is refused rather than guessed.
+
+From [Radiance-Philippines/aula-f87-control](https://github.com/Radiance-Philippines/aula-f87-control)
+(`docs/PROTOCOL.md`, `aula_f87/device.py`). **Unverified in this app** until the reporter's
+test build answers.
+
 ### MCHOSE A5 Pro Max
 
 **Connection:** 1K receiver (2023:F013), 4K receiver (2023:F015) or USB cable (2023:F019)

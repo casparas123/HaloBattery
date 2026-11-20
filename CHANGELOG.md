@@ -393,6 +393,9 @@ source; their settings and battery history remain compatible.
 
 ### Added
 
+- AULA F87 Pro on its Compx receiver (`3554:FA09`), which answers the 20-byte
+  `13 4A` frame instead of the Compx `08 04` one the same id was read with.
+  Unverified until the reporter's test build answers.
 - **ATK V75X USB cable** (`320f:5055`): shares the receiver's icon and is preferred
   when both transports are connected. The PR author confirmed battery and charging
   on the cable; receiver support was already integrated.

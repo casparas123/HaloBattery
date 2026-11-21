@@ -137,8 +137,22 @@ class PollTests(unittest.TestCase):
 
     def test_a_missing_reply_is_retried_with_the_fallback_report_ids(self):
         fake = FakeHid([])
-        self.make(fake).poll()
-        self.assertEqual([rid for rid, _ in fake.triggers], [0x03, 0x00, 0x01, 0x02])
+        provider = self.make(fake)
+        provider.poll()
+        # the four fallbacks, then the probe burst's rounds (#281)
+        self.assertEqual([rid for rid, _ in fake.triggers],
+                         [0x03, 0x00, 0x01, 0x02] + [0x03] * G.PROBE_ROUNDS)
+        self.assertIn("probe: no answer in any round",
+                      "\n".join(provider.diagnostics()))
+
+    def test_the_probe_burst_recovers_a_level(self):
+        # four empty cross reads, then the probe's first read carries the level
+        fake = FakeHid([[], [], [], [], reading(77)])
+        provider = self.make(fake)
+        out = provider.poll()
+        self.assertEqual((out[0].level, out[0].online), (77, True))
+        self.assertIn("probe: answered 77% on round 1",
+                      "\n".join(provider.diagnostics()))
 
     def test_the_cable_counts_as_charging(self):
         fake = FakeHid([reading(80)])

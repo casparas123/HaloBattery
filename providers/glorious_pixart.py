@@ -53,6 +53,15 @@ PROBES = ((0x03, 6.0), (0x00, 2.0), (0x01, 2.0), (0x02, 2.0))
 ASLEEP_KEEP = 300
 PASSIVE_TIMEOUT = 4.0                # s, before the slower GetFeature trigger
 
+# Probe build (#281): when a poll comes back empty, re-ask a few times and log
+# every frame. The reporter's D2 answers for about a minute and then goes silent
+# unless Glorious Core is running; these rounds show whether a repeat query wakes
+# the receiver again or whether nothing comes back at all.
+PROBE_ROUNDS = 3
+PROBE_READS = 4                      # reads per round, 120 ms each
+PROBE_GAP = 0.4
+PROBE_MIN_INTERVAL = 120.0           # s, at most one burst every two minutes
+
 
 def parse_reading(r) -> Optional[int]:
     """The level from a col05 input report, or None."""
@@ -92,6 +101,7 @@ class GloriousD2Provider(Provider):
         self._diag: List[str] = []
         self._last: Optional[Tuple[int, float]] = None
         self._working_rid: Optional[int] = None
+        self._last_probe = 0.0
 
     def poll(self) -> List[DeviceStatus]:
         self._diag = []
@@ -136,6 +146,8 @@ class GloriousD2Provider(Provider):
                 return [DeviceStatus(KEY, NAME, passive, bool(cable), True,
                                      "glorious", kind="mouse")]
             level = self._read_cross(trigger["path"], inp["path"])
+            if level is None and not plugged:
+                level = self._probe_burst(trigger["path"], inp["path"])
             if level is not None:
                 charging = plugged or bool(cable)
                 self._last = (level, time.time())
@@ -154,6 +166,67 @@ class GloriousD2Provider(Provider):
                                  "glorious", kind="mouse", wake_on_input=True)]
         return [DeviceStatus(KEY, NAME, None, False, False, "glorious", kind="mouse",
                              wake_on_input=True)]
+
+    def _should_probe(self) -> bool:
+        now = time.time()
+        if now - self._last_probe < PROBE_MIN_INTERVAL:
+            return False
+        self._last_probe = now
+        return True
+
+    def _probe_burst(self, trigger_path, input_path) -> Optional[int]:
+        """Probe build (#281): re-ask a few times, logging every frame received."""
+        if not self._should_probe():
+            return None
+        dev = hid.device()  # type: ignore[union-attr]
+        try:
+            dev.open_path(input_path)
+        except (OSError, IOError) as e:
+            self._diag.append(f"    probe: input open: {e}")
+            return None
+        try:
+            self._diag.append(f"    probe: {PROBE_ROUNDS} rounds, trigger rid 0x03")
+            for round_no in range(1, PROBE_ROUNDS + 1):
+                trigger = hid.device()  # type: ignore[union-attr]
+                try:
+                    trigger.open_path(trigger_path)
+                    try:
+                        trigger.get_feature_report(0x03, TRIGGER_LEN)
+                        self._diag.append(f"    probe round {round_no}: trigger accepted")
+                    except (OSError, IOError, ValueError) as e:
+                        self._diag.append(f"    probe round {round_no}: trigger {e}")
+                except (OSError, IOError) as e:
+                    self._diag.append(f"    probe round {round_no}: trigger open: {e}")
+                finally:
+                    try:
+                        trigger.close()
+                    except Exception:
+                        pass
+                frames = 0
+                for _ in range(PROBE_READS):
+                    try:
+                        reply = dev.read(INPUT_LEN, 120)
+                    except (OSError, IOError, ValueError) as e:
+                        self._diag.append(f"    probe round {round_no}: read: {e}")
+                        break
+                    if not reply:
+                        continue
+                    frames += 1
+                    self._diag.append(f"    probe round {round_no} frame: {hexdump(reply, 12)}")
+                    level = parse_reading(reply)
+                    if level is not None:
+                        self._diag.append(f"    probe: answered {level}% on round {round_no}")
+                        return level
+                if frames == 0:
+                    self._diag.append(f"    probe round {round_no}: nothing pushed")
+                time.sleep(PROBE_GAP)
+        finally:
+            try:
+                dev.close()
+            except Exception:
+                pass
+        self._diag.append("    probe: no answer in any round")
+        return None
 
     def _read_passive(self, input_path) -> Optional[int]:
         """Read a battery frame the receiver may push without a trigger."""

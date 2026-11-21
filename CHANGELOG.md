@@ -30,6 +30,10 @@ and the project follows [Semantic Versioning](https://semver.org/).
   and Exit HaloBattery hover colors, with themed pressed feedback.
 
 ### Added
+- MCHOSE V7 (`3837:1016`) on its 2.4 GHz receiver: M HUB's
+  `newMouseWirelessPids` lists it with the captured K7 V2 Ultra+, so it gets that
+  family's `0x4D`/`0900` read on interface 2 `FF01:0001`. Level and charging are
+  not yet confirmed on hardware ([#496](https://github.com/HeyOkay/HaloBattery/issues/496)).
 - MCHOSE G98 Pro (`41E4:2004`) keyboard over the same Sinowealth `13 4A 01`
   command as the K87, with the charging flag read from the reply's high
   nibble. Level and charging confirmed on the reporter's hardware in

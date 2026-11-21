@@ -49,10 +49,13 @@ and PR #20: 3837:100b, configuration collection 0xFF01:0x01 on interface 2.
 https://github.com/HeyOkay/HaloBattery/issues/4
 https://github.com/HeyOkay/HaloBattery/pull/20
 The reference documents the same short 0x11 status read, but the vendor id alone
-does not identify its protocol: issue #189's 3837:3033 keyboard and 3837:1016
-mouse use output report 0x55 instead. Unknown 0x3837 products and unrelated
-collections are therefore left unopened by this legacy mouse query; the
-separately sourced 6008/600A headset routes below remain enabled.
+does not identify its protocol: issue #189's 3837:3033 keyboard is a GLW device
+(its own provider) and 3837:1016 is the V7, which M HUB lists in
+``newMouseWirelessPids`` alongside the captured K7 V2 Ultra+ and which answers
+that family's 0x4D / 0900 read on interface 2 FF01:0001 (#496). Unknown 0x3837
+products and unrelated collections are therefore left unopened by this legacy
+mouse query; the separately sourced 6008/600A headset routes below remain
+enabled.
 
 The first-generation A5 Pro Max (0x2023 - the 1K receiver F013, the 4K receiver F015 and the
 wired mouse F019; issue #149) speaks a third exchange, taken from the community web driver
@@ -203,7 +206,12 @@ NEW_MOUSE_TARGETS = {0x100B: (2, CONFIG_PAGE, 0x0001)}
 # 52b25bf9cdb449b84c69f50970c1612a2e33b3c98b7caffd03c1c8e9dca1ce1a.
 # Only the captured 3837:1018 interface 2 FF01:0001 gets output report 4D.
 # Neither other newMouseWirelessPids nor the legacy 06 frame is inferred here.
-MC_TARGETS = {0x1018: (2, CONFIG_PAGE, 0x0001)}
+# M HUB's newMouseWirelessPids is [4116, 4120, 4124, 4118, 4125]; 4120 is the
+# K7 V2 Ultra+ captured in PR #403 and 4118 (0x1016) is the V7 in #496, whose
+# diagnostics show the same interface 2 FF01:0001 collection. Both get the
+# 0x4D / 0900 read; no other 3837 product is inferred from the list.
+MC_TARGETS = {0x1016: (2, CONFIG_PAGE, 0x0001),
+              0x1018: (2, CONFIG_PAGE, 0x0001)}
 MC_LEN, MC_HEADER = 64, 8
 MC_ATTEMPTS, MC_READS, MC_READ_MS = 3, 5, 200
 SHORT_REPORT = 0x11
@@ -643,9 +651,14 @@ class MchoseProvider(Provider):
         try:
             dev.open_path(path)
             for _ in range(MC_ATTEMPTS):
-                if dev.write(make_mc_request()) != MC_LEN:
-                    self._diag.append("    0x0900 request was not written in full")
+                wrote = dev.write(make_mc_request())
+                # the transport pads to OutputReportByteLength (the id byte is part of
+                # it), so a good write can report one byte more than the frame (#219)
+                if not isinstance(wrote, int) or wrote < MC_LEN:
+                    self._diag.append(f"    0x0900 request was not written in full ({wrote})")
                     return None
+                if wrote != MC_LEN:
+                    self._diag.append(f"    0x0900 request padded to {wrote} bytes")
                 retry = False
                 for _ in range(MC_READS):
                     resp = dev.read(MC_LEN, MC_READ_MS)

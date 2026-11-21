@@ -517,12 +517,29 @@ The same protocol as the M7 Ultra on MCHOSE's newer vendor id, which the referen
 The generic `3837` mouse exchange is restricted to `3837:100B`, interface 2,
 `FF01:0001`, as documented in [#4](https://github.com/HeyOkay/HaloBattery/issues/4)
 and [#20](https://github.com/HeyOkay/HaloBattery/pull/20). VID `3837` also covers
-keyboards and products with different protocols: the K99 `3033` and V7 `1016`
-diagnostics in [#189](https://github.com/HeyOkay/HaloBattery/issues/189) do not
-justify sending the RealTek mouse feature request to them. Those and other
+keyboards and products with different protocols: the K99 `3033` diagnostics in
+[#189](https://github.com/HeyOkay/HaloBattery/issues/189) do not justify sending
+the RealTek mouse feature request to them, and the V7 `1016` is not a RealTek
+product at all - it is handled by the new-mouse read below. Those and other
 unmapped products remain unopened by that route. The separately confirmed V9
 headset routes `6008`/`600A` are preserved. The original `5253`, G7 and A5 Pro Max
 exchanges are unchanged.
+
+### MCHOSE V7
+
+**Connection:** 2.4 GHz receiver (3837:1016)
+
+M HUB's own bundle lists the V7 in `newMouseWirelessPids`:
+`[4116, 4120, 4124, 4118, 4125]`, where `4118` is `0x1016` and `4120` is the K7
+V2 Ultra+ whose `0x4D`/`0900` exchange was captured in
+[PR #403](https://github.com/HeyOkay/HaloBattery/pull/403). The V7's receiver
+exposes the same interface 2 `FF01:0001` collection (diagnostics in
+[#496](https://github.com/HeyOkay/HaloBattery/issues/496)), so it gets that read:
+a 64-byte output report `0x4D` with command `0x0900`, answered by a checksummed
+frame whose payload holds the charge state at offset 11 and the percentage at
+offset 12. A busy reply is retried, an unknown charge state or a level outside
+1-100 is refused. **Unverified on hardware** - the test build from #496 is the
+first run.
 
 ### MCHOSE G7
 

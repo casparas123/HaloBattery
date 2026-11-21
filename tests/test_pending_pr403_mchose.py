@@ -102,8 +102,25 @@ class PollTests(unittest.TestCase):
         self.assertEqual(self.dev.read.call_count, 5)
         self.dev.send_feature_report.assert_not_called()
 
+    def test_the_v7_uses_the_same_new_mouse_read(self):
+        # M HUB's newMouseWirelessPids has 4118 = 0x1016; #496's diagnostics show
+        # the same interface 2 / FF01:0001 collection as the captured K7.
+        self.entries = [entry(product_id=0x1016, product_string="MCHOSE V7", path=b"v7")]
+        self.dev.read.return_value = reply(level=64, charge=1)
+        status = self.poll()[0]
+        self.assertEqual((status.key, status.level, status.charging),
+                         ("mchose:3837", 64, True))
+        self.dev.open_path.assert_called_once_with(b"v7")
+        self.dev.write.assert_called_once_with(M.make_mc_request())
+
+    def test_a_write_padded_with_the_report_id_is_not_a_failure(self):
+        # OutputReportByteLength includes the id byte, so a good write can report 65
+        self.dev.write.return_value = 65
+        self.dev.read.return_value = CAPTURE
+        self.assertEqual(self.poll()[0].level, 85)
+
     def test_other_new_receiver_products_remain_unopened(self):
-        for pid in (0x1014, 0x1016, 0x101C, 0x101D, 0x1012, 0x3033, 0x9999):
+        for pid in (0x1014, 0x101C, 0x101D, 0x1012, 0x3033, 0x9999):
             with self.subTest(pid=pid):
                 self.entries = [entry(product_id=pid)]
                 self.assertEqual(self.poll(), [])

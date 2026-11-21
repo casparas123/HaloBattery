@@ -53,20 +53,17 @@ class MchoseTargetTests(unittest.TestCase):
                 side_effect=lambda vid=0: [d for d in entries if d['vendor_id'] == vid]):
             return self.provider.poll()
 
-    def test_keyboard_v7_and_unknown_3837_identities_are_never_opened(self):
+    def test_keyboard_and_unknown_3837_identities_are_never_opened(self):
         fixtures = [
-            # Exact unrelated keyboard/mouse collections in #189.
+            # Exact unrelated keyboard collections in #189.
             descriptor(0x3033, b'keyboard-ff70', 3, 0xFF70, 0x0071),
             descriptor(0x3033, b'keyboard-ff31', 2, 0xFF31, 0x0074),
-            descriptor(0x1016, b'v7-config'),
-            descriptor(0x1016, b'v7-ff60', 3, 0xFF60, 0x0061),
             descriptor(0x9999, b'unknown-model'),
         ]
         self.assertEqual(self.poll(fixtures), [])
         self.device_factory.assert_not_called()
         held = '\n'.join(self.provider.diagnostics())
         self.assertIn('pid=3033', held)
-        self.assertIn('pid=1016', held)
         self.assertIn('pid=9999', held)
         self.assertIn('query held', held)
 
@@ -96,9 +93,9 @@ class MchoseTargetTests(unittest.TestCase):
         self.assertEqual(self.closed, [b'allowed'])
         self.assertEqual(self.sent, [(b'allowed', b'\x11\xf9' + b'\xff' * 19)])
 
-    def test_other_3837_products_do_not_hide_the_sourced_mouse(self):
+    def test_unsourced_3837_products_do_not_hide_the_sourced_mouse(self):
         result = self.poll([descriptor(0x3033, b'keyboard-ff70', 3, 0xFF70, 0x0071),
-                            descriptor(0x1016, b'v7-config'), descriptor(0x100B, b'allowed')])
+                            descriptor(0x1014, b'unsourced-config'), descriptor(0x100B, b'allowed')])
         self.assertEqual([s.level for s in result], [68])
         self.assertEqual(self.opened, [b'allowed'])
 

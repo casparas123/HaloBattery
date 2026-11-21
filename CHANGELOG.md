@@ -32,8 +32,10 @@ and the project follows [Semantic Versioning](https://semver.org/).
 ### Added
 - Battery support for the 8BitDo Ultimate 2 Wireless controller in XInput mode
   (`2dc8:310b`): the level and charging bit are read from byte 14 of the
-  controller's enhanced HID report on `0xFF7A:0x0001`, while XInput keeps the
-  gamepad icon. Test build 1, unverified on hardware.
+  controller's 34-byte HID report while XInput keeps the gamepad icon. The
+  XInput-facing `0001:0005` collection is tried first, then the vendor
+  `0xFF7A:0x0001` one, because the vendor collection was silent on a real
+  controller (#461). Test build 3, unverified on hardware.
 - MCHOSE G98 Pro (`41E4:2004`) keyboard over the same Sinowealth `13 4A 01`
   command as the K87, with the charging flag read from the reply's high
   nibble. Level and charging confirmed on the reporter's hardware in

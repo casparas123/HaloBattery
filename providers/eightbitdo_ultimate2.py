@@ -13,7 +13,10 @@ v1.03 (12 bytes on v1.02, whose report has no battery field); the v1.03 report
 can arrive about 250 ms after the controller wakes, so the reader listens for
 a short window instead of sending anything.
 
-Only the vendor collection is opened, and only input reports are read.
+Only input reports are read. The first report can arrive on the gamepad
+collection (0001:0005) rather than the vendor one: #461's diagnostics showed
+the vendor collection silent on a real controller, so the gamepad collection is
+tried first and the vendor one after it.
 """
 from __future__ import annotations
 
@@ -32,7 +35,14 @@ from .base import hexdump, log
 VID = 0x2DC8
 PID = 0x310B
 PAGE, USAGE = 0xFF7A, 0x0001
+# The XInput-facing collection; a real controller streamed nothing on the vendor
+# collection in #461, so it is opened first.
+GAMEPAD_PAGE, GAMEPAD_USAGE = 0x0001, 0x0005
 BATTERY_BYTE = 14
+# SDL reads the power state only when the report is at least this long: the
+# 34-byte v1.03 report is the one that carries byte 14 (shorter reports are
+# the ordinary gamepad frame, whose byte 14 is input data).
+MIN_REPORT = 34
 WINDOW = 0.8
 MAX_REPORTS = 32
 
@@ -52,7 +62,7 @@ def parse_report(data) -> Optional[Reading]:
     padded with zeros has 0 there and is ignored; the controller is running,
     so a 0 must not become a low-battery alert.
     """
-    if not data or len(data) <= BATTERY_BYTE:
+    if not data or len(data) < MIN_REPORT:
         return None
     level = data[BATTERY_BYTE] & 0x7F
     charging = bool(data[BATTERY_BYTE] & 0x80)
@@ -70,10 +80,20 @@ def read_connected(diag: List[str]) -> Optional[Reading]:
     except Exception as e:  # pragma: no cover
         log.warning("hid.enumerate(8bitdo ultimate2): %s", e)
         return None
-    candidates = [d for d in infos
-                  if d.get("product_id") == PID
-                  and (d.get("usage_page"), d.get("usage")) == (PAGE, USAGE)]
-    for d in candidates:
+    mine = [d for d in infos if d.get("product_id") == PID]
+
+    def rank(d):
+        pair = (d.get("usage_page"), d.get("usage"))
+        if pair == (GAMEPAD_PAGE, GAMEPAD_USAGE):
+            return 0
+        if pair == (PAGE, USAGE):
+            return 1
+        return 2
+
+    for d in sorted(mine, key=lambda x: (rank(x), x.get("interface_number") or 0)):
+        page, usage = d.get("usage_page"), d.get("usage")
+        where = f"{page:04x}:{usage:04x}" if page is not None and usage is not None else "?"
+        diag.append(f"    [8BitDo Ultimate 2] trying iface={d.get('interface_number')} {where}")
         dev = hid.device()
         try:
             dev.open_path(d["path"])
@@ -87,6 +107,7 @@ def read_connected(diag: List[str]) -> Optional[Reading]:
                 pass
             deadline = time.time() + WINDOW
             seen = 0
+            lengths = set()
             while time.time() < deadline and seen < MAX_REPORTS:
                 try:
                     data = dev.read(64)
@@ -97,6 +118,7 @@ def read_connected(diag: List[str]) -> Optional[Reading]:
                     time.sleep(0.01)
                     continue
                 seen += 1
+                lengths.add(len(data))
                 got = parse_report(data)
                 if got is not None:
                     diag.append(f"    [8BitDo Ultimate 2] report {data[0]:#04x} "
@@ -104,16 +126,14 @@ def read_connected(diag: List[str]) -> Optional[Reading]:
                                 f"{' charging' if got.charging else ''}")
                     return got
             if not seen:
-                diag.append("    [8BitDo Ultimate 2] nothing received: asleep, or "
-                            "the receiver does not forward the vendor report")
+                diag.append(f"    [8BitDo Ultimate 2] nothing on {where}")
             else:
-                diag.append(f"    [8BitDo Ultimate 2] {seen} report(s), no level in "
-                            f"byte {BATTERY_BYTE}")
-            return None
+                diag.append(f"    [8BitDo Ultimate 2] {seen} report(s) on {where}, "
+                            f"lengths {sorted(lengths)}, no level in byte {BATTERY_BYTE}")
         finally:
             try:
                 dev.close()
             except Exception:
                 pass
-    diag.append("    [8BitDo Ultimate 2] no 0xFF7A:0x0001 vendor collection")
+    diag.append("    [8BitDo Ultimate 2] no matching collection")
     return None

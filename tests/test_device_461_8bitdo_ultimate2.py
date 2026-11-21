@@ -26,9 +26,14 @@ def report(level=83, charging=False, rid=0x04):
 
 
 def entries():
-    return [{"vendor_id": 0x2DC8, "product_id": 0x310B, "interface_number": 2,
-             "usage_page": 0xFF7A, "usage": 0x0001,
-             "path": b"ultimate2", "product_string": "8BitDo Ultimate 2 Wireless Controller for PC"}]
+    return [
+        {"vendor_id": 0x2DC8, "product_id": 0x310B, "interface_number": 0,
+         "usage_page": 0x0001, "usage": 0x0005, "path": b"gamepad",
+         "product_string": "8BitDo Ultimate 2 Wireless Controller for PC"},
+        {"vendor_id": 0x2DC8, "product_id": 0x310B, "interface_number": 2,
+         "usage_page": 0xFF7A, "usage": 0x0001, "path": b"ultimate2",
+         "product_string": "8BitDo Ultimate 2 Wireless Controller for PC"},
+    ]
 
 
 class FakeDev:
@@ -96,7 +101,46 @@ class ReadTests(unittest.TestCase):
     def test_silence_is_reported_and_not_invented(self):
         got, diag = self.read(FakeDev([]))
         self.assertIsNone(got)
-        self.assertTrue(any("nothing received" in line for line in diag))
+        self.assertTrue(any("nothing on" in line for line in diag))
+
+    def test_the_gamepad_collection_is_tried_first(self):
+        # #461: on a real controller the vendor collection was silent and nothing
+        # arrived there; the 34-byte report is on the XInput-facing collection.
+        opened = []
+
+        class Bus:
+            def device(self):
+                class Dev:
+                    def __init__(self):
+                        self.replies = []
+
+                    def open_path(self, path):
+                        opened.append(path)
+                        self.replies = [] if path == b"ultimate2" else [report(66, True)]
+
+                    def read(self, size, timeout_ms=0):
+                        return self.replies.pop(0) if self.replies else []
+
+                    def close(self):
+                        pass
+
+                    def set_nonblocking(self, value):
+                        pass
+
+                return Dev()
+
+        U.hid = types.SimpleNamespace(device=Bus().device)
+        U.hidlist.enumerate = lambda vid=0: list(entries())
+        diag = []
+        got = U.read_connected(diag)
+        self.assertEqual((got.level, got.charging), (66, True))
+        self.assertEqual(opened[0], b"gamepad")
+
+    def test_a_short_report_is_not_a_battery_frame(self):
+        # 20-byte gamepad reports carry input data in byte 14; only >= 34 bytes count
+        short = [0x04] + [0] * 13 + [77] + [0] * 5
+        self.assertEqual(len(short), 20)
+        self.assertIsNone(U.parse_report(short))
 
 
 if __name__ == "__main__":

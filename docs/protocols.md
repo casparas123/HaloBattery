@@ -823,13 +823,17 @@ Listened to, never written: byte 14 of the controller's enhanced input report (r
 
 The controller appears as an Xbox pad, so the XInput provider owns the icon.
 Its battery is the same byte SDL's 8BitDo driver reads: byte 14 of the
-enhanced input report on vendor collection `0xFF7A:0x0001` (bit 7 charging,
-bits 0-6 the level). The v1.03 firmware report is 34 bytes and can arrive about
-250 ms after wake, so the reader only listens for a short window and never
-writes. A zero byte in an ordinary padded report is ignored, and the
-`remain=full=1000` Windows.Gaming.Input placeholder is not used as a level.
-**Test build 1 (18 Nov) and test build 2 (rebuilt on the current line)** are
-pending a report on the reporter's controller.
+enhanced input report (bit 7 charging, bits 0-6 the level). The v1.03 firmware
+report is 34 bytes and can arrive about 250 ms after wake, so the reader only
+listens for a short window and never writes. It tries the XInput-facing
+`0001:0005` collection first, then the vendor `0xFF7A:0x0001` one: on a real
+controller the vendor collection stayed silent while the gamepad collection
+carried the report (diagnostics in
+[#461](https://github.com/HeyOkay/HaloBattery/issues/461)). Only reports of at
+least 34 bytes count, so an ordinary frame whose byte 14 is input data cannot
+become a level. A zero byte is ignored, and the `remain=full=1000`
+Windows.Gaming.Input placeholder is not used as a level. **Unverified on
+hardware**; test build 3 reads the gamepad collection first.
 
 ### ASUS ROG Raikiri II
 

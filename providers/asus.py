@@ -552,17 +552,32 @@ class AsusProvider(Provider):
             except Exception:
                 pass
 
-    def _delta_cc_exchange(self, dev, command: int) -> Optional[List[int]]:
-        """Write CC 12 <command> as a 64-byte output report and read until its
-        echo comes back. None when nothing came."""
+    def _delta_cc_write(self, dev, command: int) -> bool:
+        """Send CC 12 <command> as the collection's output report.
+
+        The transport pads the frame to OutputReportByteLength, which includes
+        the report-id byte, so a successful write reports more bytes than the
+        frame passed here (#219: "write 07 returned 65 of 64 bytes" was a
+        success, and the old check threw the reply away). Only a short write is
+        an error.
+        """
         packet = [DELTA_CC_REPORT_ID, 0x12, command] + [0x00] * (DELTA_CC_PACKET - 3)
         try:
             sent = dev.write(packet)
         except (OSError, IOError, ValueError) as e:
             self._diag.append(f"    write {command:02x}: {e}")
-            return None
-        if sent != len(packet):
+            return False
+        if not isinstance(sent, int) or sent < len(packet):
             self._diag.append(f"    write {command:02x} returned {sent} of {len(packet)} bytes")
+            return False
+        if sent != len(packet):
+            self._diag.append(f"    write {command:02x}: {sent} bytes including the report id")
+        return True
+
+    def _delta_cc_exchange(self, dev, command: int) -> Optional[List[int]]:
+        """Write CC 12 <command> as a 64-byte output report and read until its
+        echo comes back. None when nothing came."""
+        if not self._delta_cc_write(dev, command):
             return None
         for _ in range(DELTA_CC_EVENT_READS):
             try:
@@ -581,14 +596,21 @@ class AsusProvider(Provider):
         return None
 
     def _read_delta_s(self, path) -> Optional[Tuple[Optional[int], bool]]:
-        """The Delta S Wireless: try the older ASUS feature-report exchange first
-        (the Strix Go 2.4's), then the newer output-report one. (level, charging);
-        level None when neither answered."""
+        """The Delta S Wireless: the newer output-report exchange first, then the
+        older feature-report one (the Strix Go 2.4's). (level, charging); level
+        None when neither answered."""
+        res = self._read_delta_s_cc(path)
+        if res is not None and res[0] is not None:
+            self._diag.append("    read as the newer ASUS headset family (output report)")
+            return res
         res = self._read_headset(path)
         if res is not None:
             self._diag.append("    read as the older ASUS headset family (feature report)")
             return res
+        return None
 
+    def _read_delta_s_cc(self, path) -> Optional[Tuple[Optional[int], bool]]:
+        """The newer output-report exchange on its own; None when no reading."""
         dev = hid.device()
         try:
             dev.open_path(path)

@@ -70,7 +70,8 @@ class FakeBus:
 
             def write(self, data):
                 self.m.on_write(data)
-                return len(data)
+                # the transport pads to OutputReportByteLength (report id included)
+                return len(data) + 1 if getattr(self.m, "padded", False) else len(data)
 
             def send_feature_report(self, data):
                 return self.m.on_feature_write(data)
@@ -215,8 +216,9 @@ class FakeDelta:
     """mode: "feature" (the older ASUS headset reply), "cc" (the newer output
     report), "nak" (the newer shape's FF AA)."""
 
-    def __init__(self, mode="feature", level=55, charging=0):
+    def __init__(self, mode="feature", level=55, charging=0, padded=False):
         self.mode, self.level, self.charging = mode, level, charging
+        self.padded = padded
         self.writes = []
         self.feature_writes = []
         self.queue = []
@@ -277,7 +279,22 @@ class DeltaSTest(ProviderTest):
         wrong, right = FakeDelta(), FakeDelta(mode="cc", level=90)
         res = self.poll(entries, {b"delta-ffc0": wrong, b"delta-ff00": right})
         self.assertEqual([r.level for r in res], [90])
-        self.assertEqual((wrong.opened, right.opened), (0, 2))
+        self.assertEqual((wrong.opened, right.opened), (0, 1))
+
+    def test_a_write_padded_with_the_report_id_is_not_an_error(self):
+        # OutputReportByteLength includes the id byte, so a good write reports 65
+        pad = FakeDelta(mode="cc", level=42, charging=1, padded=True)
+        res = self.poll(delta_entries(), {b"delta-ff00": pad})
+        self.assertEqual([(r.name, r.level, r.charging) for r in res],
+                         [("ROG Delta S Wireless", 42, True)])
+        self.assertEqual([w[:3] for w in pad.writes],
+                         [[0xCC, 0x12, 0x07], [0xCC, 0x12, 0x08]])
+
+    def test_the_output_exchange_is_tried_before_the_feature_one(self):
+        pad = FakeDelta(mode="feature")
+        self.poll(delta_entries(), {b"delta-ff00": pad})
+        self.assertEqual(pad.writes[0][:2], [0xCC, 0x12])
+        self.assertTrue(pad.feature_writes)
 
 
 if __name__ == "__main__":

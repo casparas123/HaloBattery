@@ -3,6 +3,7 @@ import os
 import sys
 import types
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -76,25 +77,131 @@ class ReadAulaTest(unittest.TestCase):
         def close(self):
             pass
 
-    def test_the_f87_frame_is_sent_and_read(self):
-        dev = self.Fake([[], reply(74)])   # the drain reads once, then the answer
+    def read(self, infos, dev, sizes=None):
+        sizes = sizes or {}
+        self.provider = P.PulsarProvider()
         saved, P.hid = P.hid, types.SimpleNamespace(device=lambda: dev)
         try:
-            reading = P.PulsarProvider()._read_aula(
-                [dict(path=b"x", product_id=A.PID, usage_page=0xFF02, usage=0x0002,
-                      interface_number=1)])
+            with mock.patch.object(P.aula_f87, "report_lengths",
+                                   side_effect=lambda path: sizes.get(path, (20, 20))):
+                return self.provider._read_aula(infos)
         finally:
             P.hid = saved
+
+    def test_the_f87_frame_is_sent_and_read(self):
+        dev = self.Fake([[], reply(74)])   # the drain reads once, then the answer
+        reading = self.read([dict(path=b"x", product_id=A.PID, usage_page=0xFF02,
+                                  usage=0x0002, interface_number=1)], dev)
         self.assertEqual((74, False, True), reading)
         self.assertEqual([A.make_request()], dev.writes)
 
     def test_a_silent_receiver_returns_none(self):
-        dev = self.Fake([])
+        self.assertIsNone(self.read([dict(path=b"x", product_id=A.PID, usage_page=0xFF02,
+                                          usage=0x0002, interface_number=1)], self.Fake([])))
+
+    def test_a_collection_too_small_for_the_frame_is_never_written_to(self):
+        # 3554:fa09 also exposes ff04:0002; Windows refuses a 20-byte write on a
+        # collection with a shorter output report, and the transport fails the poll.
+        infos = [dict(path=b"small", product_id=A.PID, usage_page=0xFF04, usage=0x0002,
+                      interface_number=1),
+                 dict(path=b"good", product_id=A.PID, usage_page=0xFF02, usage=0x0002,
+                      interface_number=1)]
+        dev = self.Fake([[], reply(74)])
+        reading = self.read(infos, dev, {b"small": (2, 2), b"good": (20, 20)})
+        self.assertEqual((74, False, True), reading)
+        self.assertEqual(1, len(dev.writes))     # only the usable collection was queried
+        diag = " ".join(self.provider._diag)
+        self.assertIn("ff04:0002 in=2 out=2", diag)
+        self.assertIn("cannot carry the 20-byte frame; skipped", diag)
+
+    def test_a_collection_with_unreadable_sizes_is_tried_last(self):
+        infos = [dict(path=b"unknown", product_id=A.PID, usage_page=0xFF02, usage=0x0002,
+                      interface_number=1)]
+        dev = self.Fake([[], reply(74)])
+        self.provider = P.PulsarProvider()
         saved, P.hid = P.hid, types.SimpleNamespace(device=lambda: dev)
         try:
-            reading = P.PulsarProvider()._read_aula(
-                [dict(path=b"x", product_id=A.PID, usage_page=0xFF02, usage=0x0002,
-                      interface_number=1)])
+            with mock.patch.object(P.aula_f87, "report_lengths", return_value=None):
+                reading = self.provider._read_aula(infos)
         finally:
             P.hid = saved
-        self.assertIsNone(reading)
+        self.assertEqual((74, False, True), reading)
+        self.assertIn("report sizes unreadable; tried last", " ".join(self.provider._diag))
+
+    def test_a_usable_collection_is_read_before_one_with_unreadable_sizes(self):
+        # ff02 sorts first; its sizes are unknown, ff04's are readable. The readable
+        # one must be asked first, so the unknown one cannot answer with a stale level.
+        infos = [dict(path=b"unknown", product_id=A.PID, usage_page=0xFF02, usage=0x0002,
+                      interface_number=1),
+                 dict(path=b"good", product_id=A.PID, usage_page=0xFF04, usage=0x0002,
+                      interface_number=1)]
+
+        class Routing:
+            def __init__(self):
+                self.path = None
+                self.writes = []
+                self.answers = {b"unknown": [reply(50)], b"good": [reply(74)]}
+
+            def open_path(self, path):
+                self.path = path
+
+            def write(self, data):
+                self.writes.append(self.path)
+                return len(data)
+
+            def read(self, length, timeout_ms):
+                if length != A.REPORT_LEN:
+                    return []
+                queue = self.answers.get(self.path, [])
+                return queue.pop(0) if queue else []
+
+            def close(self):
+                pass
+
+        dev = Routing()
+        self.provider = P.PulsarProvider()
+        saved, P.hid = P.hid, types.SimpleNamespace(device=lambda: dev)
+        try:
+            with mock.patch.object(P.aula_f87, "report_lengths",
+                                   side_effect=lambda path: {b"unknown": None,
+                                                             b"good": (20, 20)}[path]):
+                reading = self.provider._read_aula(infos)
+        finally:
+            P.hid = saved
+        self.assertEqual((74, False, True), reading)
+        self.assertEqual([b"good"], dev.writes)
+
+    def test_a_failing_collection_does_not_stop_the_next_one(self):
+        infos = [dict(path=b"bad", product_id=A.PID, usage_page=0xFF02, usage=0x0002,
+                      interface_number=1),
+                 dict(path=b"good", product_id=A.PID, usage_page=0xFF04, usage=0x0002,
+                      interface_number=1)]
+
+        class Routing:
+            def __init__(self):
+                self.path = None
+                self.writes = []
+                self.answers = {b"good": [reply(74)]}
+
+            def open_path(self, path):
+                self.path = path
+
+            def write(self, data):
+                if self.path == b"bad":
+                    raise OSError("refused")
+                self.writes.append((self.path, bytes(data)))
+                return len(data)
+
+            def read(self, length, timeout_ms):
+                if length != A.REPORT_LEN:      # the drain asks with the Compx length
+                    return []
+                queue = self.answers.get(self.path, [])
+                return queue.pop(0) if queue else []
+
+            def close(self):
+                pass
+
+        dev = Routing()
+        self.assertEqual((74, False, True), self.read(infos, dev))
+        self.assertEqual([(b"good", A.make_request())], dev.writes)
+        self.assertIn("aula query error: refused", " ".join(self.provider._diag))

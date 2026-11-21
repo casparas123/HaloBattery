@@ -356,7 +356,22 @@ class PulsarProvider(Provider):
         The F87 Pro shares 3554:FA09 with the F75, which answers the Compx frame
         instead, so both are tried and the one that answers wins.
         """
+        usable, unknown = [], []
         for d in aula_f87.candidates(infos):
+            carry = aula_f87.can_carry(d["path"])
+            where = f"  aula {d.get('usage_page', 0):04x}:{d.get('usage', 0):04x}"
+            sizes = aula_f87.report_lengths(d["path"])
+            if carry is None:
+                self._diag.append(where + ": report sizes unreadable; tried last")
+                unknown.append(d)
+                continue
+            self._diag.append(f"{where} in={sizes[0]} out={sizes[1]}")
+            if not carry:
+                self._diag.append(where + f": cannot carry the {aula_f87.REPORT_LEN}-byte "
+                                  "frame; skipped (a refused write would fail the whole poll)")
+                continue
+            usable.append(d)
+        for d in usable + unknown:
             dev = hid.device()
             try:
                 dev.open_path(d["path"])
@@ -376,7 +391,7 @@ class PulsarProvider(Provider):
                         return parsed
                 self._diag.append(f"  no AULA answer on {d.get('usage_page', 0):04x}:"
                                   f"{d.get('usage', 0):04x}")
-            except (OSError, IOError, ValueError) as e:
+            except Exception as e:      # never let one collection fail the poll
                 self._diag.append(f"  aula query error: {e}")
             finally:
                 try:

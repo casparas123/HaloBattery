@@ -389,6 +389,13 @@ and the project follows [Semantic Versioning](https://semver.org/).
   Windows refused every write ([#256](https://github.com/HeyOkay/HaloBattery/issues/256)).
   The 2.4 GHz dongle (`1532:0552`) is read as before.
 
+- AULA F87 Pro (#360): only query a collection whose HID caps can carry the
+  20-byte frame. Windows refuses a write that is too big for the collection, and
+  the HID transport records any refused native call as a failed poll for the
+  whole provider - so probing the wrong collection greyed every icon the Pulsar
+  provider owns while the keyboard was charging, even though the provider caught
+  the error.
+
 ## [1.17.0] - 2026-11-12
 
 First combined upstream release after the community fork. Includes six interface

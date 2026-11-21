@@ -182,7 +182,7 @@ on these devices by us.
 | Device | Connection | Evidence |
 |---|---|---|
 | [AULA F108 Pro](protocols.md#aula-f108-pro) | `05ac:024f`, exact F108Pro receiver | Owner level confirmed in #402; charging unknown |
-| [AULA F87 Pro on its Compx receiver](protocols.md#aula-f87-pro-on-its-compx-24-ghz-receiver) | 2.4 GHz receiver (3554:FA09) | unverified (test build) |
+| [AULA F87 Pro on its Compx receiver](protocols.md#aula-f87-pro-on-its-compx-24-ghz-receiver) | 2.4 GHz receiver (3554:FA09) | level confirmed by reporter (#360); charging is a test build |
 | [MCHOSE K7 V2 Ultra+](protocols.md#mchose-k7-v2-ultra) | `3837:1018`, receiver | Owner 85% and charging flags in #403 |
 | [EWEADN X23 Pro](protocols.md#eweadn-x23-pro) | `04f3:026f`, YDX receiver | Vendor source and PR #406; no new hardware test |
 | [Delux M900 Pro](protocols.md#delux-m900-pro-and-vgn-n75-pro) | `1d57:fa65`, passive receiver | Owner 74% report in #407; charging not newly verified |

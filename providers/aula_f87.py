@@ -20,7 +20,9 @@ Only the 2.4 GHz receiver is read; the wired interface has no battery report.
 """
 from __future__ import annotations
 
-from typing import List, Optional, Tuple
+import ctypes
+import sys
+from typing import Dict, List, Optional, Tuple
 
 VID = 0x3554
 PID = 0xFA09
@@ -62,6 +64,80 @@ def parse_reply(data) -> Optional[Tuple[Optional[int], bool, bool]]:
     if state == STATE_BATTERY and 1 <= level <= 100:
         return level, False, True
     return None
+
+
+class _HIDP_CAPS(ctypes.Structure):
+    _fields_ = [
+        ("Usage", ctypes.c_ushort),
+        ("UsagePage", ctypes.c_ushort),
+        ("InputReportByteLength", ctypes.c_ushort),
+        ("OutputReportByteLength", ctypes.c_ushort),
+        ("FeatureReportByteLength", ctypes.c_ushort),
+        ("Reserved", ctypes.c_ushort * 17),
+        ("NumberLinkCollectionNodes", ctypes.c_ushort),
+        ("NumberInputButtonCaps", ctypes.c_ushort),
+        ("NumberInputValueCaps", ctypes.c_ushort),
+        ("NumberInputDataIndices", ctypes.c_ushort),
+        ("NumberOutputButtonCaps", ctypes.c_ushort),
+        ("NumberOutputValueCaps", ctypes.c_ushort),
+        ("NumberOutputDataIndices", ctypes.c_ushort),
+        ("NumberFeatureButtonCaps", ctypes.c_ushort),
+        ("NumberFeatureValueCaps", ctypes.c_ushort),
+        ("NumberFeatureDataIndices", ctypes.c_ushort),
+    ]
+
+
+_CAPS: Dict[bytes, Optional[Tuple[int, int]]] = {}
+
+
+def report_lengths(path) -> Optional[Tuple[int, int]]:
+    """(input, output) report byte lengths of one collection, or None.
+
+    Read-only HidP_GetCaps, the same probe providers/compx.py uses for the output
+    length, cached per path (the paths change when the receiver is re-plugged).
+
+    Why this exists: Windows refuses a write that is larger than a collection's
+    output report, and the app's HID transport records any refused native call as
+    a failed poll for the whole provider - even when the provider catches the
+    error. Testing a collection that cannot carry the frame therefore greys every
+    icon that provider owns (#360, the reporter's charging run: the AULA reader
+    probed the wrong collection, the transport failed the poll, and the keyboard
+    fell back to "last known").
+    """
+    if path in _CAPS:
+        return _CAPS[path]
+    value: Optional[Tuple[int, int]] = None
+    if sys.platform == "win32":
+        try:
+            p = path.decode("utf-8", "ignore") if isinstance(path, (bytes, bytearray)) else str(path)
+            k32, hidd = ctypes.windll.kernel32, ctypes.windll.hid
+            k32.CreateFileW.restype = ctypes.c_void_p
+            handle = k32.CreateFileW(p, 0, 3, None, 3, 0, None)
+            if handle not in (None, ctypes.c_void_p(-1).value):
+                try:
+                    pp = ctypes.c_void_p()
+                    if hidd.HidD_GetPreparsedData(ctypes.c_void_p(handle), ctypes.byref(pp)):
+                        try:
+                            caps = _HIDP_CAPS()
+                            if hidd.HidP_GetCaps(pp, ctypes.byref(caps)) == 0x00110000:
+                                value = (caps.InputReportByteLength,
+                                         caps.OutputReportByteLength)
+                        finally:
+                            hidd.HidD_FreePreparsedData(pp)
+                finally:
+                    k32.CloseHandle(ctypes.c_void_p(handle))
+        except Exception:
+            value = None
+    _CAPS[path] = value
+    return value
+
+
+def can_carry(path, length: int = REPORT_LEN) -> Optional[bool]:
+    """True/False from the collection's caps; None when Windows cannot say."""
+    sizes = report_lengths(path)
+    if sizes is None:
+        return None
+    return sizes[0] >= length and sizes[1] >= length
 
 
 def candidates(infos: List[dict]) -> List[dict]:

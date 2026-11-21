@@ -1358,15 +1358,30 @@ whose descriptor identifies `24ae:185a`. State byte 5 is `01` discharging or
 `02` charging; byte 6 is percentage. These state meanings are retained in the
 [test-build source at `d5a5a5d`](https://github.com/casparas123/HaloBattery/blob/d5a5a5dfc6e93b2b26719f590e7dc65f1e3e4bdb/providers/rapoo.py#L1-L36).
 Only interface 1's `ff00:0002` / `ff00:000e` collections are listened to; no
-query is sent. The logical seven-byte report can carry zero padding from
+query is sent. Windows lists `ff00:0002` twice on this receiver, as two
+collections with their own paths, and the push rides one of them: every path
+is tried, `ff00:0002` first, and the one that answers is remembered (test
+build 1 kept one path per usage and heard nothing on the reporter's receiver).
+The logical seven-byte report can carry zero padding from
 Windows HID reads. Other report families, unknown states and percentages above
 100 are refused. The existing 64-byte read buffer is a caller limit, not a
 claim about this receiver's missing HID report descriptor. A quiet receiver
 keeps its last value greyed for up to five minutes; unplugging clears it.
 
-The capture confirms 100% discharging only. Charging and other percentages
-have source-based simulated tests; the old test build received no reporter
-confirmation, and this recovery has not been tested on hardware.
+On its USB cable the mouse leaves the radio and enumerates as **`24ae:418a`**,
+with the receiver's collection shape; Rapoo's app shows it charging then
+([#109](https://github.com/HeyOkay/HaloBattery/issues/109#issuecomment-7057596813)).
+The receiver is not listened to while the cable is present. The cable's vendor
+collections are listened to first, the same way (any link byte 4 is accepted
+there; the receiver's is `03`), and a mouse on its cable is shown charging. If
+the cable stays silent while the receiver is also enumerated, the cable id
+alone is shown as charging, with the level from before it was plugged in -
+inferred from this receiver/cable pair, not read from a reply.
+
+The reporter's test build 2, which tried every path, read `bb b0 42 20 03 01 57`
+(87 %), matching Rapoo's app
+([#109](https://github.com/HeyOkay/HaloBattery/issues/109#issuecomment-7027906466)).
+Charging on the cable is a test build, unverified on hardware.
 
 ### Wraith W1
 

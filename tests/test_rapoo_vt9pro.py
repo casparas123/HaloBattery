@@ -12,6 +12,9 @@ HIDP_CAPS.InputReportByteLength is the collection maximum (Microsoft Learn,
 ns-hidpi-_hidp_caps); HIDAPI windows/hid.c at 378a53a8b6c098a32bea5dd659d647898030ccb0
 and halo/hid_transport.py preserve numbered-report completion bytes. The old
 test build accepts >=7; 64 below is only the existing listener's caller bound.
+The duplicate ff00:0002 paths, the cable id 24AE:418A and LEVEL_87 come from
+the reporter's #109 diagnostics and HID lists (2026-11-20/21); the cable frames
+are synthetic - no push from the mouse on its cable has been captured yet.
 """
 from types import SimpleNamespace
 import unittest
@@ -23,6 +26,9 @@ from providers import rapoo
 CAPTURE = bytes.fromhex("bb b0 42 20 03 01 64")
 REPORT7 = bytes.fromhex("07 02 01 d0 07 d0 07 01 54 00 01 01 01")
 KEYBOARD_BD = bytes.fromhex("bd 01 00 07 00 46 00 01 54 ad cf 7d")
+LEVEL_87 = bytes.fromhex("bb b0 42 20 03 01 57")          # #109 test build 2 diagnostics
+CABLE_CHARGING = bytes.fromhex("bb b0 42 20 03 02 57")    # synthetic: state 2 on the cable
+CABLE_OTHER_LINK = bytes.fromhex("bb b0 42 20 01 02 57")  # synthetic: an unseen link byte
 
 
 def descriptor(path, usage=2, *, pid=0x185A, page=0xFF00, interface=1, vendor=0x24AE):
@@ -190,3 +196,119 @@ class VT9ProTests(unittest.TestCase):
         self.assertEqual(self.poll([item], {b"vt9pro": device}), [])
         self.assertEqual(len(device.calls), 16)
         self.assertEqual(device.closed, 1)
+
+    def test_every_duplicate_vendor_path_is_tried_and_the_answer_remembered(self):
+        # Windows lists ff00:0002 twice; test build 1 kept one path per usage and
+        # heard nothing, test build 2 opened every path and read 87 %.
+        first, config, second = (descriptor(b"mi_01&col02"), descriptor(b"mi_01&col05", usage=14),
+                                 descriptor(b"mi_01&col06"))
+        devices = {b"mi_01&col02": Device(), b"mi_01&col05": Device(),
+                   b"mi_01&col06": Device([LEVEL_87])}
+        result = self.poll([first, config, second], devices)
+        self.assertEqual([(s.key, s.level, s.charging, s.online) for s in result],
+                         [("rapoo:185a", 87, False, True)])
+        self.assertEqual([devices[path].opened for path in (b"mi_01&col02", b"mi_01&col06", b"mi_01&col05")],
+                         [1, 1, 0])
+        self.assertEqual(self.provider._chosen[0x185A], b"mi_01&col06")
+        self.assertIn("  listening on iface=1 ff00:0002 col06", self.provider.diagnostics())
+
+    def test_a_path_listed_twice_is_opened_once(self):
+        item = descriptor(b"mi_01&col02")
+        device = Device()
+        self.assertEqual(self.poll([item, dict(item)], {b"mi_01&col02": device}), [])
+        self.assertEqual(device.opened, 1)
+
+    def test_a_replugged_receiver_is_scanned_again(self):
+        old = [descriptor(b"old&col02"), descriptor(b"old&col06")]
+        self.poll(old, {b"old&col02": Device(), b"old&col06": Device([CAPTURE])})
+        self.assertEqual(self.provider._chosen[0x185A], b"old&col06")
+        new = [descriptor(b"new&col02"), descriptor(b"new&col06")]
+        result = self.poll(new, {b"new&col02": Device(), b"new&col06": Device([CAPTURE])})
+        self.assertEqual([(s.level, s.online) for s in result], [(100, True)])
+        self.assertEqual(self.provider._chosen[0x185A], b"new&col06")
+
+    def test_the_mouse_on_its_cable_charges_on_the_receivers_icon(self):
+        receiver, cable = descriptor(b"receiver"), descriptor(b"cable", pid=0x418A)
+        devices = {b"receiver": Device(), b"cable": Device([CABLE_CHARGING])}
+        result = self.poll([receiver, cable], devices)
+        self.assertEqual([(s.key, s.name, s.level, s.charging, s.online, s.kind) for s in result],
+                         [("rapoo:185a", "Rapoo VT9 Pro", 87, True, True, "mouse")])
+        self.assertEqual(devices[b"receiver"].opened, 0)      # a mouse on its cable is off the radio
+        self.assertTrue(any(line.startswith("[Rapoo] pid=418a 'Rapoo VT9 Pro' on its USB cable")
+                            for line in self.provider.diagnostics()))
+
+    def test_the_cable_takes_any_link_byte_but_the_receiver_keeps_0x03(self):
+        self.assertEqual(rapoo.parse_vt9pro(CABLE_OTHER_LINK, cable=True), (87, True))
+        self.assertIsNone(rapoo.parse_vt9pro(CABLE_OTHER_LINK))
+        for frame in (CABLE_OTHER_LINK[:6], bytes.fromhex("bb b0 42 20 01 00 57"),
+                      bytes.fromhex("bb b0 42 20 01 02 65"), bytes.fromhex("bc b0 42 20 01 02 57"),
+                      CABLE_OTHER_LINK + bytes([1])):
+            with self.subTest(frame=frame):
+                self.assertIsNone(rapoo.parse_vt9pro(frame, cable=True))
+        cable = descriptor(b"cable", pid=0x418A)
+        result = self.poll([cable], {b"cable": Device([CABLE_OTHER_LINK])})
+        self.assertEqual([(s.level, s.charging, s.online) for s in result], [(87, True, True)])
+
+    def test_an_on_battery_push_from_the_cable_still_shows_charging(self):
+        cable = descriptor(b"cable", pid=0x418A)
+        result = self.poll([cable], {b"cable": Device([LEVEL_87])})
+        self.assertEqual([(s.level, s.charging, s.online) for s in result], [(87, True, True)])
+
+    def test_a_silent_cable_beside_the_receiver_charges_from_the_level_before_it(self):
+        receiver, cable = descriptor(b"receiver"), descriptor(b"cable", pid=0x418A)
+        self.poll([receiver], {b"receiver": Device([LEVEL_87])})
+        for minutes in (1, 60):
+            with self.subTest(minutes=minutes):
+                self.now += 60 * minutes
+                devices = {b"receiver": Device(), b"cable": Device()}
+                result = self.poll([receiver, cable], devices)
+                self.assertEqual([(s.level, s.charging, s.online, s.ui_message, s.ui_params)
+                                  for s in result],
+                                 [(87, True, True, "state.charging_was", {"level": 87})])
+                self.assertEqual(devices[b"receiver"].opened, 0)
+
+    def test_a_silent_cable_beside_the_receiver_with_no_history_charges_without_a_level(self):
+        receiver, cable = descriptor(b"receiver"), descriptor(b"cable", pid=0x418A)
+        result = self.poll([receiver, cable], {b"receiver": Device(), b"cable": Device()})
+        self.assertEqual([(s.level, s.charging, s.online, s.ui_message) for s in result],
+                         [(None, True, True, "state.charging_level_unknown")])
+
+    def test_a_silent_cable_without_the_receiver_infers_no_charging(self):
+        receiver, cable = descriptor(b"receiver"), descriptor(b"cable", pid=0x418A)
+        self.assertEqual(self.poll([cable], {b"cable": Device()}), [])
+        self.poll([receiver], {b"receiver": Device([LEVEL_87])})
+        result = self.poll([cable], {b"cable": Device()})
+        self.assertEqual([(s.level, s.charging, s.online, s.charging_known) for s in result],
+                         [(87, False, False, False)])
+
+    def test_unplugging_the_cable_hands_back_to_the_receiver(self):
+        receiver, cable = descriptor(b"receiver"), descriptor(b"cable", pid=0x418A)
+        self.poll([receiver, cable], {b"receiver": Device(), b"cable": Device([CABLE_CHARGING])})
+        self.now += 5
+        result = self.poll([receiver], {b"receiver": Device()})
+        self.assertEqual([(s.level, s.charging, s.online, s.wake_on_input, s.charging_known)
+                          for s in result], [(87, False, False, True, False)])
+        result = self.poll([receiver], {b"receiver": Device([bytes.fromhex("bb b0 42 20 03 01 58")])})
+        self.assertEqual([(s.level, s.charging, s.online) for s in result], [(88, False, True)])
+
+    def test_only_the_cables_vendor_collections_are_listened_to(self):
+        valid = descriptor(b"cable", pid=0x418A)
+        refused = [descriptor(b"pointer", pid=0x418A, page=1, interface=0),
+                   descriptor(b"keyboard", pid=0x418A, page=1, usage=6),
+                   descriptor(b"system", pid=0x418A, page=1, usage=0x80),
+                   descriptor(b"consumer", pid=0x418A, page=0x0C, usage=1),
+                   descriptor(b"other-interface", pid=0x418A, interface=2)]
+        devices = {item["path"]: Device([CABLE_CHARGING]) for item in [valid] + refused}
+        result = self.poll(refused + [valid], devices)
+        self.assertEqual([s.key for s in result], ["rapoo:185a"])
+        self.assertTrue(all(devices[item["path"]].opened == 0 for item in refused))
+
+    def test_a_silent_receiver_and_cable_stay_inside_the_provider_deadline(self):
+        usages = (2, 2, 14, 2, 14)
+        receiver = [descriptor(b"r%d" % n, usage=usage) for n, usage in enumerate(usages)]
+        cable = [descriptor(b"c%d" % n, pid=0x418A, usage=usage) for n, usage in enumerate(usages)]
+        devices = {item["path"]: Device() for item in receiver + cable}
+        self.poll(receiver + cable, devices)
+        reads = sum(len(device.calls) for device in devices.values())
+        self.assertLessEqual(reads * rapoo.READ_TIMEOUT_MS / 1000, 12.0)
+        self.assertTrue(all(devices[item["path"]].opened == 0 for item in receiver))

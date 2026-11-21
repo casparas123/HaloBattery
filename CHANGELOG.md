@@ -252,6 +252,11 @@ and the project follows [Semantic Versioning](https://semver.org/).
   Test build pending on the reporter's unit.
 
 ### Fixed
+- Rapoo VT9 Pro (`24ae:185a`, #109): listen on every vendor collection path.
+  Windows lists `ff00:0002` twice and the battery push rides one of them, so
+  the restored one-path-per-usage scan never heard the reporter's mouse. Also
+  read the mouse on its USB cable (`24ae:418a`), so the icon shows charging
+  instead of greying out while it is plugged in.
 - Slightly inset pictograms inside the Classic thick ring while preserving the thin-ring layout.
 - Keep the last reported Phone Link charge visible when its cache does not
   change; stop stale charging animation and do not treat it as a live reading.

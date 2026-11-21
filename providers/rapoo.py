@@ -11,6 +11,20 @@ test-build source records the state meanings; the capture confirms only
 100% discharging. Windows collection-sized reads may add zero padding after
 the seven-byte payload. This family never uses the Gen-2 07/BD parsers below.
 
+Windows lists ff00:0002 twice on this receiver, as two top-level collections
+with their own paths, and the push rides one of them: test build 1 kept one
+path per usage and heard nothing, test build 2 opened every path and read
+"bb b0 42 20 03 01 57" - 87 %, the number Rapoo's app showed (#109,
+2026-11-20). So these candidates are kept by path, never folded by usage.
+
+On its USB cable the same mouse leaves the radio - the receiver goes silent -
+and enumerates as 24AE:418A with the receiver's collection shape (the
+reporter's two HID lists, 2026-11-21; Rapoo's app says "charging" then). The
+cable is listened to first, the same way, and a mouse on its cable is shown
+charging. If the cable stays silent while the receiver is enumerated too, the
+cable id alone is shown as charging with the level from before it went in -
+inferred from this exact receiver/cable pair, not read from a reply.
+
 Rapoo's own web driver at hub.rapoo.com ("RAPOO HUB - VT Generation 2 Series
 Web Driver") reads the battery of every device it supports without ever asking
 for it: the device pushes a status report on input report 7 and the driver's
@@ -62,7 +76,9 @@ keyboard has not answered this provider yet; the next test build is the check.
 """
 from __future__ import annotations
 
+import re
 import time
+from functools import partial
 from typing import Dict, List, Optional, Tuple
 
 try:
@@ -75,10 +91,12 @@ from .base import DeviceStatus, Provider, hexdump, log
 
 RAPOO_VID = 0x24AE
 VT7_RECEIVER = 0x1413      # the mouse's 2.4 GHz receiver
-VT9_PRO_RECEIVER = 0x185A  # older VT9 Pro, passive BB family from issue #109
 VT7_CABLE = 0x4613         # ... and the same mouse on its charging cable
 V700DIY_KEYBOARD = 0x4824  # the keyboard on its cable / plugged in
 V700DIY_RECEIVER = 0x1924  # ... and its own 2.4 GHz receiver
+VT9_PRO_RECEIVER = 0x185A  # older VT9 Pro, passive BB family from issue #109
+VT9_PRO_CABLE = 0x418A     # ... and the same mouse on its USB cable (#109's HID lists)
+VT9_PRO_NAME = "Rapoo VT9 Pro"
 # pid -> (name, kind, the id its icon is keyed on): both states of one device
 # share an icon, and a reading that reports charging wins in the merge below.
 PIDS = {
@@ -87,7 +105,8 @@ PIDS = {
     V700DIY_RECEIVER: ("Rapoo V700DIY-98", "keyboard", V700DIY_KEYBOARD),
     V700DIY_KEYBOARD: ("Rapoo V700DIY-98", "keyboard", V700DIY_KEYBOARD),
     0x14A9: ("Rapoo VT9 Pro V2", "mouse", 0x14A9),
-    VT9_PRO_RECEIVER: ("Rapoo VT9 Pro", "mouse", VT9_PRO_RECEIVER),
+    VT9_PRO_RECEIVER: (VT9_PRO_NAME, "mouse", VT9_PRO_RECEIVER),
+    VT9_PRO_CABLE: (VT9_PRO_NAME, "mouse", VT9_PRO_RECEIVER),
 }
 
 VENDOR_PAGE = 0xFF00
@@ -119,24 +138,33 @@ QUIET_RESCAN_EVERY = 5                # a silent device is fully re-scanned occa
 ASLEEP_KEEP = 300                     # s, as in the other receiver providers
 VT9_PRO_ATTEMPTS = 16                # 4 s covers the observed ~3 s BB push cadence
 VT9_PRO_BUFFER_LIMIT = 64            # existing read(64) caller bound, NOT a descriptor/report size
+VT9_PRO_LINK = 0x03                  # byte 4 of every receiver push: the 2.4 GHz link
+VT9_PRO_MAX_PATHS = 3                # 3 x 4 s stays inside the provider's 20 s deadline
+                                     # (halo/polling.py); #109's ids list exactly three
+VT9_PRO_IDS = (VT9_PRO_CABLE, VT9_PRO_RECEIVER)   # one device, polled cable first
+VT9_PRO_KEY = f"rapoo:{VT9_PRO_RECEIVER:04x}"
 
 Reading = Tuple[int, bool]
 
 
-def parse_vt9pro(r) -> Optional[Reading]:
+def parse_vt9pro(r, *, cable: bool = False) -> Optional[Reading]:
     """The old receiver's seven-byte BB/B0 push, allowing zero-only HID padding.
 
     The pinned test build accepts >=7 bytes. Windows HIDAPI/native reads use
     HIDP_CAPS.InputReportByteLength (the collection maximum), not the length
     of this report ID. Keep the existing read(64) caller bound and reject any
     meaningful trailing bytes; neither 32 nor 64 is a known descriptor size.
+
+    Byte 4 names the link, 0x03 (2.4 GHz) in every receiver push. No push from
+    the mouse on its cable (24AE:418A) has been seen yet, so cable=True takes
+    any link byte there; every other check stays the same.
     """
     if (not isinstance(r, (bytes, bytearray, list, tuple)) or not 7 <= len(r) <= VT9_PRO_BUFFER_LIMIT
             or any(type(byte) is not int or not 0 <= byte <= 255 for byte in r)):
         return None
     if any(r[7:]):
         return None
-    if r[0] != 0xBB or r[1] != 0xB0 or r[4] != 0x03:
+    if r[0] != 0xBB or r[1] != 0xB0 or (not cable and r[4] != VT9_PRO_LINK):
         return None
     state, level = r[5], r[6]
     if state not in (1, 2) or not 0 <= level <= 100:
@@ -218,6 +246,36 @@ def candidates(ifaces: List[dict]) -> List[dict]:
     return sorted(out, key=rank)
 
 
+def vt9pro_collections(infos: List[dict], pid: int) -> List[dict]:
+    """Interface 1's ff00:0002 / ff00:000e collections of one VT9 Pro id, by path.
+
+    Windows lists ff00:0002 twice on the #109 receiver - two top-level
+    collections with their own paths - and the push rides one of them: test
+    build 1 kept one path per usage and heard nothing, test build 2 opened every
+    path and read the level. So every path is kept (one listed twice is opened
+    once), ff00:0002 first, each usage in enumeration order. The pointer,
+    keyboard and consumer collections are never opened.
+    """
+    mine: List[dict] = []
+    seen = set()
+    for d in infos:
+        if (d.get("product_id") != pid or d.get("vendor_id", RAPOO_VID) != RAPOO_VID
+                or d.get("interface_number") != 1 or d.get("usage_page") != VENDOR_PAGE
+                or d.get("usage") not in PREFERRED_USAGES or d.get("path") in seen):
+            continue
+        seen.add(d.get("path"))
+        mine.append(d)
+    return sorted(mine, key=lambda d: PREFERRED_USAGES.index(d["usage"]))
+
+
+def path_tag(path) -> str:
+    """' col06' from a Windows HID path, so diagnostics tell duplicate usages apart."""
+    if isinstance(path, (bytes, bytearray)):
+        path = bytes(path).decode("ascii", "replace")
+    match = re.search(r"&col([0-9a-f]+)", str(path), re.IGNORECASE)
+    return f" col{match.group(1).lower()}" if match else ""
+
+
 class RapooProvider(Provider):
     name = "rapoo"
 
@@ -270,20 +328,10 @@ class RapooProvider(Provider):
             return []
         found: Dict[str, List[Tuple[int, bool, str, str]]] = {}   # key -> readings
         for pid, (name, kind, logical) in PIDS.items():
+            if pid in VT9_PRO_IDS:
+                continue                  # the older VT9 Pro and its cable: _poll_vt9pro
             mine = [d for d in infos if d["product_id"] == pid]
-            if pid == VT9_PRO_RECEIVER:
-                # #109 identifies two vendor top-level collections on iface 1.
-                # The capture cannot say which Windows collection receives BB;
-                # listen on these two, never on the pointer/key/consumer faces.
-                mine = [d for d in mine if d.get("vendor_id", RAPOO_VID) == RAPOO_VID
-                        and d.get("interface_number") == 1
-                        and d.get("usage_page") == VENDOR_PAGE
-                        and d.get("usage") in PREFERRED_USAGES]
             if not mine:
-                if pid == VT9_PRO_RECEIVER:
-                    self._last.pop(f"rapoo:{logical:04x}", None)
-                    self._chosen.pop(pid, None)
-                    self._quiet.pop(pid, None)
                 continue
             key = f"rapoo:{logical:04x}"
             self._meta[key] = (name, kind)
@@ -297,8 +345,7 @@ class RapooProvider(Provider):
             quiet = self._quiet.get(pid, 0)
             deep = self._chosen.get(pid) is None and (
                 quiet == 0 or quiet % QUIET_RESCAN_EVERY == 0)
-            max_candidates = 2 if pid == VT9_PRO_RECEIVER else MAX_CANDIDATES
-            budget = order[:max_candidates] if deep else order[:1]
+            budget = order[:MAX_CANDIDATES] if deep else order[:1]
             got = None
             for n, d in enumerate(budget):
                 self._diag.append(f"  listening on iface={d.get('interface_number')} "
@@ -306,11 +353,8 @@ class RapooProvider(Provider):
                 # The first candidate is the one that carries the pushes, and it gets the
                 # full window (one push period); the extra candidates of a full scan only
                 # a short one - they are a fallback for a device that moved.
-                if pid == VT9_PRO_RECEIVER:
-                    got = self._listen(d["path"], VT9_PRO_ATTEMPTS, parser=parse_vt9pro)
-                else:
-                    got = self._listen(d["path"],
-                                       READ_ATTEMPTS if n == 0 else SWEEP_ATTEMPTS)
+                got = self._listen(d["path"],
+                                   READ_ATTEMPTS if n == 0 else SWEEP_ATTEMPTS)
                 if got is not None:
                     self._chosen[pid] = d["path"]
                     break
@@ -336,12 +380,116 @@ class RapooProvider(Provider):
         # to sleep a few seconds ago, so keep the last value greyed out for a while
         now = time.time()
         for key, last in self._last.items():
-            if key in found or now - last[2] >= ASLEEP_KEEP:
+            if key == VT9_PRO_KEY or key in found or now - last[2] >= ASLEEP_KEEP:
                 continue
             name, kind = self._meta.get(key, ("Rapoo device", "mouse"))
             out.append(DeviceStatus(key, name, last[0], last[1], False, "rapoo",
                                     kind=kind))
+        vt9 = self._poll_vt9pro(infos)
+        if vt9 is not None:
+            out.append(vt9)
         return out
+
+    def _listen_vt9pro(self, pid: int, cols: List[dict], *, cable: bool) -> Optional[Reading]:
+        """Listen on one VT9 Pro id's vendor paths; remember the one that answers.
+
+        A silent id is listened on its first path only and fully re-scanned every
+        few polls. A remembered path that is gone (the receiver was re-plugged
+        between two polls) is forgotten, so the next scan covers every path.
+        """
+        chosen = self._chosen.get(pid)
+        if chosen is not None and all(d["path"] != chosen for d in cols):
+            self._chosen.pop(pid, None)
+            self._quiet.pop(pid, None)
+            chosen = None
+        order = list(cols)
+        if chosen is not None:
+            order.sort(key=lambda d: d["path"] != chosen)
+        quiet = self._quiet.get(pid, 0)
+        deep = chosen is None and (quiet == 0 or quiet % QUIET_RESCAN_EVERY == 0)
+        parser = partial(parse_vt9pro, cable=cable)
+        for d in (order[:VT9_PRO_MAX_PATHS] if deep else order[:1]):
+            self._diag.append(f"  listening on iface={d.get('interface_number')} "
+                              f"{d.get('usage_page', 0):04x}:{d.get('usage', 0):04x}"
+                              f"{path_tag(d['path'])}")
+            got = self._listen(d["path"], VT9_PRO_ATTEMPTS, parser=parser)
+            if got is not None:
+                self._chosen[pid] = d["path"]
+                self._quiet[pid] = 0
+                return got
+        self._quiet[pid] = quiet + 1
+        return None
+
+    def _poll_vt9pro(self, infos: List[dict]) -> Optional[DeviceStatus]:
+        """The older VT9 Pro over its receiver (185A) and its USB cable (418A): one icon."""
+        receiver = vt9pro_collections(infos, VT9_PRO_RECEIVER)
+        cable = vt9pro_collections(infos, VT9_PRO_CABLE)
+        if not receiver and not cable:
+            # unplugged: a later plug-in starts from nothing
+            self._last.pop(VT9_PRO_KEY, None)
+            for pid in VT9_PRO_IDS:
+                self._chosen.pop(pid, None)
+                self._quiet.pop(pid, None)
+            return None
+        now = time.time()
+        if cable:
+            self._diag.append(f"[Rapoo] pid={VT9_PRO_CABLE:04x} '{VT9_PRO_NAME}' on its USB cable "
+                              f"'{(cable[0].get('product_string') or '').strip()}'")
+            if receiver:
+                self._diag.append(f"  receiver {VT9_PRO_RECEIVER:04x} not listened to: "
+                                  "a mouse on its cable is off the radio")
+            got = self._listen_vt9pro(VT9_PRO_CABLE, cable, cable=True)
+            if got is not None:
+                # on its cable the mouse charges, whatever the push's state byte
+                # says (the frame itself is in the diagnostics above)
+                self._last[VT9_PRO_KEY] = (got[0], True, now)
+                return DeviceStatus(VT9_PRO_KEY, VT9_PRO_NAME, got[0], True, True, "rapoo",
+                                    kind="mouse")
+            if receiver:
+                self._diag.append("  nothing from the cable: shown charging from the cable id")
+                return self._vt9pro_on_cable(now)
+            # the cable alone and silent: nothing ties it to the receiver, so no
+            # charging is inferred - the greyed rule below
+        else:
+            self._diag.append(f"[Rapoo] pid={VT9_PRO_RECEIVER:04x} '{VT9_PRO_NAME}' "
+                              f"'{(receiver[0].get('product_string') or '').strip()}'")
+            got = self._listen_vt9pro(VT9_PRO_RECEIVER, receiver, cable=False)
+            if got is not None:
+                self._last[VT9_PRO_KEY] = (got[0], got[1], now)
+                return DeviceStatus(VT9_PRO_KEY, VT9_PRO_NAME, got[0], got[1], True, "rapoo",
+                                    kind="mouse")
+        last = self._last.get(VT9_PRO_KEY)
+        if last is not None and now - last[2] < ASLEEP_KEEP:
+            self._diag.append("  nothing heard; keeping the last level, greyed out")
+            return DeviceStatus(VT9_PRO_KEY, VT9_PRO_NAME, last[0], False, False, "rapoo",
+                                kind="mouse", wake_on_input=True, charging_known=False)
+        self._diag.append("  nothing heard yet and no earlier level")
+        return None
+
+    def _vt9pro_on_cable(self, now: float) -> DeviceStatus:
+        """On its cable with the cable silent: charging, inferred from the cable id.
+
+        24AE:418A is enumerated exactly while the mouse sits on its cable (the
+        reporter's two HID lists, #109) and Rapoo's own app shows "charging"
+        then, while the receiver beside it hears nothing. That pair is the only
+        evidence, so this runs only while the receiver is enumerated too. The
+        level is the last one read: a charging push a moment ago as it is,
+        otherwise the one from before the cable went in, labelled as such.
+        """
+        last = self._last.get(VT9_PRO_KEY)
+        if last is None:
+            return DeviceStatus(VT9_PRO_KEY, VT9_PRO_NAME, None, True, True, "rapoo",
+                                kind="mouse",
+                                approx="charging (level not reported while charging)",
+                                ui_message="state.charging_level_unknown")
+        level, charging_then, when = last
+        if charging_then and now - when < ASLEEP_KEEP:
+            return DeviceStatus(VT9_PRO_KEY, VT9_PRO_NAME, level, True, True, "rapoo",
+                                kind="mouse")
+        return DeviceStatus(VT9_PRO_KEY, VT9_PRO_NAME, level, True, True, "rapoo",
+                            kind="mouse",
+                            approx=f"charging (about {level}% before it was plugged in)",
+                            ui_message="state.charging_was", ui_params={"level": level})
 
     def diagnostics(self) -> List[str]:
         return list(self._diag)

@@ -13,10 +13,12 @@ v1.03 (12 bytes on v1.02, whose report has no battery field); the v1.03 report
 can arrive about 250 ms after the controller wakes, so the reader listens for
 a short window instead of sending anything.
 
-Only input reports are read. The first report can arrive on the gamepad
-collection (0001:0005) rather than the vendor one: #461's diagnostics showed
-the vendor collection silent on a real controller, so the gamepad collection is
-tried first and the vendor one after it.
+Only input reports are read, and only from the vendor collection: the
+XInput-facing 0001:0005 collection belongs to Windows' XInput stack, and
+reading it there made XInput fail with "read error" and the pad disappear
+(#461, test build 3). On the 2.4 GHz dongle the vendor collection stays silent
+on a real controller, so the level is only available over Bluetooth, which the
+Bluetooth provider reads.
 """
 from __future__ import annotations
 
@@ -35,8 +37,8 @@ from .base import hexdump, log
 VID = 0x2DC8
 PID = 0x310B
 PAGE, USAGE = 0xFF7A, 0x0001
-# The XInput-facing collection; a real controller streamed nothing on the vendor
-# collection in #461, so it is opened first.
+# The XInput-facing collection. It is deliberately never opened: doing so breaks
+# XInput with "read error" (#461, test build 3).
 GAMEPAD_PAGE, GAMEPAD_USAGE = 0x0001, 0x0005
 BATTERY_BYTE = 14
 # SDL reads the power state only when the report is at least this long: the
@@ -81,16 +83,10 @@ def read_connected(diag: List[str]) -> Optional[Reading]:
         log.warning("hid.enumerate(8bitdo ultimate2): %s", e)
         return None
     mine = [d for d in infos if d.get("product_id") == PID]
-
-    def rank(d):
-        pair = (d.get("usage_page"), d.get("usage"))
-        if pair == (GAMEPAD_PAGE, GAMEPAD_USAGE):
-            return 0
-        if pair == (PAGE, USAGE):
-            return 1
-        return 2
-
-    for d in sorted(mine, key=lambda x: (rank(x), x.get("interface_number") or 0)):
+    # Never open the XInput-facing collection: Windows' XInput stack owns it, and
+    # reading it there makes XInput fail with "read error" and the pad vanish
+    # (#461, test build 3). Only the vendor collection is read.
+    for d in [x for x in mine if (x.get("usage_page"), x.get("usage")) == (PAGE, USAGE)]:
         page, usage = d.get("usage_page"), d.get("usage")
         where = f"{page:04x}:{usage:04x}" if page is not None and usage is not None else "?"
         diag.append(f"    [8BitDo Ultimate 2] trying iface={d.get('interface_number')} {where}")

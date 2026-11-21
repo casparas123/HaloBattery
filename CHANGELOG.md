@@ -30,12 +30,11 @@ and the project follows [Semantic Versioning](https://semver.org/).
   and Exit HaloBattery hover colors, with themed pressed feedback.
 
 ### Added
-- Battery support for the 8BitDo Ultimate 2 Wireless controller in XInput mode
-  (`2dc8:310b`): the level and charging bit are read from byte 14 of the
-  controller's 34-byte HID report while XInput keeps the gamepad icon. The
-  XInput-facing `0001:0005` collection is tried first, then the vendor
-  `0xFF7A:0x0001` one, because the vendor collection was silent on a real
-  controller (#461). Test build 3, unverified on hardware.
+- 8BitDo Ultimate 2 Wireless (`2dc8:310b`): the reader no longer opens the
+  XInput-facing `0001:0005` collection, which broke XInput (`read error`) and
+  made the pad disappear on 2.4 GHz and USB in test build 3 (#461). The 2.4 GHz
+  dongle exposes no battery level at all; the controller reports one over
+  Bluetooth, which the Bluetooth provider shows.
 - MCHOSE G98 Pro (`41E4:2004`) keyboard over the same Sinowealth `13 4A 01`
   command as the K87, with the charging flag read from the reply's high
   nibble. Level and charging confirmed on the reporter's hardware in

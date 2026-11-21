@@ -103,23 +103,19 @@ class ReadTests(unittest.TestCase):
         self.assertIsNone(got)
         self.assertTrue(any("nothing on" in line for line in diag))
 
-    def test_the_gamepad_collection_is_tried_first(self):
-        # #461: on a real controller the vendor collection was silent and nothing
-        # arrived there; the 34-byte report is on the XInput-facing collection.
+    def test_the_xinput_collection_is_never_opened(self):
+        # #461 test build 3 opened 0001:0005 and XInput died with "read error":
+        # the collection belongs to Windows' XInput stack, so it is never touched.
         opened = []
 
         class Bus:
             def device(self):
                 class Dev:
-                    def __init__(self):
-                        self.replies = []
-
                     def open_path(self, path):
                         opened.append(path)
-                        self.replies = [] if path == b"ultimate2" else [report(66, True)]
 
                     def read(self, size, timeout_ms=0):
-                        return self.replies.pop(0) if self.replies else []
+                        return []
 
                     def close(self):
                         pass
@@ -131,10 +127,8 @@ class ReadTests(unittest.TestCase):
 
         U.hid = types.SimpleNamespace(device=Bus().device)
         U.hidlist.enumerate = lambda vid=0: list(entries())
-        diag = []
-        got = U.read_connected(diag)
-        self.assertEqual((got.level, got.charging), (66, True))
-        self.assertEqual(opened[0], b"gamepad")
+        self.assertIsNone(U.read_connected([]))
+        self.assertEqual([b"ultimate2"], opened)
 
     def test_a_short_report_is_not_a_battery_frame(self):
         # 20-byte gamepad reports carry input data in byte 14; only >= 34 bytes count

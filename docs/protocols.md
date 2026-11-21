@@ -827,15 +827,16 @@ The controller appears as an Xbox pad, so the XInput provider owns the icon.
 Its battery is the same byte SDL's 8BitDo driver reads: byte 14 of the
 enhanced input report (bit 7 charging, bits 0-6 the level). The v1.03 firmware
 report is 34 bytes and can arrive about 250 ms after wake, so the reader only
-listens for a short window and never writes. It tries the XInput-facing
-`0001:0005` collection first, then the vendor `0xFF7A:0x0001` one: on a real
-controller the vendor collection stayed silent while the gamepad collection
-carried the report (diagnostics in
-[#461](https://github.com/HeyOkay/HaloBattery/issues/461)). Only reports of at
-least 34 bytes count, so an ordinary frame whose byte 14 is input data cannot
-become a level. A zero byte is ignored, and the `remain=full=1000`
-Windows.Gaming.Input placeholder is not used as a level. **Unverified on
-hardware**; test build 3 reads the gamepad collection first.
+listens for a short window and never writes. Only the vendor collection is
+opened. The XInput-facing `0001:0005` collection belongs to Windows' XInput
+stack: test build 3 read it, XInput failed with `read error`, and the pad
+disappeared on both 2.4 GHz and USB (#461), so it is never touched again. On
+the 2.4 GHz dongle the vendor collection stays silent on a real controller
+(`nothing received`), and Windows.Gaming.Input reports the `remain=full=1000`
+placeholder, so **no level is available over the dongle**. Over Bluetooth the
+controller does report one: the reporter saw 60 % from the Bluetooth provider,
+which is the supported way to read this pad. Only reports of at least 34 bytes
+count, so an ordinary frame whose byte 14 is input data cannot become a level.
 
 ### ASUS ROG Raikiri II
 

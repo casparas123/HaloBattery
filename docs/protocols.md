@@ -728,8 +728,10 @@ The Royal Kludge S85's SINOWEALTH 2.4 GHz receiver (`258a:0150`) exposes the
 keyboard control collection `ff02:0002`.  The read-only CompX keyboard power
 query is a 20-byte output report `13 05 01 ... 19`; the receiver acknowledges it
 first, then sends a status frame `13 0a ...` with the level at byte 6 and the
-link state at byte 7.  The provider repeats the query for a short window so a
-sleeping keyboard can answer after it is woken.
+link state at byte 7.  The query is sent **once** per window and the receiver is
+then listened to for two seconds: sending it again only produced more
+acknowledgements and no status frame in the reporter's diagnostics (#494 test
+build 3, `frames: 7 ack`).
 
 The protocol comes from the open-source
 `Rainbow132/2.4G-wireless-device-battery-level-acquisition` notes.  The level
@@ -741,6 +743,12 @@ matching the keyboard).
 the reporter's unit answered 1 and 0 while the keyboard was at 85 %, and test
 build 2 showed those as levels.  Only a frame with a non-zero link byte is a
 reading; offline frames are logged and ignored.
+
+On the cable id the native transport can start refusing reads mid-window
+(`I/O unavailable ... Incorrect function`) - test build 3 then lost the icon
+entirely, because a provider that raises is marked unavailable and switched off
+after three failures. The provider now stops reading, keeps whatever arrived,
+and reports charging with the last level; nothing in a poll may raise.
 
 The receiver has no charging query, so a keyboard that stays in 2.4 GHz mode
 while a cable charges it is reported with charging unknown rather than guessed.

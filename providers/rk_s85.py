@@ -93,6 +93,7 @@ class RkS85Provider(Provider):
         self._diag: List[str] = []
         # level, when, read on the cable (so the text can say where it came from)
         self._last: Optional[Tuple[int, float, bool]] = None
+        self._cable = False
 
     def _read(self, path) -> Optional[Tuple[int, bool]]:
         dev = hid.device()  # type: ignore[union-attr]
@@ -105,20 +106,31 @@ class RkS85Provider(Provider):
         try:
             deadline = time.monotonic() + WINDOW_S
             last_send = 0.0
+            acked = False
             while time.monotonic() < deadline:
                 now = time.monotonic()
-                if now - last_send >= 0.25:
+                # One query is enough: the receiver acknowledges it, then the
+                # keyboard's status frame follows. Re-sending only produced more
+                # acknowledgements and no status in the reporter's diagnostics.
+                if not acked and now - last_send >= 0.25:
                     try:
                         dev.write(REQUEST)
                     except (OSError, ValueError) as e:
                         self._diag.append(f"  write: {e}")
                         return None
                     last_send = now
-                r = dev.read(64, READ_TIMEOUT_MS)
+                try:
+                    r = dev.read(64, READ_TIMEOUT_MS)
+                except (OSError, IOError) as e:
+                    # The cable id can start refusing reads mid-window; keep what
+                    # arrived instead of raising the whole provider (#494).
+                    self._diag.append(f"  read: {e}")
+                    break
                 if not r:
                     continue
                 if len(r) > 1 and r[0] == REPORT_ID and r[1] != STATUS:
                     frames["ack"] += 1
+                    acked = True
                 elif is_offline_frame(r):
                     frames["offline"] += 1
                     self._diag.append(f"  offline frame: {hexdump(r, 20)}: link byte 0, "
@@ -149,7 +161,19 @@ class RkS85Provider(Provider):
                 pass
 
     def poll(self) -> List[DeviceStatus]:
+        # The native transport can fail mid-read on the cable id ("Incorrect
+        # function", #494 test build 3). A provider that raises is marked I/O
+        # unavailable and, after three in a row, switched off - so nothing here
+        # may escape: fall back to what is known instead.
         self._diag = []
+        self._cable = False
+        try:
+            return self._poll()
+        except Exception as e:
+            self._diag.append(f"  poll error: {e}")
+            return [self._fallback()]
+
+    def _poll(self) -> List[DeviceStatus]:
         if hid is None:
             return []
         try:
@@ -166,8 +190,8 @@ class RkS85Provider(Provider):
         groups = {}
         for d in control:
             groups.setdefault(d["product_id"], []).append(d)
-        cable = CABLE_PID in groups
-        order = [CABLE_PID, PID] if cable else [PID]
+        self._cable = CABLE_PID in groups
+        order = [CABLE_PID, PID] if self._cable else [PID]
         for pid in order:
             group = groups.get(pid)
             if not group:
@@ -183,30 +207,34 @@ class RkS85Provider(Provider):
                 return [DeviceStatus(KEY, NAME, level, charging, True, "rk_s85",
                                      kind="keyboard", charging_known=pid == CABLE_PID,
                                      via="USB cable" if pid == CABLE_PID else "2.4 GHz receiver")]
-        if cable:
+        return [self._fallback()]
+
+    def _fallback(self) -> DeviceStatus:
+        """What can be said without a fresh reading."""
+        last = self._last
+        if self._cable:
             # on the cable, but its query answered nothing usable: charging, and
             # the level only if one was read recently enough to be worth showing
-            last = self._last
             if last is None or time.time() - last[1] >= ASLEEP_KEEP:
-                return [DeviceStatus(KEY, NAME, None, True, True, "rk_s85",
-                                     kind="keyboard", charging_known=True, via="USB cable",
-                                     approx="charging (level not reported while charging)",
-                                     ui_message="state.charging_level_unknown")]
+                return DeviceStatus(KEY, NAME, None, True, True, "rk_s85",
+                                    kind="keyboard", charging_known=True, via="USB cable",
+                                    approx="charging (level not reported while charging)",
+                                    ui_message="state.charging_level_unknown")
             level, _, on_cable = last
             if on_cable:
-                return [DeviceStatus(KEY, NAME, level, True, True, "rk_s85",
-                                     kind="keyboard", charging_known=True, via="USB cable")]
-            return [DeviceStatus(KEY, NAME, level, True, True, "rk_s85",
-                                 kind="keyboard", charging_known=True, via="USB cable",
-                                 approx=f"charging (about {level}% before it was plugged in)",
-                                 ui_message="state.charging_was", ui_params={"level": level})]
-        if self._last and time.time() - self._last[1] < ASLEEP_KEEP:
-            return [DeviceStatus(KEY, NAME, self._last[0], False, False, "rk_s85",
-                                 kind="keyboard", charging_known=False,
-                                 wake_on_input=True)]
-        return [DeviceStatus(KEY, NAME, None, False, False, "rk_s85",
-                             kind="keyboard", charging_known=False,
-                             wake_on_input=True)]
+                return DeviceStatus(KEY, NAME, level, True, True, "rk_s85",
+                                    kind="keyboard", charging_known=True, via="USB cable")
+            return DeviceStatus(KEY, NAME, level, True, True, "rk_s85",
+                                kind="keyboard", charging_known=True, via="USB cable",
+                                approx=f"charging (about {level}% before it was plugged in)",
+                                ui_message="state.charging_was", ui_params={"level": level})
+        if last and time.time() - last[1] < ASLEEP_KEEP:
+            return DeviceStatus(KEY, NAME, last[0], False, False, "rk_s85",
+                                kind="keyboard", charging_known=False,
+                                wake_on_input=True)
+        return DeviceStatus(KEY, NAME, None, False, False, "rk_s85",
+                            kind="keyboard", charging_known=False,
+                            wake_on_input=True)
 
     def diagnostics(self) -> List[str]:
         return list(self._diag)

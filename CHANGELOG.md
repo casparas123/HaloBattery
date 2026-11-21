@@ -30,6 +30,9 @@ and the project follows [Semantic Versioning](https://semver.org/).
   and Exit HaloBattery hover colors, with themed pressed feedback.
 
 ### Fixed
+- Royal Kludge S85: a transport error on the cable id no longer marks the whole
+  provider unavailable (which removed the icon), and the receiver is queried once
+  per window instead of being re-asked continuously (#494).
 - Royal Kludge S85 (#494): ignore the receiver's offline status frame. Its
   link byte is 0 and its level byte is a placeholder, so a sleeping keyboard
   read as 1 % and 0 % while it was at 85 %. On the cable, charging is shown

@@ -170,5 +170,61 @@ class PollTest(unittest.TestCase):
         self.assertTrue(out[0].wake_on_input)
 
 
+class TransportFailureTest(unittest.TestCase):
+    """#494 test build 3: the cable id raised "Incorrect function" mid-read and the
+    provider was marked I/O unavailable, then switched off after three failures."""
+
+    def setUp(self):
+        self._saved = (R.hid, R.hidlist, R.time)
+
+    def tearDown(self):
+        R.hid, R.hidlist, R.time = self._saved
+
+    def poll(self, device, infos):
+        R.hid = types.SimpleNamespace(device=lambda: device)
+        R.hidlist = types.SimpleNamespace(enumerate=lambda vid=0: list(infos))
+        return R.RkS85Provider().poll()
+
+    def test_a_read_error_keeps_the_icon_instead_of_raising(self):
+        class BadRead:
+            def open_path(self, path):
+                pass
+
+            def write(self, data):
+                return len(data)
+
+            def read(self, size, timeout=0):
+                raise OSError("native I/O failed: (0x1) Incorrect function")
+
+            def close(self):
+                pass
+
+        infos = [{"product_id": R.PID, "usage_page": 0xFF02, "usage": 0x0002,
+                  "path": b"receiver"}]
+        out = self.poll(BadRead(), infos)
+        self.assertEqual(1, len(out))
+        self.assertFalse(out[0].online)
+
+    def test_the_cable_id_that_fails_still_reads_as_charging(self):
+        class BadRead:
+            def open_path(self, path):
+                pass
+
+            def write(self, data):
+                return len(data)
+
+            def read(self, size, timeout=0):
+                raise OSError("native I/O failed: (0x1) Incorrect function")
+
+            def close(self):
+                pass
+
+        infos = [{"product_id": R.CABLE_PID, "usage_page": 0xFF02, "usage": 0x0002,
+                  "path": b"cable"}]
+        out = self.poll(BadRead(), infos)
+        self.assertEqual(1, len(out))
+        self.assertTrue(out[0].charging)
+        self.assertTrue(out[0].online)
+
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()

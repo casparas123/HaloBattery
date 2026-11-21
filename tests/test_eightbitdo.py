@@ -128,6 +128,21 @@ class ProviderTest(unittest.TestCase):
         E.hidlist = types.SimpleNamespace(enumerate=lambda vid=0: list(entries))
         return self.provider.poll()
 
+    def test_ultimate2_streams_its_level_in_a_34_byte_report(self):
+        # #520: firmware v1.03 sends 34-byte reports; byte 14 is level | 0x80 charging
+        pad = FakePad([enhanced(0x04, 0x80 | 64)])
+        out = self.poll([entry(USB_PATH, pid=E.ULTIMATE2_PID)], {USB_PATH: pad})
+        self.assertEqual(len(out), 1)
+        s = out[0]
+        self.assertEqual((s.name, s.level, s.charging), ("8BitDo Ultimate 2 Wireless", 64, True))
+        self.assertEqual(pad.writes, [])          # nothing is ever sent
+
+    def test_ultimate2_short_reports_carry_no_level(self):
+        pad = FakePad([[0x04] + [0] * 11])        # v1.02's 12-byte report
+        out = self.poll([entry(USB_PATH, pid=E.ULTIMATE2_PID)], {USB_PATH: pad})
+        self.assertEqual([(s.name, s.level) for s in out], [("8BitDo Ultimate 2 Wireless", None)])
+        self.assertEqual(pad.writes, [])
+
     def test_enhanced_bluetooth_report_is_read(self):
         pad = FakePad([enhanced(0x01, 0x80 | 62)])
         out = self.poll([entry(BT_PATH)], {BT_PATH: pad})

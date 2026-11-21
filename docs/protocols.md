@@ -817,6 +817,17 @@ The same exchange as the DeathStalker V2 Pro TKL above, with the ids and interfa
 
 Listened to, never written: byte 14 of the controller's enhanced input report (report 0x01 over Bluetooth, 0x04 over USB; bits 0-6 the level in %, bit 7 charging), as SDL reads it. The controller sends that report only after Steam or a game has switched it on, see the note below the table. The Pro 3 (2DC8:6009) is the exception: its descriptor declares one input report, 0x04, on both transports, and it carries the level in byte 14 at all times, so the Pro 3 shows its level without Steam - **confirmed on a real Pro 3 over Bluetooth**, with Steam closed and the controller freshly turned on. In XInput mode these controllers are read as Xbox controllers. The other models are **unverified**, so a level of 0 or above 100 is refused rather than shown
 
+### 8BitDo Ultimate 2 Wireless
+
+**Connection:** 2.4 GHz receiver (`2DC8:310B`)
+
+It streams a **34-byte** input report (firmware v1.03; earlier builds sent 12 bytes
+with no battery field) whose byte 14 holds the level in bits 0-6 and the charging bit
+in bit 7 — the same byte SDL reads once the report is at least 34 bytes
+(`SDL_hidapi_8bitdo.c`). Nothing is sent to the controller. **Unverified on
+hardware**: the test build in
+[#520](https://github.com/HeyOkay/HaloBattery/issues/520) is the first run.
+
 ### ASUS ROG Raikiri II
 
 **Connection:** 2.4 GHz receiver (`0B05:1C92`), vendor collection `ff03:0001` on interface 4

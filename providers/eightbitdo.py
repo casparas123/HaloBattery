@@ -46,9 +46,10 @@ from .base import DeviceStatus, Provider, hexdump, log
 
 VENDOR_8BITDO = 0x2DC8
 
-# pid -> name. The ids SDL's 8BitDo driver handles, minus the Ultimate 2 Wireless /
-# Ultimate 3, whose reports differ. Only the Pro 2 over Bluetooth (6006) has a user
-# report so far (#101).
+# pid -> name. The ids SDL's 8BitDo driver handles, minus the Ultimate 3, whose
+# reports differ. Only the Pro 2 over Bluetooth (6006) has a user report so far
+# (#101). The Ultimate 2 Wireless (#520) streams a 34-byte report instead of the
+# enhanced one and is read by _read_ultimate2.
 KNOWN = {
     0x6000: "8BitDo SF30 Pro",
     0x6100: "8BitDo SF30 Pro",
@@ -57,6 +58,7 @@ KNOWN = {
     0x6003: "8BitDo Pro 2",
     0x6006: "8BitDo Pro 2",
     0x6009: "8BitDo Pro 3",
+    0x310B: "8BitDo Ultimate 2 Wireless",
 }
 
 # The enhanced report id: Bluetooth -> 0x01, USB -> 0x04 (SDL_hidapi_8bitdo.c).
@@ -68,6 +70,11 @@ ENHANCED_REPORT_BY_PID = {0x6009: 0x04}
 def enhanced_report(pid: int, bluetooth: bool) -> int:
     return ENHANCED_REPORT_BY_PID.get(pid, ENHANCED_REPORT[bluetooth])
 BATTERY_BYTE = 14
+# The Ultimate 2 Wireless (#520): firmware v1.03 streams a 34-byte report whose byte
+# 14 is the level (low 7 bits) and charging bit (bit 7), the same byte SDL reads once
+# the report is at least 34 bytes (SDL_hidapi_8bitdo.c). No switch, no request.
+ULTIMATE2_PID = 0x310B
+ULTIMATE2_MIN_REPORT = 34
 
 # Bluetooth HID paths carry this service GUID and the "VID&" spelling; USB paths "VID_".
 _BT_HID_GUID = "{00001124-0000-1000-8000-00805f9b34fb}"
@@ -157,6 +164,56 @@ class EightBitDoProvider(Provider):
             except Exception:
                 pass
 
+    def _read_ultimate2(self, path, window: float) -> Optional[Tuple[int, bool]]:
+        """The Ultimate 2 Wireless streams its battery; nothing is sent to it.
+
+        Its report is 34 bytes on firmware v1.03 (12 bytes before that, with no level),
+        and byte 14 carries the level and the charging bit like the enhanced report.
+        """
+        dev = hid.device()
+        try:
+            dev.open_path(path)
+        except (OSError, IOError) as e:
+            self._diag.append(f"    open: {e}")
+            return None
+        try:
+            try:
+                dev.set_nonblocking(True)
+            except Exception:
+                pass
+            seen: Dict[int, List[int]] = {}
+            count = 0
+            deadline = time.time() + window
+            while time.time() < deadline and count < MAX_REPORTS:
+                try:
+                    data = dev.read(64)
+                except (OSError, ValueError) as e:
+                    self._diag.append(f"    read: {e}")
+                    break
+                if not data:
+                    time.sleep(0.005)
+                    continue
+                seen.setdefault(data[0], list(data))
+                count += 1
+                if len(data) < ULTIMATE2_MIN_REPORT:
+                    continue
+                res = parse_battery(data[BATTERY_BYTE])
+                if res is not None:
+                    self._diag.append(f"    report {data[0]:#04x} len={len(data)}: "
+                                      f"{hexdump(data, 32)}")
+                    return res
+            if not seen:
+                self._diag.append(f"    nothing received in {window:.1f} s")
+            for r, data in seen.items():
+                self._diag.append(f"    report {r:#04x} len={len(data)}, no level in byte "
+                                  f"{BATTERY_BYTE}: {hexdump(data, 32)}")
+            return None
+        finally:
+            try:
+                dev.close()
+            except Exception:
+                pass
+
     def poll(self) -> List[DeviceStatus]:
         self._diag = []
         if hid is None:
@@ -190,7 +247,10 @@ class EightBitDoProvider(Provider):
                 if left <= 0:
                     self._diag.append("  out of time for this controller")
                     break
-                res = self._read(d["path"], enhanced_report(pid, bluetooth), min(WINDOW, left))
+                if pid == ULTIMATE2_PID:
+                    res = self._read_ultimate2(d["path"], min(WINDOW, left))
+                else:
+                    res = self._read(d["path"], enhanced_report(pid, bluetooth), min(WINDOW, left))
                 if res is not None:
                     break
             key = f"8bitdo:{pid:04x}:{serial}"

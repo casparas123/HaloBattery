@@ -202,6 +202,7 @@ MESSAGES = {
     'provider.msi': 'MSI тінтуірлері',
     'provider.ninjutso_sprime': 'Ninjutso / Sprime тінтуірлері',
     'provider.redsquare': 'Red Square Alumix TKL пернетақтасы',
+    'provider.rk_s85': 'Royal Kludge S85',
     'provider.royal_kludge': 'Royal Kludge MG6 Pro',
     'provider.wraith': 'Wraith W1',
     'provider.zowie': 'ZOWIE тінтуірлері',

@@ -29,6 +29,13 @@ and the project follows [Semantic Versioning](https://semver.org/).
   and fade the header wordmark on hover. Share Close
   and Exit HaloBattery hover colors, with themed pressed feedback.
 
+### Fixed
+- Royal Kludge S85 (#494): ignore the receiver's offline status frame. Its
+  link byte is 0 and its level byte is a placeholder, so a sleeping keyboard
+  read as 1 % and 0 % while it was at 85 %. On the cable, charging is shown
+  with the level from before it was plugged in (or "level not reported while
+  charging") instead of that placeholder.
+
 ### Added
 - MCHOSE G98 Pro (`41E4:2004`) keyboard over the same Sinowealth `13 4A 01`
   command as the K87, with the charging flag read from the reply's high

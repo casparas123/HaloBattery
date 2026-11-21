@@ -217,6 +217,7 @@ MESSAGES = {
     "provider.msi": "Миші MSI",
     "provider.ninjutso_sprime": "Миші Ninjutso / Sprime",
     "provider.redsquare": "Клавіатура Red Square Alumix TKL",
+    "provider.rk_s85": "Royal Kludge S85",
     "provider.royal_kludge": "Royal Kludge MG6 Pro",
     "provider.wraith": "Wraith W1",
     "provider.zowie": "Миші ZOWIE",

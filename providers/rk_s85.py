@@ -13,6 +13,17 @@ than reading once.  Only the read-only power query is sent.
 
 The receiver does not expose a charging query.  The level is shown without a
 charging state instead of guessing one; a cable check is part of the test.
+
+A sleeping keyboard gets the same ``13 0a`` shape back with the link byte 0
+and a **placeholder** in the level byte: the reporter's unit answered level 1
+and 0 while the keyboard was at 85 % (#494 test build 2).  Only a frame whose
+link byte is non-zero carries a level; the offline frames are logged and
+ignored.
+
+While the keyboard is on its USB cable it enumerates as ``258a:0193``, answers
+the same query and is shown charging.  A keyboard that stays in 2.4 GHz mode
+while a cable charges it cannot be shown as charging: its reply has no
+charging field (see docs/protocols.md).
 """
 from __future__ import annotations
 
@@ -36,6 +47,9 @@ KEY = "rk:s85"
 CONTROL_USAGE = (0xFF02, 0x0002)
 REQUEST = [0x13, 0x05, 0x01] + [0x00] * 16 + [0x19]
 REPORT_ID = 0x13
+STATUS = 0x0A
+LEVEL_INDEX = 6
+LINK_INDEX = 7
 PAYLOAD_LEN = 20
 READ_TIMEOUT_MS = 150
 WINDOW_S = 2.0
@@ -47,17 +61,29 @@ def is_s85(info: dict) -> bool:
             and (info.get("usage_page"), info.get("usage")) == CONTROL_USAGE)
 
 
+def is_status_frame(r) -> bool:
+    """True for the ``13 0a`` shape, online or offline."""
+    return bool(r) and len(r) > LINK_INDEX and r[0] == REPORT_ID and r[1] == STATUS
+
+
+def is_offline_frame(r) -> bool:
+    """The receiver's answer for a sleeping keyboard: link byte 0, no level."""
+    return is_status_frame(r) and r[LINK_INDEX] == 0
+
+
 def parse_reply(r) -> Optional[Tuple[int, bool]]:
-    """(level, linked) from the S85 status frame, or None."""
-    if not r or len(r) <= 7:
+    """(level, linked) from the S85 status frame, or None.
+
+    An offline frame (link byte 0) is refused: its level byte is a placeholder,
+    measured as 1 and 0 on the reporter's keyboard while it was at 85 %.
+    """
+    if not is_status_frame(r) or is_offline_frame(r):
         return None
     b = list(r)
-    if b[0] != REPORT_ID or b[1] != 0x0A:
-        return None
-    level = b[6]
+    level = b[LEVEL_INDEX]
     if not 0 <= level <= 100:
         return None
-    return level, b[7] != 0
+    return level, b[LINK_INDEX] != 0
 
 
 class RkS85Provider(Provider):
@@ -65,7 +91,8 @@ class RkS85Provider(Provider):
 
     def __init__(self):
         self._diag: List[str] = []
-        self._last: Optional[Tuple[int, float]] = None
+        # level, when, read on the cable (so the text can say where it came from)
+        self._last: Optional[Tuple[int, float, bool]] = None
 
     def _read(self, path) -> Optional[Tuple[int, bool]]:
         dev = hid.device()  # type: ignore[union-attr]
@@ -74,6 +101,7 @@ class RkS85Provider(Provider):
         except (OSError, IOError) as e:
             self._diag.append(f"  open: {e}")
             return None
+        frames = {"ack": 0, "offline": 0, "status": 0, "other": 0}
         try:
             deadline = time.monotonic() + WINDOW_S
             last_send = 0.0
@@ -89,10 +117,26 @@ class RkS85Provider(Provider):
                 r = dev.read(64, READ_TIMEOUT_MS)
                 if not r:
                     continue
-                self._diag.append(f"  reply: {hexdump(r, 12)}")
+                if len(r) > 1 and r[0] == REPORT_ID and r[1] != STATUS:
+                    frames["ack"] += 1
+                elif is_offline_frame(r):
+                    frames["offline"] += 1
+                    self._diag.append(f"  offline frame: {hexdump(r, 20)}: link byte 0, "
+                                      f"level byte {r[LEVEL_INDEX]} is a placeholder and is ignored")
+                    continue
+                elif is_status_frame(r):
+                    frames["status"] += 1
+                    self._diag.append(f"  status frame: {hexdump(r, 20)}")
+                else:
+                    frames["other"] += 1
+                    self._diag.append(f"  reply: {hexdump(r, 20)}")
                 parsed = parse_reply(r)
                 if parsed is not None:
+                    self._diag.append("  frames: " + ", ".join(
+                        f"{count} {kind}" for kind, count in frames.items() if count))
                     return parsed
+            self._diag.append("  frames: " + ", ".join(
+                f"{count} {kind}" for kind, count in frames.items() if count))
             self._diag.append("  no status frame (keyboard asleep or receiver idle)")
             return None
         except (OSError, IOError, ValueError) as e:
@@ -133,17 +177,29 @@ class RkS85Provider(Provider):
             parsed = self._read(group[0]["path"])
             if parsed is not None:
                 level, linked = parsed
-                self._last = (level, time.time())
                 charging = pid == CABLE_PID
+                self._last = (level, time.time(), charging)
                 self._diag.append(f"  -> {level}% charging={charging} linked={linked}")
                 return [DeviceStatus(KEY, NAME, level, charging, True, "rk_s85",
                                      kind="keyboard", charging_known=pid == CABLE_PID,
                                      via="USB cable" if pid == CABLE_PID else "2.4 GHz receiver")]
         if cable:
-            level = self._last[0] if self._last else None
+            # on the cable, but its query answered nothing usable: charging, and
+            # the level only if one was read recently enough to be worth showing
+            last = self._last
+            if last is None or time.time() - last[1] >= ASLEEP_KEEP:
+                return [DeviceStatus(KEY, NAME, None, True, True, "rk_s85",
+                                     kind="keyboard", charging_known=True, via="USB cable",
+                                     approx="charging (level not reported while charging)",
+                                     ui_message="state.charging_level_unknown")]
+            level, _, on_cable = last
+            if on_cable:
+                return [DeviceStatus(KEY, NAME, level, True, True, "rk_s85",
+                                     kind="keyboard", charging_known=True, via="USB cable")]
             return [DeviceStatus(KEY, NAME, level, True, True, "rk_s85",
-                                 kind="keyboard", charging_known=True,
-                                 via="USB cable")]
+                                 kind="keyboard", charging_known=True, via="USB cable",
+                                 approx=f"charging (about {level}% before it was plugged in)",
+                                 ui_message="state.charging_was", ui_params={"level": level})]
         if self._last and time.time() - self._last[1] < ASLEEP_KEEP:
             return [DeviceStatus(KEY, NAME, self._last[0], False, False, "rk_s85",
                                  kind="keyboard", charging_known=False,

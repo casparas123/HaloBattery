@@ -732,11 +732,23 @@ link state at byte 7.  The provider repeats the query for a short window so a
 sleeping keyboard can answer after it is woken.
 
 The protocol comes from the open-source
-`Rainbow132/2.4G-wireless-device-battery-level-acquisition` notes.  It is not
-yet confirmed on S85 hardware.  The receiver has no charging query, so the
-level is reported with charging unknown rather than guessed.  On the USB cable
-the keyboard switches to `258a:0193`; that wired presence is the charging
-signal, and the same read-only query is used for the level.
+`Rainbow132/2.4G-wireless-device-battery-level-acquisition` notes.  The level
+was confirmed on the reporter's S85 in #494 (53 % and 82 % in both modes,
+matching the keyboard).
+
+**The link byte is what makes a level real.** A sleeping keyboard gets the same
+`13 0a` shape back with the link byte 0 and a placeholder in the level byte:
+the reporter's unit answered 1 and 0 while the keyboard was at 85 %, and test
+build 2 showed those as levels.  Only a frame with a non-zero link byte is a
+reading; offline frames are logged and ignored.
+
+The receiver has no charging query, so a keyboard that stays in 2.4 GHz mode
+while a cable charges it is reported with charging unknown rather than guessed.
+On the USB cable the keyboard switches to `258a:0193`; that wired presence is
+the charging signal and the same read-only query is used for the level.  When
+the cable answers offline frames only, the icon shows charging with the level
+from before it was plugged in, or "charging (level not reported while
+charging)".
 
 ### Keychron Ultra-Link 8K, Keychron M5
 

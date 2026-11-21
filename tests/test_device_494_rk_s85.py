@@ -13,6 +13,11 @@ def reply(level=54, linked=1):
     return [0x13, 0x0A] + [0x00] * 4 + [level, linked] + [0x00] * 12
 
 
+def offline(level=1):
+    """The receiver's answer for a sleeping keyboard: link byte 0 (#494)."""
+    return reply(level=level, linked=0)
+
+
 INFO = {
     "path": b"rk-s85",
     "product_id": R.PID,
@@ -32,6 +37,15 @@ class ParseTest(unittest.TestCase):
         bad = reply()
         bad[1] = 0x05
         self.assertIsNone(R.parse_reply(bad))
+
+    def test_an_offline_frame_is_not_a_level(self):
+        # The reporter's keyboard answered level 1 and 0 while it was at 85 %:
+        # the link byte 0 marks the receiver's placeholder, not a reading.
+        for level in (0, 1, 85):
+            with self.subTest(level=level):
+                self.assertIsNone(R.parse_reply(offline(level)))
+                self.assertTrue(R.is_offline_frame(offline(level)))
+        self.assertEqual((54, True), R.parse_reply(reply(54)))
 
 
 CABLE = dict(INFO, product_id=R.CABLE_PID, product_string="RK S85")
@@ -89,6 +103,63 @@ class PollTest(unittest.TestCase):
         wrong = dict(INFO, product_id=0x010C)
         self.assertEqual(self.poll([wrong], dev), [])
         self.assertEqual(dev.writes, [])
+
+    def test_the_poll_never_shows_an_offline_level(self):
+        dev = FakeDevice([offline(1)] * 3)
+        out = self.poll([INFO], dev)
+        self.assertEqual([(s.level, s.online) for s in out], [(None, False)])
+        self.assertIn("offline frame", " ".join(self.provider.diagnostics()))
+
+    def test_the_placeholder_frame_before_a_real_one_is_skipped(self):
+        # The receiver can answer the placeholder first and the real status
+        # frame inside the same window; the poll must not stop at the first.
+        dev = FakeDevice([offline(1), offline(0), reply(82)])
+        out = self.poll([INFO], dev)
+        self.assertEqual([(s.level, s.online) for s in out], [(82, True)])
+
+    def test_offline_frames_after_a_reading_keep_that_reading(self):
+        dev = FakeDevice([reply(82)])
+        self.poll([INFO], dev)
+        dev.replies = [offline(0)] * 3
+        out = self.poll([INFO], dev)
+        self.assertEqual([(82, False, False)], [(s.level, s.charging, s.online) for s in out])
+
+    def test_a_cable_offline_frame_is_charging_without_a_level(self):
+        dev = FakeDevice([offline(0)] * 3)
+        out = self.poll([INFO, CABLE], dev)
+        self.assertEqual([(s.level, s.charging, s.online, s.ui_message) for s in out],
+                         [(None, True, True, "state.charging_level_unknown")])
+
+    def test_a_cable_offline_frame_shows_the_level_from_before_the_cable(self):
+        dev = FakeDevice([reply(82)])
+        self.poll([INFO], dev)
+        dev.replies = [offline(0)] * 3
+        out = self.poll([INFO, CABLE], dev)
+        self.assertEqual([(s.level, s.charging, s.ui_message, s.ui_params) for s in out],
+                         [(82, True, "state.charging_was", {"level": 82})])
+
+    def test_the_fallback_keeps_a_level_read_on_the_cable_itself(self):
+        dev = FakeDevice([reply(83)])
+        self.poll([INFO, CABLE], dev)          # a live reading on the cable
+        dev.replies = [offline(0)] * 3
+        out = self.poll([INFO, CABLE], dev)
+        self.assertEqual([(s.level, s.charging, s.ui_message, s.approx) for s in out],
+                         [(83, True, "", "")])
+
+    def test_a_stale_last_level_is_not_shown_on_the_cable(self):
+        dev = FakeDevice([reply(82)])
+        self.poll([INFO], dev)
+        self.provider._last = (82, R.time.time() - R.ASLEEP_KEEP - 1, False)
+        dev.replies = [offline(0)] * 3
+        out = self.poll([INFO, CABLE], dev)
+        self.assertEqual([(s.level, s.charging, s.ui_message) for s in out],
+                         [(None, True, "state.charging_level_unknown")])
+
+    def test_a_live_cable_reading_needs_no_before_text(self):
+        dev = FakeDevice([reply(83)])
+        out = self.poll([INFO, CABLE], dev)
+        self.assertEqual([(s.level, s.charging, s.ui_message, s.approx) for s in out],
+                         [(83, True, "", "")])
 
     def test_silence_keeps_the_last_level_greyed(self):
         dev = FakeDevice([reply(54)])

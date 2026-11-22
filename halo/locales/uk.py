@@ -139,6 +139,8 @@ MESSAGES = {
     "provider.inphic": "Миші Inphic / Attack Shark",
     "provider.irocks": "iRocks M31R",
     "provider.io_aurora": "IO Aurora",
+    "provider.io_aurora": "IO Aurora",
+    "provider.graphite2": "IO Graphite 2 Pro",
     "provider.jabra": "Гарнітури Jabra (приймач Link 380 / 390)",
     "provider.kraken_v4": "Razer Kraken V4",
     "provider.mchose_kb": "Клавіатури MCHOSE",

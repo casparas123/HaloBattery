@@ -1672,3 +1672,37 @@ change normal provider allowlists.
   Aurora 83 payload, one 100 ms wait and GET_FEATURE. No CompX/Glorious
   fallback, wired probes or alternate-size probing. Real receiver, charging
   and recovery validation remain outstanding.
+### IO Graphite 2 Pro Wireless (4C4A:4155)
+
+**Connection:** 2.4 GHz dongle (`4c4a:4155`, "C-Media Electronics Inc." / "Graphite 2 Pro
+Wireless") or the headset on its USB-C cable (`0d8c:0379`, "Graphite 2 Pro (Wired Mode)").
+
+The headset's battery is on the C-Media vendor collections `ff90:0001` / `ff82:0001`, but
+the dongle only creates those two when it enumerates **with the headset already linked**:
+plugged in with the headset off it exposes four collections, and replugging it with the
+headset on exposes six (reporter's test, #537). When they are absent the app says the
+headset is not linked and sends nothing.
+
+The reporter's report descriptors define two different channels, and neither declares a
+feature report:
+
+| Collection | Report | Data bytes | Direction |
+|---|---|---|---|
+| `ff90:0001` | `0x55` | 63 | input only (status) |
+| `ff82:0001` | `0x41` | 63 | input and output (command) |
+
+That is why the first two test builds failed: the X9's `65 01` frame was written to `ff90`
+as output report 0x55, which that collection does not declare, and the fallback read a
+feature report that neither collection has. The request is therefore sent on `ff82` as
+output report 0x41:
+
+    write  ff82  41 65 01 00 ...            (63 data bytes, M HUB audio.blk.readBattery)
+    read   ff82  41 65 <level> <state>      (answer in place)
+    read   ff90  55 65 <level> <state>      (answer on the status side)
+
+The build listens on `ff90` once before sending, then reads the command collection and the
+status collection in turn; state 2 is discharging, 3 charging, 4 full, 26 asleep (the last
+one keeps the previous level greyed for five minutes). Nothing is written to `ff90`, and no
+feature report is touched. The wired headset's own collections are tried first, since the
+wired device may expose the same pair. **Unverified on hardware**: this build exists to
+find out which side answers this firmware.

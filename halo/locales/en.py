@@ -93,6 +93,8 @@ MESSAGES = {
     "provider.darmoshark": "Darmoshark N5",
     "provider.gwolves": "G-Wolves mice",
     "provider.io_aurora": "IO Aurora",
+    "provider.io_aurora": "IO Aurora",
+    "provider.graphite2": "IO Graphite 2 Pro",
     "provider.glorious": "Glorious Model O Wireless",
     "provider.gs3075t": "GANSS GS3075T keyboards",
     "provider.hyperx": "HyperX Cloud II Wireless",

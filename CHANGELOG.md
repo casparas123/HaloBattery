@@ -87,6 +87,16 @@ and the project follows [Semantic Versioning](https://semver.org/).
   captured control collection; keep old readings greyed when a query fails.
   Confirmed on a user's unit: 100 % matching IO Hub, the charging ring on the
   PC cable and clearing when unplugged ([#493](https://github.com/HeyOkay/HaloBattery/issues/493)).
+- IO by Red Square Graphite 2 Pro Wireless (`4c4a:4155` dongle, `0d8c:0379`
+  wired): the dongle only creates its C-Media vendor collections (`ff90:0001`,
+  `ff82:0001`) when it enumerates with the headset already linked. The
+  reporter's descriptors show `ff90` is input-only report 0x55 and `ff82` is an
+  input/output pair on report 0x41, with no feature report on either, so this
+  build sends the read-only `65 01` query on `ff82` report 0x41 and reads both
+  the command and status sides, after one idle listen on `ff90`. Nothing is
+  written to `ff90`; the wired device's own pair is tried first. Level and
+  charging remain **unverified on hardware**
+  ([#537](https://github.com/HeyOkay/HaloBattery/issues/537)).
 - Sony INZONE H5 (`054C:0EBF`): read its dongle's vendor HID collection
   (`FF04:0001`) with the same Sony battery frame as the INZONE H9, which that
   dongle carries over a COM port instead. Shows the level and charging state,

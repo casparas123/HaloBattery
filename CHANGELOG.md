@@ -6,6 +6,14 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Akko Verge S9 Ultra (`36EB:1087` dongle): read the level from the dongle's HID report 2
+  (`02 10` link, `02 12` battery), decoded from a USBPcap capture of the vendor app, with
+  the frame's two-byte trailer computed and the reply's trailer checked. The exchange has
+  no charging flag. Unverified in this app - a test build is with the reporter of
+  [#505](https://github.com/HeyOkay/HaloBattery/issues/505).
+
 ### Changed
 
 - Wait briefly for GitHub release-attestation availability before completing

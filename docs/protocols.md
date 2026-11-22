@@ -1672,3 +1672,28 @@ change normal provider allowlists.
   Aurora 83 payload, one 100 ms wait and GET_FEATURE. No CompX/Glorious
   fallback, wired probes or alternate-size probing. Real receiver, charging
   and recovery validation remain outstanding.
+
+### Turtle Beach Stellar Wireless (ROCCAT Syn Max Air 1E7D:3A3F, Stealth 700 Gen 2 10F5:218C)
+
+The receiver exposes a vendor collection `ff00:0001` with 64-byte unnumbered
+input and output reports. Interface 0 is the only collection queried.
+
+    request  00 8A 07 06 01 00 ...            (64 bytes, no report id)
+    reply    8A 83 06 02 LL 00 V1 V1 V2 V2 CC
+             LL    coarse level 0..5 (6 while charging)
+             V1V1  cell voltage, little-endian mV (20 mV steps)
+             V2V2  second, filtered voltage
+             CC    01 while charging / on the dock
+
+The receiver pushes unsolicited `E0`-`E6` event reports on the same
+collection; the read ignores them and matches the `8A` tag. No reply within
+1.5 s means the headset is off or asleep while the receiver stays
+enumerated. Only this read-only status request is sent.
+
+Source: protocol captured from ROCCAT Swarm (USBPcap, firmware 1.08) and
+documented by @BrooklynBanana in #206; reference implementation
+(GPL-3.0) at github.com/ferloom/Wireless-Device-Battery-Monitor. The Syn
+Max Air percentage uses that unit's measured discharge curve; the Stealth
+700 Gen 2 is a different battery, so it reports the receiver's coarse
+level until an owner confirms a curve. Both models are **unverified in the
+app** until their owners run a test build.

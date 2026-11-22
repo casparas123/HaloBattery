@@ -92,6 +92,7 @@ MESSAGES = {
     "provider.darmoshark": "Darmoshark N5",
     "provider.gwolves": "Мыши G-Wolves",
     "provider.io_aurora": "IO Aurora",
+    "provider.stellar": "Наушники ROCCAT / Turtle Beach",
     "provider.glorious": "Glorious Model O Wireless",
     "provider.gs3075t": "Клавиатуры GANSS GS3075T",
     "provider.hyperx": "HyperX Cloud II Wireless",

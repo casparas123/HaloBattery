@@ -8,6 +8,16 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Turtle Beach Stellar Wireless headsets: the ROCCAT Syn Max Air (`1e7d:3a3f`)
+  and Turtle Beach Stealth 700 Gen 2 (`10f5:218c`) share a receiver whose
+  `ff00:0001` collection answers a 64-byte unnumbered request with
+  `8A 83 06 02 LL 00 V1 V1 V2 V2 CC` (level, cell voltage, charging).
+  Confirmed capture from ROCCAT Swarm on the Syn Max Air; the Gen 2 shows the
+  same collection in its diagnostics but has no capture yet. The Syn Max Air
+  derives its percentage from the measured voltage curve, the Gen 2 shows the
+  receiver's coarse level. Read-only; both await owner confirmation
+  ([#206](https://github.com/HeyOkay/HaloBattery/issues/206)).
+
 - Restrict battery requests to sourced HID control collections, keep confirmed
   cable routes, hold unsourced receiver paths, and restore Barracuda receiver
   mode after failed reads. Correct

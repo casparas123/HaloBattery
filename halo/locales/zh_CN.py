@@ -94,6 +94,7 @@ MESSAGES = {
     "provider.darmoshark": "Darmoshark N5",
     "provider.gwolves": "G-Wolves 鼠标",
     "provider.io_aurora": "IO Aurora",
+    "provider.stellar": "ROCCAT / Turtle Beach 耳机",
     "provider.glorious": "Glorious Model O Wireless",
     "provider.gs3075t": "GANSS GS3075T 键盘",
     "provider.hyperx": "HyperX Cloud II Wireless",

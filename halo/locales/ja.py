@@ -94,6 +94,7 @@ MESSAGES = {
     "provider.darmoshark": "Darmoshark N5",
     "provider.gwolves": "G-Wolves マウス",
     "provider.io_aurora": "IO Aurora",
+    "provider.stellar": "ROCCAT / Turtle Beach ヘッドセット",
     "provider.glorious": "Glorious Model O Wireless",
     "provider.gs3075t": "GANSS GS3075T キーボード",
     "provider.hyperx": "HyperX Cloud II Wireless",

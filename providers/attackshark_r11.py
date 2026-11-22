@@ -57,9 +57,10 @@ class AttackSharkR11Provider(Provider):
     def __init__(self):
         self._diag: List[str] = []
         self._last: Optional[Tuple[int, bool, float]] = None
-        # The mouse reports a lower level while charging (95 % at a full 100 %),
-        # the same way the vendor app keeps showing the level from before the
-        # cable. Hold that level for the charging session.
+        # The mouse can report a lower level while charging (95 % at a full 100 %),
+        # and a poll around the plug-in can catch 85 % on the way from 90 %. Keep
+        # the higher of that pre-cable level and the charging reply, which matches
+        # the vendor app in both cases.
         self._precharge: Optional[int] = None
 
     def _pick(self, infos: List[dict]) -> Optional[dict]:
@@ -124,7 +125,7 @@ class AttackSharkR11Provider(Provider):
                     if self._precharge is None and self._last is not None and not self._last[1]:
                         self._precharge = self._last[0]
                     if self._precharge is not None:
-                        level = self._precharge
+                        level = max(level, self._precharge)
                 else:
                     self._precharge = None
                 self._last = (level, charging, time.time())

@@ -36,6 +36,8 @@ and the project follows [Semantic Versioning](https://semver.org/).
 - Read the Attack Shark R11 Ultra on its 2.4 GHz CompX 8K receiver
   (`3554:FB44`) with the shared 17-byte power query, so the tray shows its
   level and charging state (#525).
+  While charging it holds the level from before the cable (the mouse reports a
+  few points lower then, while the vendor app keeps the pre-cable level).
 - MCHOSE G98 Pro (`41E4:2004`) keyboard over the same Sinowealth `13 4A 01`
   command as the K87, with the charging flag read from the reply's high
   nibble. Level and charging confirmed on the reporter's hardware in

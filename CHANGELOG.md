@@ -252,6 +252,9 @@ and the project follows [Semantic Versioning](https://semver.org/).
   Test build pending on the reporter's unit.
 
 ### Fixed
+- Rapoo VT9 Pro: the charging cable's id (`24ae:418a`) now reports charging on
+  the same icon as the `24ae:185a` receiver, instead of leaving the last level
+  greyed out (#109).
 - Slightly inset pictograms inside the Classic thick ring while preserving the thin-ring layout.
 - Keep the last reported Phone Link charge visible when its cache does not
   change; stop stale charging animation and do not treat it as a live reading.

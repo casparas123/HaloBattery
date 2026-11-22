@@ -1364,9 +1364,15 @@ Windows HID reads. Other report families, unknown states and percentages above
 claim about this receiver's missing HID report descriptor. A quiet receiver
 keeps its last value greyed for up to five minutes; unplugging clears it.
 
-The capture confirms 100% discharging only. Charging and other percentages
-have source-based simulated tests; the old test build received no reporter
-confirmation, and this recovery has not been tested on hardware.
+On its charging cable the same mouse enumerates as **`24ae:418a`** (reporter's
+list in #109, same vendor collections). That id is treated as the charging
+signal for the `185a` icon: if it pushes the BB frame the state byte decides, and
+if it pushes nothing at all its mere presence reports charging with the level
+from before it was plugged in. Level was confirmed by the reporter against the
+keyboard's own display; charging is being tested in the #109 build.
+
+The capture confirms 100% discharging only; other percentages come from
+source-based simulated tests.
 
 ### Wraith W1
 

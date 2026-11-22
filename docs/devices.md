@@ -62,6 +62,7 @@
 | [JBL Quantum 350 Wireless](protocols.md#jbl-quantum-350-wireless) | 2.4 GHz receiver (`0ecb:206b`) | level only; charging not exposed |
 | [Keychron Ultra-Link 8K, Keychron M5](protocols.md#keychron-ultra-link-8k-keychron-m5) | 2.4 GHz receiver and USB cable | level confirmed on hardware (M6 8K and G4, #373); charging from bit 7 of the reply, not yet seen in the app |
 | [IO Aurora](protocols.md#io-aurora) | 2.4 GHz receiver (`3554:fb08`), cable (`3554:fb09`) | yes (level and charging) |
+| [IO Graphite 2 Pro Wireless](protocols.md#io-graphite-2-pro-wireless-4c4a4155) | 2.4 GHz dongle (`4c4a:4155`) or USB-C cable (`0d8c:0379`) | unverified (#537) |
 | [LAMZU Maya X](protocols.md#lamzu-maya-x) | 8K dongle or USB cable | yes |
 | [LAMZU Atlantis V2](protocols.md#lamzu-atlantis-v2) | 2.4 GHz receiver (3554:F50D) or USB cable (3554:F50F) | yes (level and charging) |
 | [Lofree Hyzen](protocols.md#lofree-hyzen) | 2.4 GHz dongle | no |

@@ -1672,3 +1672,30 @@ change normal provider allowlists.
   Aurora 83 payload, one 100 ms wait and GET_FEATURE. No CompX/Glorious
   fallback, wired probes or alternate-size probing. Real receiver, charging
   and recovery validation remain outstanding.
+
+### IO Graphite 2 Pro Wireless (4C4A:4155)
+
+**Connection:** 2.4 GHz dongle (`4c4a:4155`, "C-Media Electronics Inc." / "Graphite 2 Pro
+Wireless") or the headset on its USB-C cable (`0d8c:0379`, "Graphite 2 Pro (Wired Mode)").
+
+The headset's battery is on the C-Media vendor collections `ff90:0001` / `ff82:0001`, but
+the dongle only creates those two when it enumerates **with the headset already linked**:
+plugged in with the headset off it exposes four collections, and replugging it with the
+headset on exposes six (reporter's test, #537). When they are absent the app says the
+headset is not linked and sends nothing.
+
+The status read is the MCHOSE X9's `65 01` family query (see `providers/mchose.py`):
+report 0x55, 63 data bytes, answered `55 65 <level> <state>` with state 2 discharging,
+3 charging, 4 full, 26 asleep. On this firmware the first test build's output report 0x55
+was refused by Windows with `ERROR_INVALID_FUNCTION`, so this build logs the collection's
+HID report lengths (input/output/feature) and the exact native error, then tries the same
+read-only request three ways, stopping at the first that answers:
+
+1. output report 0x55 with `65 01 ...`;
+2. a feature read of report 0x55;
+3. an unnumbered 64-byte output report (`00 65 01 ...`).
+
+The wired headset's own collections are tried before the dongle's, since the wired device
+may expose the channel even when the dongle refuses it. A collection that refuses every
+form is logged and skipped; nothing is written to the headset's settings. **Unverified on
+hardware**: this build exists to find out which form, if any, this firmware accepts.

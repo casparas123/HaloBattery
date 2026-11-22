@@ -148,6 +148,8 @@ PIDS: Dict[int, Dict[int, str]] = {
         0xFA09: "Compx 2.4 GHz keyboard",
         0xF520: "Teevolution Terra Pro (1K receiver)",
         0xF523: "Teevolution Terra Pro (2.4 GHz)",
+        0xF54B: "GravaStar Mercury X Pro (4K receiver)",
+        0xF549: "GravaStar Mercury X Pro (wired)",
     },
     0x35BB: {
         0xD3FA: "HECATE mouse (wired)",

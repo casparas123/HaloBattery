@@ -246,6 +246,29 @@ class PulsarTest(unittest.TestCase):
         self.assertEqual("mouse", d.kind)
         self.assertEqual([(0xFF02, 0x0002)], bus.written())
 
+    def test_the_grava_star_mercury_x_pro_receiver_is_read(self):
+        # #526: 3554:f54b on the 4K dongle. The reporter's vendor software shows a
+        # level, so the family's report-8 power query is expected to answer here too.
+        bus = self.one_receiver(vid=0x3554, pid=0xF54B, replies=[reply(64, 1, 4010)])
+        found = P.PulsarProvider().poll()
+        self.assertEqual(1, len(found))
+        d = found[0]
+        self.assertEqual("pulsar:3554f54b", d.key)
+        self.assertEqual("GravaStar Mercury X Pro (4K receiver)", d.name)
+        self.assertEqual((64, True), (d.level, d.charging))
+        self.assertEqual([(0xFF02, 0x0002)], bus.written())
+
+    def test_the_grava_star_mercury_x_pro_on_its_cable_is_read(self):
+        # #526, the cable id from the vendor tool's log
+        bus = self.one_receiver(vid=0x3554, pid=0xF549, replies=[reply(95, 1, 4100)])
+        found = P.PulsarProvider().poll()
+        self.assertEqual(1, len(found))
+        d = found[0]
+        self.assertEqual("pulsar:3554f549", d.key)
+        self.assertEqual("GravaStar Mercury X Pro (wired)", d.name)
+        self.assertEqual((95, True), (d.level, d.charging))
+        self.assertEqual([(0xFF02, 0x0002)], bus.written())
+
     def test_the_teevolution_terra_pro_is_read_as_a_keyboard(self):
         # #300: 3554:f523 'Compx' 'RapidSync' - the dongle's product string does not
         # name the model, but it publishes the family's ff02:0002 collection

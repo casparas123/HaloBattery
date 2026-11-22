@@ -36,6 +36,9 @@ and the project follows [Semantic Versioning](https://semver.org/).
   and Exit HaloBattery hover colors, with themed pressed feedback.
 
 ### Added
+- Read the GravaStar Mercury X Pro on its 4K receiver (`3554:F54B`) and on its
+  cable (`3554:F549`) with the shared CompX power query (#526). The ids come
+  from the reporter's vendor tool; the first read is the test build.
 - Add an outline Discord shortcut at the bottom of the navigation rail, with
   a tooltip and a native fade to Discord's brand color on hover.
 - MCHOSE G98 Pro (`41E4:2004`) keyboard over the same Sinowealth `13 4A 01`

@@ -76,6 +76,8 @@ from .base import DeviceStatus, Provider, hexdump, log
 RAPOO_VID = 0x24AE
 VT7_RECEIVER = 0x1413      # the mouse's 2.4 GHz receiver
 VT9_PRO_RECEIVER = 0x185A  # older VT9 Pro, passive BB family from issue #109
+VT9_PRO_CABLE = 0x418A     # ... the same mouse on its charging cable (#109)
+VT9_PRO_PIDS = (VT9_PRO_RECEIVER, VT9_PRO_CABLE)
 VT7_CABLE = 0x4613         # ... and the same mouse on its charging cable
 V700DIY_KEYBOARD = 0x4824  # the keyboard on its cable / plugged in
 V700DIY_RECEIVER = 0x1924  # ... and its own 2.4 GHz receiver
@@ -88,6 +90,7 @@ PIDS = {
     V700DIY_KEYBOARD: ("Rapoo V700DIY-98", "keyboard", V700DIY_KEYBOARD),
     0x14A9: ("Rapoo VT9 Pro V2", "mouse", 0x14A9),
     VT9_PRO_RECEIVER: ("Rapoo VT9 Pro", "mouse", VT9_PRO_RECEIVER),
+    VT9_PRO_CABLE: ("Rapoo VT9 Pro", "mouse", VT9_PRO_RECEIVER),
 }
 
 VENDOR_PAGE = 0xFF00
@@ -269,9 +272,12 @@ class RapooProvider(Provider):
             log.warning("hid.enumerate(rapoo): %s", e)
             return []
         found: Dict[str, List[Tuple[int, bool, str, str]]] = {}   # key -> readings
+        cable_seen = False
         for pid, (name, kind, logical) in PIDS.items():
             mine = [d for d in infos if d["product_id"] == pid]
-            if pid == VT9_PRO_RECEIVER:
+            if pid == VT9_PRO_CABLE:
+                cable_seen = bool(mine)
+            if pid in VT9_PRO_PIDS:
                 # #109 identifies two vendor top-level collections on iface 1.
                 # The capture cannot say which Windows collection receives BB;
                 # listen on these two, never on the pointer/key/consumer faces.
@@ -297,7 +303,7 @@ class RapooProvider(Provider):
             quiet = self._quiet.get(pid, 0)
             deep = self._chosen.get(pid) is None and (
                 quiet == 0 or quiet % QUIET_RESCAN_EVERY == 0)
-            max_candidates = 2 if pid == VT9_PRO_RECEIVER else MAX_CANDIDATES
+            max_candidates = 2 if pid in VT9_PRO_PIDS else MAX_CANDIDATES
             budget = order[:max_candidates] if deep else order[:1]
             got = None
             for n, d in enumerate(budget):
@@ -306,7 +312,7 @@ class RapooProvider(Provider):
                 # The first candidate is the one that carries the pushes, and it gets the
                 # full window (one push period); the extra candidates of a full scan only
                 # a short one - they are a fallback for a device that moved.
-                if pid == VT9_PRO_RECEIVER:
+                if pid in VT9_PRO_PIDS:
                     got = self._listen(d["path"], VT9_PRO_ATTEMPTS, parser=parse_vt9pro)
                 else:
                     got = self._listen(d["path"],
@@ -323,13 +329,29 @@ class RapooProvider(Provider):
                               if self._last.get(key) else
                               "  nothing heard yet and no earlier level")
 
+        # The charging cable enumerates as 418a and may push nothing at all: its
+        # presence is the charging signal, as the wired id is on the other models.
+        vt9_key = f"rapoo:{VT9_PRO_RECEIVER:04x}"
+        if cable_seen:
+            if vt9_key in found:
+                level, _charging, name, kind = found[vt9_key][0]
+                found[vt9_key] = [(level, True, name, kind)]
+                self._diag.append("[Rapoo] 418a on the cable: charging")
+            else:
+                meta = self._meta.get(vt9_key, ("Rapoo VT9 Pro", "mouse"))
+                last = self._last.get(vt9_key)
+                found[vt9_key] = [(last[0] if last else None, True, meta[0], meta[1])]
+                self._diag.append("[Rapoo] 418a on the cable: charging"
+                                  + (" with the last level" if last else ", no level yet"))
+
         out: List[DeviceStatus] = []
         for key, readings in found.items():
             # one device over two ids: a reading that reports charging wins
             # over one that does not (a charging cable beats a stale receiver)
             readings.sort(key=lambda r: (not r[1],))
             level, charging, name, kind = readings[0]
-            self._last[key] = (level, charging, time.time())
+            if level is not None:
+                self._last[key] = (level, charging, time.time())
             out.append(DeviceStatus(key, name, level, charging, True, "rapoo",
                                     kind=kind))
         # silent: a receiver cannot tell a switched-off mouse from one that went

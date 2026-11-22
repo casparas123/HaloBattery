@@ -102,6 +102,30 @@ class VT9ProTests(unittest.TestCase):
             with self.subTest(frame=frame):
                 self.assertIsNone(rapoo.parse_vt9pro(frame))
 
+    def test_the_charging_cable_id_shares_the_icon_and_marks_charging(self):
+        # #109: plugged in, the mouse adds 24ae:418a; it may push nothing at all,
+        # so its presence is the charging signal.
+        receiver = descriptor(b"vt9pro")
+        cable = descriptor(b"vt9cable", pid=0x418A)
+        result = self.poll([receiver, cable],
+                           {b"vt9pro": Device([CAPTURE]), b"vt9cable": Device([])})
+        self.assertEqual([(s.key, s.name, s.level, s.charging, s.online) for s in result],
+                         [("rapoo:185a", "Rapoo VT9 Pro", 100, True, True)])
+
+    def test_the_cable_alone_still_shows_charging_without_inventing_a_level(self):
+        cable = descriptor(b"vt9cable", pid=0x418A)
+        result = self.poll([cable], {b"vt9cable": Device([])})
+        self.assertEqual([(s.key, s.level, s.charging, s.online) for s in result],
+                         [("rapoo:185a", None, True, True)])
+
+    def test_the_cable_does_not_erase_the_last_level(self):
+        receiver = descriptor(b"vt9pro")
+        cable = descriptor(b"vt9cable", pid=0x418A)
+        self.poll([receiver], {b"vt9pro": Device([CAPTURE])})
+        result = self.poll([receiver, cable],
+                           {b"vt9pro": Device([]), b"vt9cable": Device([])})
+        self.assertEqual([(s.level, s.charging) for s in result], [(100, True)])
+
     def test_zero_padded_windows_completion_preserves_the_seven_byte_payload(self):
         item = descriptor(b"vt9pro")
         for length in (8, 10, 32, 64):

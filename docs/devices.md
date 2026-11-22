@@ -114,7 +114,7 @@
 | [Red Square Alumix TKL (RSQ-20055)](protocols.md#red-square-alumix-tkl-rsq-20055) | 2.4 GHz receiver (342D:E411) | no |
 | [Sony DualSense (PS5)](protocols.md#sony-dualsense-ps5) | USB or Bluetooth | yes |
 | [Sony DualShock 4 (PS4)](protocols.md#sony-dualshock-4-ps4) | USB cable and Bluetooth | yes |
-| [Rapoo VT9 Pro, original `24AE:185A`](protocols.md#passive-inphic--attack-shark-and-rapoo-readers) | 2.4 GHz receiver | capture confirms 100% discharging; recovered app path unverified |
+| [Rapoo VT9 Pro, original `24AE:185A`](protocols.md#passive-inphic--attack-shark-and-rapoo-readers) | 2.4 GHz receiver or USB cable (`24AE:418A`) | level confirmed by the reporter (#109); charging on the cable in test |
 | [Steam Controller (2025) with its puck](protocols.md#steam-controller-2025-with-its-puck) | 2.4 GHz puck | yes |
 | [Steam Controller (2025), wired `28DE:1302`](protocols.md#steam-controller-2025-with-its-puck) | USB | no — recovered path needs hardware confirmation |
 | [SteelSeries Aerox 3 Wireless](protocols.md#steelseries-aerox-3-wireless) | 2.4 GHz dongle | no |

@@ -929,15 +929,34 @@ Listened to, never written: byte 14 of the controller's enhanced input report (r
 
 ### 8BitDo Ultimate 2 Wireless (XInput)
 
-**Connection:** Bluetooth (level); 2.4 GHz receiver (`2dc8:310b`) or USB (gamepad only).
+**Connection:** Bluetooth (level); 2.4 GHz receiver (`2dc8:310b`, level asked from the
+dongle - unverified); USB (gamepad only).
 
 An XInput pad, so Windows.Gaming.Input owns the battery report: over the dongle it
 returns its placeholder (`remain=1000`, `full=1000`), and Windows Settings shows no
-battery for the device either (checked by the reporter). The receiver's vendor
-collection (`ff7a:0001`) is silent - the diagnostics recorded `nothing received` - and
-its XInput-facing collection `0001:0005` must never be opened: reading it makes XInput
-fail with `read error` and the pad disappears on 2.4 GHz and USB (test build 3, #461).
-There is therefore no level to read over the dongle, and none is invented.
+battery for the device either (checked by the reporter). The receiver's XInput-facing
+collection `0001:0005` must never be opened: reading it makes XInput fail with
+`read error` and the pad disappears on 2.4 GHz and USB (test build 3, #461).
+
+The vendor collection (`ff7a:0001`, output report `0x81`, input report `0x02`, 64 bytes)
+sends nothing by itself - test builds 1-4 recorded `nothing received` - because it is a
+request/answer channel. 8BitDo Ultimate Software V2 asks the dongle about the controller
+behind it with one fixed query (`getControllerVersion_CMD`), documented by
+[8bitdo-ultimate2-linux](https://github.com/MiguelSanzBr/8bitdo-ultimate2-linux)
+(MIT; reverse-engineered from the official app):
+
+| Request (zero-padded to 64 bytes) | Answer | Read |
+|---|---|---|
+| `81 04 21 01 00 00 06` | `02 04 04 00 21 01 ...` | byte 18 = battery %; 19-20 = firmware x100; 23 = colorway |
+| `81 04 00 01` | `02 04 04 00 00 01 ...` | bytes 22-23 = PID of the answering device: `0x6013` dongle, `0x6012` the controller on its cable (logged only) |
+
+Only a dongle answers the first query; a controller on its cable or switched off does
+not, and then no level is shown. The answer has no documented charging flag: the same
+family's input report keeps the level in bits 0-6 and charging in bit 7, and a plain
+percentage never sets bit 7, so a set bit 7 is read as charging and a clear one leaves
+the charging state unknown. Both answers are written to the diagnostics raw. The pairing
+rule is the naming rule below: one XInput slot whose one Windows.Gaming.Input report is
+`2dc8:310b`. **Unverified on hardware** (#520).
 
 Over Bluetooth the controller reports one, and the Bluetooth provider shows it - 60 % on
 the reporter's unit. The XInput provider names the pad **8BitDo Ultimate 2** from the

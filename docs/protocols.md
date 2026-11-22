@@ -562,6 +562,14 @@ The request header is flag `0x55`, command `0x05`, reserved, checksum, size and 
 its receiver publishes ff02:0002 and no ff42 at all, so it is read here rather than by
 the bragi path. The Teevolution Terra Pro (3554:F523, #300) is the same exchange behind the 'RapidSync' product string, with its vendor collection on interface 2. Its 1K sibling `3554:F520` is the same reader and is now claimed too; **confirmed on hardware** by @7-1ME in #448 at 100% (4235 mV). The ATK X1 Pro is confirmed on hardware by @gnrlk3nobi in #230: it read immediately, the level stayed within about 5 % of ATK HUB in both states (the two apps sample at different moments, so the sign flips), and the charging state followed the cable. The keyboard receiver and the Fire X 8K are still waiting for their testers.
 
+### Attack Shark R11 Ultra
+
+**Connection:** 2.4 GHz CompX 8K receiver (3554:FB44)
+
+The receiver publishes the same `ff02:0002` CompX control collection as the LAMZU / Pulsar mice above - next to `ff03` / `ff04` / `ff05` vendor pages - and is read with the same 17-byte report-0x08 frame: command 0x04 asks for the power details, the level is in byte 6, the on-cable flag in byte 7, and byte 16 carries the checksum (0x55 minus the sum of bytes 0-15). Nothing is written to the mouse or keyboard collections; only that one question goes to the control collection. A frame with a wrong checksum, or a level outside 0-100, is refused rather than shown.
+
+Reported in [#525](https://github.com/HeyOkay/HaloBattery/issues/525): the id and the collection are claimed from the reporter's diagnostics. The first read is the test build in that issue, so the level and the charging flag stay provisional until they agree with the vendor software.
+
 ### iRocks M31R
 
 **Connection:** 2.4 GHz receiver (14A5:C009) and USB cable (14A5:C010)

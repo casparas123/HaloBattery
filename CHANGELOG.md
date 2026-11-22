@@ -87,6 +87,15 @@ and the project follows [Semantic Versioning](https://semver.org/).
   captured control collection; keep old readings greyed when a query fails.
   Confirmed on a user's unit: 100 % matching IO Hub, the charging ring on the
   PC cable and clearing when unplugged ([#493](https://github.com/HeyOkay/HaloBattery/issues/493)).
+- IO by Red Square Graphite 2 Pro Wireless (`4c4a:4155` C-Media dongle): send the
+  C-Media audio status read already used for the MCHOSE X9 (`55 65 01 ...` on
+  report 0x55, level at byte 2 and state at byte 3: 2 discharging, 3 charging,
+  4 full, 26 asleep), on the dongle's `ff90:0001` collection and then
+  `ff82:0001`. When the dongle enumerates without either collection the headset
+  is not linked and nothing is sent; an answer without a level is the headset
+  asleep, and its last level is kept greyed for five minutes. A reading from a
+  discharging state leaves the charging state unknown. **Unverified on hardware**
+  ([#537](https://github.com/HeyOkay/HaloBattery/issues/537)).
 - Sony INZONE H5 (`054C:0EBF`): read its dongle's vendor HID collection
   (`FF04:0001`) with the same Sony battery frame as the INZONE H9, which that
   dongle carries over a COM port instead. Shows the level and charging state,

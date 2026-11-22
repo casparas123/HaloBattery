@@ -1672,3 +1672,34 @@ change normal provider allowlists.
   Aurora 83 payload, one 100 ms wait and GET_FEATURE. No CompX/Glorious
   fallback, wired probes or alternate-size probing. Real receiver, charging
   and recovery validation remain outstanding.
+
+### IO Graphite 2 Pro Wireless (4C4A:4155)
+
+**Connection:** 2.4 GHz dongle, C-Media strings ("C-Media Electronics Inc." / "Graphite 2 Pro
+Wireless"). The headset itself also has Bluetooth, and a phone shows its level there; this
+reader only claims the dongle.
+
+The reporter's enumeration (#537) shows the dongle as one USB device with several
+collections: `000c:0001` twice (the second one media keys), `000b:0001` (telephony),
+`ff22:0001` (feature report 0xAA only) and, when the headset is linked, `ff90:0001` and
+`ff82:0001`, both with 64-byte input and output reports. That is the shape of the MCHOSE X9's
+C-Media dongle, which this project already reads, so the same audio status read is sent -
+one query, no configuration, nothing written to flash:
+
+| Request (report 0x55 + 63 bytes) | Answer (report 0x55) | Read |
+|---|---|---|
+| `65 01 00 ...` | `55 65 <level> <state> ...` | level = percentage; state 2 discharging, 3 charging, 4 full, 26 asleep (no level) |
+
+`ff90:0001` is tried first (where the X9 answers, within 30 ms), then `ff82:0001`; a
+collection that cannot carry report 0x55 refuses the write and is skipped. When the dongle
+enumerates without either collection the headset is not linked and nothing is sent: the icon
+appears without a number. State 26 is a real answer with no level, so the last level is kept
+greyed for five minutes; a level above 100, an unknown state or a truncated answer is
+refused rather than shown. State 3 is decoded as charging because that is what the byte means
+for this family, but it has never been observed on this model, and a discharging answer
+leaves the charging state unknown rather than asserting it. The frame and decoder are the ones
+recovered for the X9 in `providers/mchose.py` from M HUB
+(`audio.blk.readBattery` / `parseBatteryResponse`) and the sister-family community driver
+(github.com/JoaoKSS/MCHOSE_v9_PRO_Controller); no vendor app for this headset shows a battery
+percentage, so there is no reference to compare a first answer with. **Unverified on
+hardware.**

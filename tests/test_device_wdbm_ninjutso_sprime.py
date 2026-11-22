@@ -40,9 +40,10 @@ class FakeDevice:
         self.closed += 1
 
 
-def entry(pid):
-    return {"vendor_id": N.VID, "product_id": pid, "usage_page": N.PAGE,
-            "usage": N.USAGE, "feature_report_byte_length": 32,
+def entry(pid, page=None, usage=None):
+    # a real Windows entry: hidapi does not return feature_report_byte_length (#528)
+    return {"vendor_id": N.VID, "product_id": pid, "usage_page": page or N.PAGE,
+            "usage": N.USAGE if usage is None else usage,
             "path": b"nj-%04x" % pid, "product_string": "Ninjutso"}
 
 
@@ -93,11 +94,34 @@ class PollTest(unittest.TestCase):
         self.assertEqual([(r.key, r.level, r.charging, r.via) for r in res],
                          [("sprime:pm1", 70, True, "USB cable")])
 
-    def test_wrong_collection_not_opened(self):
+    def test_the_8k_receivers_are_read(self):
+        # #528: the Sora V2 8K receiver reports its vendor collection on interface 1
+        # with no report length in the enumeration, and used to be skipped twice over
+        for pid in (0xAE8C, 0xAE8A):
+            dev = FakeDevice([reply(64, charging=1)])
+            res = self.poll([entry(pid)], dev)
+            self.assertEqual([(r.key, r.name, r.level, r.charging, r.via) for r in res],
+                             [("ninjutso:sora_v2", "Ninjutso Sora V2", 64, True,
+                               "2.4 GHz receiver")], hex(pid))
+
+    def test_the_request_is_the_vendors_frame(self):
+        dev = FakeDevice([reply(55)])
+        self.poll([entry(0xAE8C)], dev)
+        self.assertEqual(32, len(dev.sent[0]))
+        self.assertEqual([0x05, 0x15, 0x00, 0x00, 0x01, 0x00, 0x00, 0x04],
+                         dev.sent[0][:8])
+        self.assertEqual(0, any(dev.sent[0][8:]))
+
+    def test_a_wrong_collection_is_not_opened(self):
         dev = FakeDevice([])
-        e = entry(N.SORA_RECEIVER); e["feature_report_byte_length"] = 16
-        self.assertEqual(self.poll([e], dev), [])
+        self.assertEqual(self.poll([entry(0xAE8C, page=0x0001, usage=0x0006)], dev), [])
         self.assertEqual(dev.sent, [])
+        self.assertIn("no ffa0:0001 collection", "\n".join(self.provider.diagnostics()))
+
+    def test_an_unknown_ninjutso_product_is_ignored(self):
+        dev = FakeDevice([reply(50)])
+        self.assertEqual(self.poll([entry(0x9999)], dev), [])
+        self.assertEqual([], dev.sent)
 
 
 if __name__ == "__main__":

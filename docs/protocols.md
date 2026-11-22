@@ -936,9 +936,9 @@ Report `0x4B`, read `0x80`: command `0x27` returns link in byte 8 and percentage
 
 ### Ninjutso Sora V2; Sprime PM1
 
-**Connection:** Sora V2 receiver `1915:AE1C` / cable `AE11`; Sprime PM1 receiver `AC1C` / `AD8C`, cable `AC11` / `AC12` / `AC13`.
+**Connection:** Sora V2 receiver `1915:AE1C`, or the 8K receiver `AE8C` / `AE8A` / cable `AE11`; Sprime PM1 receiver `AC1C` / `AD8C`, cable `AC11` / `AC12` / `AC13`.
 
-Collection `FFA0:0001`, feature report `0x05`, command `0x15`, 32-byte request. Reply byte 9 is the level (0 means 100), byte 10 charging, byte 11 full (Sprime), byte 12 online. Only this read is sent. **Unverified in this app.**
+Collection `FFA0:0001`, feature report `0x05`, command `0x15`, 32-byte request with payload byte 3 set to `0x01` and payload byte 6 (the battery argument) to `0x04` - the vendor's own frame. Reply byte 9 is the level (0 means 100), byte 10 charging, byte 11 full (Sprime), byte 12 online. The collection is picked by usage page/usage, not by a report length: hidapi on Windows returns no `feature_report_byte_length`, so a length gate used to reject every real device. Only this read is sent. **Unverified in this app** - a test build is with the reporter of [#528](https://github.com/HeyOkay/HaloBattery/issues/528).
 
 ### GameSir G7 Pro; FlyDigi Vader Pro
 

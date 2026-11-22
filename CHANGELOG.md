@@ -6,6 +6,15 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Ninjutso Sora V2 on its 8K receiver (`1915:AE8C` / `AE8A`): the same NinjaForce read as
+  the `AE1C` receiver, and the collection is now picked by usage page instead of a report
+  length, which hidapi on Windows does not report (so the Sora V2 / Sprime reader could
+  not open a device at all). The request now carries the vendor's battery argument byte.
+  Unverified in this app - a test build is with the reporter of
+  [#528](https://github.com/HeyOkay/HaloBattery/issues/528).
+
 ### Changed
 
 - Wait briefly for GitHub release-attestation availability before completing

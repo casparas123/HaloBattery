@@ -138,6 +138,7 @@ MESSAGES = {
     "state.charging": "{state}, cargando",
     "state.asleep": "{state} (último valor conocido, dispositivo suspendido)",
     "provider.ajazz": "Ratones AJAZZ",
+"provider.sinowealth_rx": "Ratones Sinowealth con receptor de 2,4 GHz",
     "provider.alienware": "Teclado Alienware Pro Wireless",
     "provider.atk_keyboard": "Teclado ATK V75X",
     "provider.atk_nearlink": "Ratones ATK X1 Nearlink",

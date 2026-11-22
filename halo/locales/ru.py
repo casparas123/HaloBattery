@@ -127,6 +127,7 @@ MESSAGES = {
     "state.charging": "{state}, заряжается",
     "state.asleep": "{state} (последнее значение, устройство спит)",
     "provider.ajazz": "Мыши AJAZZ",
+"provider.sinowealth_rx": "Мыши Sinowealth с приёмником 2,4 ГГц",
     "provider.alienware": "Клавиатура Alienware Pro Wireless",
     "provider.atk_keyboard": "Клавиатура ATK V75X",
     "provider.atk_nearlink": "Мыши ATK X1 Nearlink",

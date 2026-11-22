@@ -571,6 +571,17 @@ The K99 V3 uses M HUB's **GLW func-config** read on the id-less 64-byte generic-
 
 The request header is flag `0x55`, command `0x05`, reserved, checksum, size and little-endian offset; for a read with no payload the checksum is size + offset = `0x38`. The reply carries the same fields and its checksum covers size + offset + payload. The battery byte is **payload offset 32**: bit 7 is charging, bits 0-6 are the percentage. The earlier `55 03 00 38 38` query returned a different info frame (52 % in the reporter's diagnostics while M HUB showed 90 %), so it is not used. Protocol from [krisgfx9/Wireless-Device-Battery-Monitor PR #1957](https://github.com/krisgfx9/Wireless-Device-Battery-Monitor/pull/1957), recovered from M HUB's own web driver and confirmed on a G75 V2 on the same `3837:3033` receiver. Confirmed on the reporter's K99 V3 (@Kolomhon, #458): the level agreed with M HUB within its 10 % display step, and the charging bit followed the cable. The query is only sent shortly after real keyboard input, like the ATK keyboard provider: on an idle keyboard the request itself can wake the keyboard, and the wake can reach the desktop as input (#458 follow-up).
 
+### Sinowealth 2.4 GHz receiver (258A:002F)
+
+**Connection:** 2.4 GHz receiver (`258A:002F`), e.g. Hator mice and the Redragon M690 Pro / M602-KS
+
+The receiver answers a 7-byte feature report 5 on its `FF00:0001` vendor collection (interface 1), not an interrupt read. Two documented commands, each sent as SET_FEATURE followed by a GET_FEATURE of the same report after ~100 ms:
+
+- `05 80` link status: `05 80 01 01` while the mouse is linked, `05 80 00 ..` once it is off or asleep;
+- `05 90` battery: `05 90 11 <level>` over 2.4 GHz (level 1-100), and `05 90 10 01` (charging) / `05 90 10 02` (charged) on the cable. **The wireless reply carries no charging flag**, so the app keeps `charging_known=False` unless a cable status arrives; a wireless level of 0 means the 2.4 GHz link is not up yet and is not shown.
+
+The frame is the one OpenMouse captured from a Redragon M690 Pro on this receiver ([`captures/redragon-m690-pro`](https://github.com/OpenMouse-Project/mouse-protocol/tree/main/captures/redragon-m690-pro), [testing notes](https://github.com/OpenMouse-Project/mouse-protocol/blob/main/docs/redragon-m690-pro-testing.md)), verified on an M602-KS by [krisgfx9/Wireless-Device-Battery-Monitor](https://github.com/krisgfx9/Wireless-Device-Battery-Monitor). Both are GPL/AGPL projects: protocol facts only, and `providers/sinowealth_rx.py` is an independent implementation from the captured byte shapes, not a port of their code. `258A:002F` is a shared OEM receiver whose product string is the generic "2.4G Wireless Receiver", so the app shows one family name rather than a brand; the status names the collection that answered in the diagnostics. **Unverified in this app**: a test build is with the reporter of [#527](https://github.com/HeyOkay/HaloBattery/issues/527).
+
 ### Zaopin Z2 4K
 
 **Connection:** 2.4 GHz 4K receiver (`3554:F527`), USB-C (`3554:F526`), and Bluetooth LE.

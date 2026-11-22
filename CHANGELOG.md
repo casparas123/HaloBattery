@@ -6,6 +6,15 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Sinowealth 2.4 GHz receiver mice (`258A:002F`, e.g. Hator and Redragon models): read the
+  level from the receiver's short status report (`05 80` link, `05 90` battery). The
+  wireless reply has no charging flag, so charging stays unknown there; the cable
+  statuses (`10 01` charging, `10 02` charged) are parsed when they arrive. Unverified in
+  this app - a test build is with the reporter of
+  [#527](https://github.com/HeyOkay/HaloBattery/issues/527).
+
 ### Changed
 
 - Wait briefly for GitHub release-attestation availability before completing

@@ -117,6 +117,7 @@ MESSAGES = {
     'state.charging': '{state}, зарядталуда',
     'state.asleep': '{state} (соңғы белгілі мән, құрылғы ұйқы режимінде)',
     'provider.ajazz': 'AJAZZ тінтуірлері',
+'provider.sinowealth_rx': 'Sinowealth 2,4 ГГц қабылдағышы бар тінтуірлер',
     'provider.alienware': 'Alienware Pro Wireless пернетақтасы',
     'provider.atk_keyboard': 'ATK V75X пернетақтасы',
     'provider.atk_nearlink': 'ATK X1 Nearlink тінтуірлері',

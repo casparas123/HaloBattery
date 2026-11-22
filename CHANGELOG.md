@@ -76,6 +76,10 @@ and the project follows [Semantic Versioning](https://semver.org/).
   battery/history mutations without changing device requests or controller identities.
 
 ### Added
+- Read the 8BitDo Ultimate 2 in DInput mode (hold B while pressing Home) from
+  its 34-byte status report: level and charging in byte 14
+  ([#520](https://github.com/HeyOkay/HaloBattery/issues/520)). XInput mode keeps
+  the level-only dongle query, where the controller reports no charging bit.
 - Razer BlackShark V3 Pro (`1532:0577`) on its 2.4 GHz receiver: it exposes
   the same `ff14:0001` collections as the BlackShark V3, so it is read by that path
   ([#519](https://github.com/HeyOkay/HaloBattery/issues/519)). The reporter

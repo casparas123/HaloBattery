@@ -956,7 +956,8 @@ family's input report keeps the level in bits 0-6 and charging in bit 7, and a p
 percentage never sets bit 7, so a set bit 7 is read as charging and a clear one leaves
 the charging state unknown. Both answers are written to the diagnostics raw. The pairing
 rule is the naming rule below: one XInput slot whose one Windows.Gaming.Input report is
-`2dc8:310b`. **Unverified on hardware** (#520).
+`2dc8:310b`. The level query is confirmed on the reporter's unit in #520; the charging
+state remains unknown in XInput mode.
 
 Over Bluetooth the controller reports one, and the Bluetooth provider shows it - 60 % on
 the reporter's unit. The XInput provider names the pad **8BitDo Ultimate 2** from the
@@ -966,6 +967,21 @@ slot, one report). Windows' report order is not the XInput slot order, so next t
 controller the pad keeps the generic name rather than risk renaming the other one. Its
 Windows.Gaming.Input reports are deliberately left out of the trusted set: the
 `remain=full=1000` placeholder would otherwise become a false 100 % (#110, #191).
+
+### 8BitDo Ultimate 2 Wireless (DInput)
+
+**Connection:** USB cable, 2.4 GHz receiver, or Bluetooth, after starting the controller
+with **B** held while pressing **Home**. It appears as a DirectInput pad (`2dc8:6012`),
+not an Xbox pad, so games that only use XInput will not see it.
+
+Listens only; nothing is sent. The controller streams a 34-byte input report `0x01`:
+byte 14 holds the level in bits 0-6 and the charging state in bit 7. SDL's 8BitDo HIDAPI
+driver reads exactly that field (`data[14] >> 7` for the state and `data[14] & 0x7f` for
+the level); a level of 100 is treated as charged. The same report is available over the
+dongle, the USB cable, and Bluetooth. Older v1.02 firmware sends a 12-byte report with
+no charging field; the diagnostics show the report length, so that case is distinguishable.
+
+**Unverified on hardware** in this app; the test build is in #520.
 
 ### ASUS ROG Raikiri II
 

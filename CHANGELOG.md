@@ -30,10 +30,10 @@ and the project follows [Semantic Versioning](https://semver.org/).
   and Exit HaloBattery hover colors, with themed pressed feedback.
 
 ### Added
-- Razer Basilisk V4 Pro (`1532:00E3`) on its 2.4 GHz receiver: added to the
-  Razer mice table, which stops the receiver being skipped as an unknown device
-  ([#514](https://github.com/HeyOkay/HaloBattery/issues/514)). Unverified on
-  hardware; the wired id that reports charging is not known yet.
+- Razer Basilisk V4 Pro on its 2.4 GHz receiver (`1532:00E3`) and USB cable
+  (`1532:00E2`): added to the Razer mice table, which stops it being skipped as
+  an unknown device; the cable id reports charging through the same commands
+  ([#514](https://github.com/HeyOkay/HaloBattery/issues/514)).
 - MCHOSE G98 Pro (`41E4:2004`) keyboard over the same Sinowealth `13 4A 01`
   command as the K87, with the charging flag read from the reply's high
   nibble. Level and charging confirmed on the reporter's hardware in

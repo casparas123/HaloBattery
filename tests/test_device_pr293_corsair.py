@@ -159,7 +159,6 @@ class BragiPollTest(unittest.TestCase):
             0x1B7F: "Corsair Dark Core RGB Pro SE",
             0x1BA6: "Corsair M65 RGB Ultra Wireless",   # #411 (Slipstream receiver)
             0x1BB5: "Corsair M65 RGB Ultra Wireless",   # #411 (the same mouse on its cable)
-            0x2B42: "Corsair SABRE v3 PRO Ultralight",  # #543 (receiver)
             0x2B07: "Corsair K65 PLUS Wireless",
             0x1BDC: "Corsair M75 Wireless",
             0x0A40: "Corsair Virtuoso RGB Wireless SE",
@@ -177,7 +176,7 @@ class BragiPollTest(unittest.TestCase):
         self.assertEqual(C.BRAGI_SESSION_PIDS, {0x0A40})
         self.assertEqual(C.BRAGI_KEYS[0x2B07], "corsair:2b07")
         self.assertEqual(C.BRAGI_KINDS, {0x1B7F: "mouse", 0x1BA6: "mouse",
-                                         0x1BB5: "mouse", 0x2B42: "mouse",
+                                         0x1BB5: "mouse",
                                          0x2B07: "keyboard", 0x1BDC: "mouse"})
         self.assertNotIn(0x1B7F, C.PIDS)
         self.assertNotIn(0x0A40, C.PIDS)

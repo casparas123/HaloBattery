@@ -950,20 +950,20 @@ Windows.Gaming.Input reports are deliberately left out of the trusted set: the
 
 ### Corsair SABRE v3 PRO Ultralight
 
-**Connection:** 2.4 GHz Slipstream receiver (`1B1C:2B42`).
+**Connection:** 2.4 GHz receiver (`1B1C:2B42`); the mouse on its cable is
+`1B1C:2B43`. Both expose `FF42:0001` / `FF42:0002`.
 
-The receiver publishes the same `FF42:0001` / `FF42:0002` pair as the Dark Core
-and M65 receivers. OpenLinkHub's SABRE v3 packages (`sabrev3proW` for the
-receiver, `sabrev3proWU` on the cable) read battery property `0x0F` and charge
-property `0x10`; the level is in tenths of a percent and the charge values are
-the same 1 charging / 2 on battery / 3 full as the M65. The first Halo test build
-asks those properties through the existing Bragi/Slipstream exchange, so the
-reporter's diagnostics will show whether this model answers it or needs the
-newer Slipstream V2 framing.
-
-The receiver's product string is `CORSAIR SABRE v3 PRO WIRELESS USB Receiver`;
-the wired identity and its id are not known yet. **Unverified in this app** -
-first test build in [#543](https://github.com/HeyOkay/HaloBattery/issues/543).
+This model does not answer the older 64-byte Bragi exchange. OpenLinkHub's
+`sabrev3proW` package uses the newer 512-byte Slipstream V2 transfer: a 513-byte
+output report with report id 0, endpoint 1, `01 01`, then a get-property
+request. The battery property is `0x0F`; the reply carries tenths of a percent
+as a little-endian value at bytes 5-6. Property `0x10` is asked separately for
+the charge state (1 charging, 2 on battery, 3 full). The package performs a
+login and switches the mouse to software mode before the battery read; Halo
+repeats those handshakes, then sends only the two property reads. The level is **unverified in this app** -
+the test build in [#543](https://github.com/HeyOkay/HaloBattery/issues/543)
+decides. The wired id is read through the same transfer; the receiver's paired
+device is endpoint 1.
 
 ### ASUS ROG Raikiri II
 

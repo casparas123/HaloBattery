@@ -573,34 +573,6 @@ class BragiPollTest(unittest.TestCase):
         self.assertEqual(bus.opened, [])
         self.assertEqual(bus.dongles[b"d"].writes, [])
 
-    def test_the_sabre_v3_pro_receiver_is_read(self):
-        # #543: 1b1c:2b42 'CORSAIR SABRE v3 PRO WIRELESS USB Receiver' has the
-        # ff42:0001/0002 pair. OpenLinkHub's SABRE v3 package reads battery 0x0F
-        # and charge 0x10; this first build asks the same properties through the
-        # existing Bragi exchange, so the reporter's diagnostics decide the rest.
-        class Receiver(FakeDongle):
-            def read(self, size, timeout_ms):
-                self.reads += 1
-                if len(self.writes) >= 3:
-                    return list(bragi_reply(1))
-                return list(bragi_reply(550))
-
-        out, bus = self.poll(
-            [entry(0x2B42, b"sabre", 1, 0xFF42, 0x0001,
-                   "CORSAIR SABRE v3 PRO WIRELESS USB Receiver")],
-            {b"sabre": Receiver(replies=[])})
-        self.assertEqual(len(out), 1)
-        st = out[0]
-        self.assertEqual((st.key, st.name, st.level, st.charging, st.kind),
-                         ("corsair:2b42", "Corsair SABRE v3 PRO Ultralight",
-                          55, True, "mouse"))
-        self.assertIn(0x2B42, C.BRAGI_CHARGE_PIDS)
-        self.assertEqual(bus.opened, [b"sabre"])
-        self.assertEqual(bus.dongles[b"sabre"].writes[0][:4],
-                         bytes((0x00, 0x09, 0x02, 0x0F)))
-        self.assertEqual(bus.dongles[b"sabre"].writes[2][:4],
-                         bytes((0x00, 0x09, 0x02, 0x10)))
-
     def test_the_m65_slipstream_receiver_is_read(self):
         # #411: 1b1c:1ba6 'CORSAIR SLIPSTREAM WIRELESS USB Receiver'; the dump
         # carries the same ff42:0001/0002 pair as the Dark Core dongle. OpenLinkHub's
@@ -768,7 +740,6 @@ class BragiPollTest(unittest.TestCase):
             0x0A3D: "Corsair Virtuoso RGB Wireless SE",
             0x0A64: "Corsair Virtuoso RGB Wireless XT",
             0x0A62: "Corsair Virtuoso RGB Wireless XT",
-            0x2B42: "Corsair SABRE v3 PRO Ultralight",  # #543 (receiver)
             0x2B07: "Corsair K65 PLUS Wireless",       # #293 (K65 PLUS receiver)
             0x1BDC: "Corsair M75 Wireless",            # #301 (Slipstream receiver)
         })
@@ -931,6 +902,98 @@ class VirtuosoFamilyTests(unittest.TestCase):
         out = self.poll([entry(0x0A64, b"xt", 3, 0xFF42, 0x0001)], {b"xt": One()})
         self.assertEqual([(s.key, s.name, s.level) for s in out],
                          [("corsair:virtuoso-xt", "Corsair Virtuoso RGB Wireless XT", 55)])
+
+
+class SabreV3Test(unittest.TestCase):
+    """#543: the 512-byte Slipstream V2 read, not the 64-byte Bragi exchange."""
+
+    def test_the_request_is_513_bytes(self):
+        frame = C.sabre_v3_frame(C.SABRE_V3_PROP_BATTERY)
+        self.assertEqual(513, len(frame))
+        self.assertEqual(bytes([0x00, 0x01, 0x01, 0x01, 0x02, 0x0F]), frame[:6])
+        self.assertEqual(bytes(507), frame[6:])
+
+    def test_the_level_is_tenths_of_a_percent_at_5_6(self):
+        r = bytearray(512)
+        r[5:7] = (800).to_bytes(2, "little")
+        self.assertEqual(80, C.parse_sabre_v3_level(r))
+
+    def test_a_shifted_reply_is_read_too(self):
+        r = bytearray(513)
+        r[6:8] = (750).to_bytes(2, "little")
+        self.assertEqual(75, C.parse_sabre_v3_level(r))
+
+    def test_the_charge_state_is_byte_5(self):
+        r = bytearray(512)
+        r[5] = 1
+        self.assertTrue(C.parse_sabre_v3_charge(r))
+        r[5] = 2
+        self.assertFalse(C.parse_sabre_v3_charge(r))
+        r[5] = 3
+        self.assertFalse(C.parse_sabre_v3_charge(r))
+        r[5] = 0
+        self.assertIsNone(C.parse_sabre_v3_charge(r))
+
+    def test_a_non_multiple_of_ten_is_not_a_level(self):
+        r = bytearray(512)
+        r[5:7] = (801).to_bytes(2, "little")
+        self.assertIsNone(C.parse_sabre_v3_level(r))
+
+
+class SabreV3PollTest(unittest.TestCase):
+    class FakeDevice:
+        def __init__(self):
+            self.writes = []
+            self.last = None
+
+        def open_path(self, path):
+            pass
+
+        def write(self, data):
+            self.writes.append(bytes(data))
+            self.last = bytes(data)
+            return len(data)
+
+        def read(self, size, timeout_ms=0):
+            if self.last is None:
+                return []
+            prop = self.last[5]
+            if prop == C.SABRE_V3_PROP_BATTERY:
+                r = bytearray(512)
+                r[5:7] = (800).to_bytes(2, "little")
+                return list(r)
+            if prop == C.SABRE_V3_PROP_CHARGE:
+                r = bytearray(512)
+                r[5] = 1
+                return list(r)
+            return []
+
+        def close(self):
+            pass
+
+    INFO = [{"path": b"sabre", "interface_number": 1, "usage_page": 0xFF42,
+             "usage": 0x0001, "product_id": 0x2B42,
+             "product_string": "CORSAIR SABRE v3 PRO WIRELESS USB Receiver"}]
+
+    def setUp(self):
+        self._saved = (C.hid, C.hidlist)
+        self.dev = self.FakeDevice()
+        C.hid = types.SimpleNamespace(device=lambda: self.dev)
+        C.hidlist = types.SimpleNamespace(enumerate=lambda vid=0: list(self.INFO))
+
+    def tearDown(self):
+        C.hid, C.hidlist = self._saved
+
+    def test_the_receiver_is_read_with_the_512_byte_exchange(self):
+        out = C.CorsairProvider().poll()
+        self.assertEqual(1, len(out))
+        st = out[0]
+        self.assertEqual(("corsair:sabre-v3", 80, True, "mouse"),
+                         (st.key, st.level, st.charging, st.kind))
+        self.assertEqual([C.SABRE_V3_WRITE_SIZE] * 4,
+                         [len(w) for w in self.dev.writes])
+        self.assertEqual(C.SABRE_V3_PROP_BATTERY, self.dev.writes[2][5])
+        self.assertEqual(C.SABRE_V3_PROP_CHARGE, self.dev.writes[3][5])
 
 
 if __name__ == "__main__":

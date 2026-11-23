@@ -76,9 +76,10 @@ and the project follows [Semantic Versioning](https://semver.org/).
   battery/history mutations without changing device requests or controller identities.
 
 ### Added
-- Corsair SABRE v3 PRO Ultralight (`1B1C:2B42`) on its 2.4 GHz Slipstream
-  receiver: first attempt through the existing Bragi/Slipstream exchange, with
-  the battery and charge properties from OpenLinkHub's SABRE v3 package
+- Corsair SABRE v3 PRO Ultralight (`1B1C:2B42` receiver, `1B1C:2B43` on its
+  cable): read the level and charge state through the 512-byte Slipstream V2
+  exchange used by OpenLinkHub's SABRE v3 package, after the login and
+  software-mode handshakes; the older 64-byte Bragi frame is not answered
   ([#543](https://github.com/HeyOkay/HaloBattery/issues/543)).
 - Razer BlackShark V3 Pro (`1532:0577`) on its 2.4 GHz receiver: it exposes
   the same `ff14:0001` collections as the BlackShark V3, so it is read by that path

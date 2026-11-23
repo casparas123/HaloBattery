@@ -1257,6 +1257,26 @@ The receiver uses the Sonix 33-byte dongle reports documented and tested on an A
 
 The receiver is shared by several OEM keyboards; this provider claims it only when the product string contains `X66`. **Confirmed on hardware** by @VipexArtz in #446: the receiver read 41% (the software showed about 40%) and the Bluetooth reading was 47%; the level rose while charging, as it also does in the vendor software. The reply has no charging flag, so charging stays unknown by design.
 
+### Ducky OK-M (I-CHIP 2.4 GHz dongle)
+
+**Connection:** 2.4 GHz dongle (`056D:C077`, product string `Ducky OK-M 2.4G`).
+
+The dongle's 64-byte vendor collection on interface 1 (`FF00:0001`) takes a
+64-byte output report `0A 05` followed by zeros. The reply echoes `0A 05`; byte
+14 is the level in percent and byte 15 is the battery voltage times ten (`50 2A`
+= 80 %, 4.2 V). Only levels 1-100 are accepted. The same dongle id is used by the
+Yunzii B87, whose owner documented this read in
+[jordan-lee-code/yunzii-applet](https://github.com/jordan-lee-code/yunzii-applet);
+the repository has no licence file, so the protocol facts are used and no code is
+copied. That project notes the dongle caches the level reported at the keyboard's
+last reconnect, so a level can lag until the keyboard is power-cycled.
+
+Charging is **not exposed** by this dongle. The B87 owner detects it from the
+presence of a separate wired USB device; the Ducky OK-M's wired id is not known,
+so this app reports the level only and marks the charger state unknown.
+**Unverified on the Ducky** - first test build in
+[#545](https://github.com/HeyOkay/HaloBattery/issues/545).
+
 ### URX Core75 (2.4 GHz)
 
 **Connection:** 2.4 GHz dongle (36B0:3002, "URX Core75 Wireless")

@@ -83,6 +83,7 @@ MESSAGES = {
     "provider.jbl": "JBL Quantum",
     "provider.keychron": "Keychron",
     "provider.urx": "URX Core75",
+    "provider.ducky": "Klawiatura Ducky OK-M",
     "provider.lamzu": "Myszy LAMZU",
     "provider.lamzu_sw": "Lamzu Tachi (odbiornik 8K)",
     "provider.lofree": "Klawiatury Lofree, myszy AULA V9",

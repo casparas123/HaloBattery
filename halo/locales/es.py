@@ -112,6 +112,7 @@ MESSAGES = {
     "provider.jbl": "JBL Quantum",
     "provider.keychron": "Keychron",
     "provider.urx": "URX Core75",
+    "provider.ducky": "Teclado Ducky OK-M",
     "provider.lamzu": "Ratones LAMZU",
     "provider.lamzu_sw": "Lamzu Tachi (8K receiver)",
     "provider.lofree": "Teclados Lofree, ratones AULA V9",

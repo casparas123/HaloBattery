@@ -181,6 +181,15 @@ class PollTest(unittest.TestCase):
         self.assertEqual(fake.sent[0][1][8], 0x08)
         self.assertTrue(any("pid=5006" in line for line in diag))
 
+    def test_the_generic_royuan_receiver_is_read_with_the_bare_frame(self):
+        ents = entries(pid=0x4011)
+        fake = FakeDongle(answer(100, 100, 1), answer_path=CONFIG)
+        out, diag = self.poll(fake, ents)
+        self.assertEqual([(s.key, s.level, s.kind) for s in out],
+                         [("monsgeek:4011", 100, "keyboard")])
+        self.assertEqual(fake.sent[0][1][8], 0x00)
+        self.assertTrue(any("pid=4011" in line for line in diag))
+
     def test_the_x820_receivers_real_reply_is_read(self):
         # #372, test build 3 on the reporter's PC with the X820 Ultra in use:
         # 100 %. The keyboard link byte (r[4]) is zero while it is online.

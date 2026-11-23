@@ -45,6 +45,7 @@ MEASURED_VID = 0x3151
 # alone rather than shown as 0 %.
 DONGLES = {
     0x5026: ("MonsGeek FUN60 Pro", "keyboard"),
+    0x4011: ("MonsGeek 2.4G Wireless Keyboard", "keyboard"),
     # ROYUAN's 2.4 GHz receiver for the Attack Shark X820 Ultra (#372). The
     # receiver answers the same 0xF7 status query; this gen2 firmware wants the
     # Bit7 checksum in the request (0xFF - 0xF7 = 0x08).

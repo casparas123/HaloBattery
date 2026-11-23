@@ -90,6 +90,14 @@ class PollTest(unittest.TestCase):
         self.assertEqual(dev.writes[0][:3], [0x00, 0x0F, 0x20])
         self.assertEqual(len(dev.writes[0]), 65)
 
+    def test_versa_mlg_query(self):
+        dev = FakeDevice([query_reply(86)])
+        e = entry(0xE52E); e["usage_page"], e["usage"] = 0xFF0D, 0x00B0
+        res = self.poll([e], dev)
+        self.assertEqual([(r.key, r.level, r.via) for r in res],
+                         [("msi:e52e", 86, "2.4 GHz receiver")])
+        self.assertEqual(dev.writes[0][:3], [0x00, 0x0F, 0x20])
+
     def test_gm41_passive(self):
         dev = FakeDevice([passive_reply()])
         res = self.poll([entry(0x0D4C, "passive")], dev)

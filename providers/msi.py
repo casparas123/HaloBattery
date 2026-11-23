@@ -26,6 +26,7 @@ from .base import DeviceStatus, Provider, hexdump, log
 VID = 0x0DB0
 MODELS = {
     0x9E22: ("msi:9e22", "MSI VERSA 300 ELITE WIRELESS", False, "query", 0xFF0D, 0x00B0),
+    0xE52E: ("msi:e52e", "MSI VERSA WIRELESS MLG EDITION", False, "query", 0xFF0D, 0x00B0),
     0x0D3C: ("msi:0d31", "MSI Clutch GM31 Lightweight Wireless", False, "query", 0xFF00, 0x0001),
     0x0D3B: ("msi:0d31", "MSI Clutch GM31 Lightweight Wireless", True, "query", 0xFF00, 0x0001),
     0x0D4C: ("msi:0d41", "MSI Clutch GM41 Lightweight Wireless", False, "passive", 0xFF10, 0x0006),

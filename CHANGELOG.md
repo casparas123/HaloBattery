@@ -76,6 +76,10 @@ and the project follows [Semantic Versioning](https://semver.org/).
   battery/history mutations without changing device requests or controller identities.
 
 ### Added
+- Corsair SABRE v3 PRO Ultralight (`1B1C:2B42`) on its 2.4 GHz Slipstream
+  receiver: first attempt through the existing Bragi/Slipstream exchange, with
+  the battery and charge properties from OpenLinkHub's SABRE v3 package
+  ([#543](https://github.com/HeyOkay/HaloBattery/issues/543)).
 - Razer BlackShark V3 Pro (`1532:0577`) on its 2.4 GHz receiver: it exposes
   the same `ff14:0001` collections as the BlackShark V3, so it is read by that path
   ([#519](https://github.com/HeyOkay/HaloBattery/issues/519)). The reporter

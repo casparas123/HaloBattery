@@ -288,6 +288,7 @@ BRAGI_PIDS = {
     # cable first avoids waiting out the receiver's read budget before the level.
     0x1BB5: "Corsair M65 RGB Ultra Wireless",   # #411 the same mouse on its cable
     0x1BA6: "Corsair M65 RGB Ultra Wireless",   # #411 SLIPSTREAM receiver
+    0x2B42: "Corsair SABRE v3 PRO Ultralight",   # #543 receiver; first try
     0x2B07: "Corsair K65 PLUS Wireless",
     0x1BDC: "Corsair M75 Wireless",
     0x0A40: "Corsair Virtuoso RGB Wireless SE",
@@ -299,12 +300,13 @@ BRAGI_PIDS = {
 # the pictogram each family member draws: the Dark Core is a mouse, the K65 PLUS a
 # keyboard; the Virtuoso ids are headsets
 BRAGI_KINDS = {0x1B7F: "mouse", 0x1BA6: "mouse", 0x1BB5: "mouse",
-               0x2B07: "keyboard", 0x1BDC: "mouse"}
+               0x2B42: "mouse", 0x2B07: "keyboard", 0x1BDC: "mouse"}
 # one icon per product: a headset's receiver and cable ids share the key
 BRAGI_KEYS = {
     0x1B7F: "corsair:1b7f",
     0x1BA6: "corsair:m65",
     0x1BB5: "corsair:m65",
+    0x2B42: "corsair:2b42",
     0x2B07: "corsair:2b07",
     0x1BDC: "corsair:1bdc",
     0x0A40: "corsair:virtuoso-se",
@@ -371,7 +373,7 @@ BRAGI_EXACT_PIDS = {0x1BA6, M65_CABLE_PID}
 # ids that answer the charge property 0x10. The Virtuoso family was measured in
 # #204; the wired M65 uses the same property in OpenLinkHub's m65rgbultraWU
 # package, and its Slipstream receiver uses m65rgbultraW's charge query (#411).
-BRAGI_CHARGE_PIDS = set(BRAGI_BARE_PIDS) | {0x1BB5, 0x1BA6}
+BRAGI_CHARGE_PIDS = set(BRAGI_BARE_PIDS) | {0x1BB5, 0x1BA6, 0x2B42}
 
 
 def bragi_request(prop: int = BRAGI_PROP_BATTERY,

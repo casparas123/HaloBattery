@@ -948,6 +948,23 @@ controller the pad keeps the generic name rather than risk renaming the other on
 Windows.Gaming.Input reports are deliberately left out of the trusted set: the
 `remain=full=1000` placeholder would otherwise become a false 100 % (#110, #191).
 
+### Corsair SABRE v3 PRO Ultralight
+
+**Connection:** 2.4 GHz Slipstream receiver (`1B1C:2B42`).
+
+The receiver publishes the same `FF42:0001` / `FF42:0002` pair as the Dark Core
+and M65 receivers. OpenLinkHub's SABRE v3 packages (`sabrev3proW` for the
+receiver, `sabrev3proWU` on the cable) read battery property `0x0F` and charge
+property `0x10`; the level is in tenths of a percent and the charge values are
+the same 1 charging / 2 on battery / 3 full as the M65. The first Halo test build
+asks those properties through the existing Bragi/Slipstream exchange, so the
+reporter's diagnostics will show whether this model answers it or needs the
+newer Slipstream V2 framing.
+
+The receiver's product string is `CORSAIR SABRE v3 PRO WIRELESS USB Receiver`;
+the wired identity and its id are not known yet. **Unverified in this app** -
+first test build in [#543](https://github.com/HeyOkay/HaloBattery/issues/543).
+
 ### ASUS ROG Raikiri II
 
 **Connection:** 2.4 GHz receiver (`0B05:1C92`), vendor collection `ff03:0001` on interface 4

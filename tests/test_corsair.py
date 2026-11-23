@@ -573,6 +573,34 @@ class BragiPollTest(unittest.TestCase):
         self.assertEqual(bus.opened, [])
         self.assertEqual(bus.dongles[b"d"].writes, [])
 
+    def test_the_sabre_v3_pro_receiver_is_read(self):
+        # #543: 1b1c:2b42 'CORSAIR SABRE v3 PRO WIRELESS USB Receiver' has the
+        # ff42:0001/0002 pair. OpenLinkHub's SABRE v3 package reads battery 0x0F
+        # and charge 0x10; this first build asks the same properties through the
+        # existing Bragi exchange, so the reporter's diagnostics decide the rest.
+        class Receiver(FakeDongle):
+            def read(self, size, timeout_ms):
+                self.reads += 1
+                if len(self.writes) >= 3:
+                    return list(bragi_reply(1))
+                return list(bragi_reply(550))
+
+        out, bus = self.poll(
+            [entry(0x2B42, b"sabre", 1, 0xFF42, 0x0001,
+                   "CORSAIR SABRE v3 PRO WIRELESS USB Receiver")],
+            {b"sabre": Receiver(replies=[])})
+        self.assertEqual(len(out), 1)
+        st = out[0]
+        self.assertEqual((st.key, st.name, st.level, st.charging, st.kind),
+                         ("corsair:2b42", "Corsair SABRE v3 PRO Ultralight",
+                          55, True, "mouse"))
+        self.assertIn(0x2B42, C.BRAGI_CHARGE_PIDS)
+        self.assertEqual(bus.opened, [b"sabre"])
+        self.assertEqual(bus.dongles[b"sabre"].writes[0][:4],
+                         bytes((0x00, 0x09, 0x02, 0x0F)))
+        self.assertEqual(bus.dongles[b"sabre"].writes[2][:4],
+                         bytes((0x00, 0x09, 0x02, 0x10)))
+
     def test_the_m65_slipstream_receiver_is_read(self):
         # #411: 1b1c:1ba6 'CORSAIR SLIPSTREAM WIRELESS USB Receiver'; the dump
         # carries the same ff42:0001/0002 pair as the Dark Core dongle. OpenLinkHub's
@@ -740,6 +768,7 @@ class BragiPollTest(unittest.TestCase):
             0x0A3D: "Corsair Virtuoso RGB Wireless SE",
             0x0A64: "Corsair Virtuoso RGB Wireless XT",
             0x0A62: "Corsair Virtuoso RGB Wireless XT",
+            0x2B42: "Corsair SABRE v3 PRO Ultralight",  # #543 (receiver)
             0x2B07: "Corsair K65 PLUS Wireless",       # #293 (K65 PLUS receiver)
             0x1BDC: "Corsair M75 Wireless",            # #301 (Slipstream receiver)
         })

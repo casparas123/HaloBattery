@@ -288,6 +288,20 @@ class PulsarTest(unittest.TestCase):
         self.assertEqual("mouse", d.kind)
         self.assertEqual([(0xFF02, 0x0002)], bus.written())
 
+    def test_the_atk_v1_x2_receiver_is_read(self):
+        # #544: 373b:11fe 'Wireless mouse 8k NANO dongle-L' publishes the same
+        # ff02:0002 control collection as the X1 Pro and Fire X 8K
+        bus = self.one_receiver(vid=0x373B, pid=0x11FE, replies=[reply(80, 0, 4000)])
+        found = P.PulsarProvider().poll()
+        self.assertEqual(1, len(found))
+        d = found[0]
+        self.assertEqual("pulsar:373b11fe", d.key)
+        self.assertEqual("ATK V1 X2 (8K dongle)", d.name)
+        self.assertEqual(80, d.level)
+        self.assertFalse(d.charging)
+        self.assertEqual("mouse", d.kind)
+        self.assertEqual([(0xFF02, 0x0002)], bus.written())
+
     def test_the_atk_x1_pro_1k_receiver_is_read(self):
         # #230: 373b:101a 'ATK Mouse 1K Dongle' publishes the same ff02:0002
         # collection as its 8K sibling

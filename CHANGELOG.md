@@ -76,6 +76,9 @@ and the project follows [Semantic Versioning](https://semver.org/).
   battery/history mutations without changing device requests or controller identities.
 
 ### Added
+- ATK V1 X2 (`373B:11FE` 8K NANO dongle): the same Compx
+  `ff02:0002` power query as the X1 Pro and Fire X 8K; the reporter read 80 %
+  from a source patch ([#544](https://github.com/HeyOkay/HaloBattery/issues/544)).
 - Razer BlackShark V3 Pro (`1532:0577`) on its 2.4 GHz receiver: it exposes
   the same `ff14:0001` collections as the BlackShark V3, so it is read by that path
   ([#519](https://github.com/HeyOkay/HaloBattery/issues/519)). The reporter

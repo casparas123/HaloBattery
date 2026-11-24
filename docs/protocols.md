@@ -873,9 +873,11 @@ The transaction Lofree's own web driver (hyzen.lofree.tech) uses, on report 0x04
 
 ### Lofree Flow Lite84
 
-**Target:** `05ac:024f`, captured product `2.4G Wireless Receiver`, control
-collection `FF02:0002`. The USB ID is shared with Apple keyboards and AULA F108
-receivers, so a matching ID elsewhere never authorizes a Flow request.
+**Target:** `05ac:024f` (Apple's id, copied by Compx) and `3554:fa0a` (Compx's own
+id, #557), both with captured product `2.4G Wireless Receiver`, control
+collection `FF02:0002`. Both USB ids are shared - `05ac:024f` with Apple
+keyboards and AULA F108 receivers, `3554:fa0a` with every other Compx receiver -
+so a matching ID elsewhere never authorizes a Flow request.
 
 Source: Lofree Control HUB (`lofree.tech/home`, bundle `index-BTVblIUr.js`),
 recorded in [`providers/lofree.py`](../providers/lofree.py) and

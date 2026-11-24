@@ -12,9 +12,10 @@ the verified Python driver in wkchew03/Mouse-Battery-Tracker).
 
 The Sora V2 receiver is AE1C; AE8C and AE8A are the 8K receivers of the same
 mouse (the vendor's own device table, and OpenMouse's
-`NINJUTSO_LEGACY_RECEIVER_PRODUCT_IDS`). Its cable is AE11. The Sprime PM1
-uses AC11 / AC12 / AC13 on the cable and AC1C / AD8C on the receiver. Only
-this read is sent.
+`NINJUTSO_LEGACY_RECEIVER_PRODUCT_IDS`). Its cable is AE11, and AE13 is the
+8K cable - the mouse enumerates as AE13 while its cable connects it to the
+PC, not as its receiver (#528). The Sprime PM1 uses AC11 / AC12 / AC13 on the
+cable and AC1C / AD8C on the receiver. Only this read is sent.
 
 The collection is chosen by usage page/usage, not by a report length: hidapi
 on Windows does not return `feature_report_byte_length`, so a length gate
@@ -23,7 +24,7 @@ would reject every real device (#528).
 from __future__ import annotations
 
 import time
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 try:
     import hid
@@ -37,6 +38,7 @@ VID = 0x1915
 SORA_RECEIVER = 0xAE1C
 SORA_RECEIVERS = (SORA_RECEIVER, 0xAE8C, 0xAE8A)      # AE8C / AE8A: the 8K receivers
 SORA_CABLE = 0xAE11
+SORA_CABLES = (SORA_CABLE, 0xAE13)                    # AE13: the 8K cable
 SPRIME_CABLES = (0xAC11, 0xAC12, 0xAC13)
 SPRIME_RECEIVERS = (0xAC1C, 0xAD8C)
 PAGE, USAGE = 0xFFA0, 0x0001
@@ -49,12 +51,12 @@ LISTEN_MS = 500
 
 
 def is_cable(pid: int) -> bool:
-    return pid in (SORA_CABLE,) + SPRIME_CABLES
+    return pid in SORA_CABLES + SPRIME_CABLES
 
 
 def model(pid: int):
-    if pid in SORA_RECEIVERS + (SORA_CABLE,):
-        return "ninjutso:sora_v2", "Ninjutso Sora V2", pid == SORA_CABLE
+    if pid in SORA_RECEIVERS + SORA_CABLES:
+        return "ninjutso:sora_v2", "Ninjutso Sora V2", pid in SORA_CABLES
     if pid in SPRIME_CABLES + SPRIME_RECEIVERS:
         return "sprime:pm1", "Sprime PM1", pid in SPRIME_CABLES
     return None
@@ -92,7 +94,7 @@ class NinjutsoSprimeProvider(Provider):
             return []
 
         out: List[DeviceStatus] = []
-        seen = set()
+        groups: Dict[str, List[Tuple[dict, int, str, bool]]] = {}
         for d in infos:
             pid = d.get("product_id")
             if not isinstance(pid, int):
@@ -101,21 +103,26 @@ class NinjutsoSprimeProvider(Provider):
             if m is None:
                 continue
             key, name, cable = m
-            if key in seen:
-                continue
             if (d.get("usage_page"), d.get("usage")) != (PAGE, USAGE):
                 self._diag.append(f"  pid={pid:04x}: no ffa0:0001 collection here")
                 continue
-            got = self._read(d["path"], cable, key == "sprime:pm1")
-            if got is None:
-                self._diag.append(f"  pid={pid:04x}: no battery reply")
-                continue
-            level, charging, connected = got
-            seen.add(key)
-            out.append(DeviceStatus(key, name, level if connected else None,
-                                    charging, connected, "ninjutso_sprime",
-                                    kind="mouse",
-                                    via="USB cable" if cable else "2.4 GHz receiver"))
+            groups.setdefault(key, []).append((d, pid, name, cable))
+        for key, items in groups.items():
+            # The cable is the charging signal: ask it first when the receiver
+            # is still enumerated beside it, and fall back to the receiver only
+            # when the cable gives no reply.
+            items.sort(key=lambda it: not it[3])
+            for d, pid, name, cable in items:
+                got = self._read(d["path"], cable, key == "sprime:pm1")
+                if got is None:
+                    self._diag.append(f"  pid={pid:04x}: no battery reply")
+                    continue
+                level, charging, connected = got
+                out.append(DeviceStatus(key, name, level if connected else None,
+                                        charging, connected, "ninjutso_sprime",
+                                        kind="mouse",
+                                        via="USB cable" if cable else "2.4 GHz receiver"))
+                break
         return out
 
     def _read(self, path, cable: bool, allow_full: bool) -> Optional[Tuple[int, bool, bool]]:

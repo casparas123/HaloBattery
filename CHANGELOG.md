@@ -12,6 +12,10 @@ and the project follows [Semantic Versioning](https://semver.org/).
   the `AE1C` receiver, and the collection is now picked by usage page instead of a report
   length, which hidapi on Windows does not report (so the Sora V2 / Sprime reader could
   not open a device at all). The request now carries the vendor's battery argument byte.
+  The 8K cable is `AE13` - the id the mouse reports when its cable connects it to the PC -
+  so it is still read, and shows charging, while it charges; `AE11` stays the 1K cable. When
+  both the cable and the receiver are enumerated, the cable is asked first and a silent cable
+  falls back to the receiver.
   Unverified in this app - a test build is with the reporter of
   [#528](https://github.com/HeyOkay/HaloBattery/issues/528).
 

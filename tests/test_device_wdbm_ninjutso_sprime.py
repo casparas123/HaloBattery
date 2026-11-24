@@ -19,12 +19,15 @@ def reply(level=50, charging=0, full=0, online=1):
 
 
 class FakeDevice:
-    def __init__(self, replies):
+    def __init__(self, replies, fail_paths=()):
         self.replies = list(replies)
         self.sent = []
         self.closed = 0
+        self.fail_paths = set(fail_paths)
 
     def open_path(self, path):
+        if path in self.fail_paths:
+            raise OSError("busy")
         self.path = path
 
     def send_feature_report(self, data):
@@ -103,6 +106,26 @@ class PollTest(unittest.TestCase):
             self.assertEqual([(r.key, r.name, r.level, r.charging, r.via) for r in res],
                              [("ninjutso:sora_v2", "Ninjutso Sora V2", 64, True,
                                "2.4 GHz receiver")], hex(pid))
+
+    def test_the_8k_cable_is_read(self):
+        # #528: with its cable plugged in, the 8K mouse enumerates as AE13
+        dev = FakeDevice([reply(79, charging=1)])
+        res = self.poll([entry(0xAE13)], dev)
+        self.assertEqual([(r.key, r.level, r.charging, r.via) for r in res],
+                         [("ninjutso:sora_v2", 79, True, "USB cable")])
+
+    def test_the_cable_is_asked_before_the_receiver(self):
+        # #528: the receiver can still be enumerated while the mouse charges
+        dev = FakeDevice([reply(72, charging=1)])
+        res = self.poll([entry(0xAE8C), entry(0xAE13)], dev)
+        self.assertEqual([(r.level, r.charging, r.via) for r in res],
+                         [(72, True, "USB cable")])
+        self.assertEqual(1, len(dev.sent))
+
+    def test_a_silent_cable_falls_back_to_the_receiver(self):
+        dev = FakeDevice([reply(66)], fail_paths={b"nj-ae13"})
+        res = self.poll([entry(0xAE13), entry(0xAE8C)], dev)
+        self.assertEqual([(r.level, r.via) for r in res], [(66, "2.4 GHz receiver")])
 
     def test_the_request_is_the_vendors_frame(self):
         dev = FakeDevice([reply(55)])

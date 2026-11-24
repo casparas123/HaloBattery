@@ -33,7 +33,7 @@ class FakeHidpp:
 
     def __init__(self, features=None, name=None, error=None, silent=False, registers=None,
                  register_error_form=0x8F, register_noise=None, headset_registers=None,
-                 headset_only=False):
+                 headset_only=False, silent_ping=False):
         self.features = features or {}
         # a long-only HID++ 1.0 headset: 11 <idx> 05 <reg> in, 10 <idx> 05 <reg> ... out
         self.headset_registers = headset_registers
@@ -41,6 +41,8 @@ class FakeHidpp:
         self.name = name
         self.error = error
         self.silent = silent
+        # the 2.0 ping gets no answer but the old registers still do (a cradle)
+        self.silent_ping = silent_ping
         self.registers = registers
         # a HID++ 2.0 device answers a register read with the 2.0 error form (FF)
         self.register_error_form = register_error_form
@@ -150,6 +152,8 @@ class FakeBus:
         if dev is None:
             return self._error(path, idx, feat, fn, 0x08)
         if dev.silent:
+            return
+        if dev.silent_ping:
             return
         if dev.error is not None:
             return self._error(path, idx, feat, fn, dev.error)
@@ -280,6 +284,23 @@ class ReceiverTests(LogitechTestCase):
         [st] = L.LogitechProvider().poll()
         self.assertEqual((st.name, st.level, st.kind, st.key),
                          ("Logitech MX Revolution", 75, "mouse", "logitech:c525:1"))
+
+    def test_the_mx_revolution_charges_while_the_ping_cannot_reach_it(self):
+        # #489: in its powered cradle the mouse's 2.4 GHz link is off, so the 2.0
+        # ping gets no answer (or says unreachable), but the cradle still answers
+        # the charge register with the charging status 0x50
+        for dev in (FakeHidpp(silent_ping=True, registers={0x0D: [95, 0x69, 0x50]}),
+                    FakeHidpp(error=0x09, registers={0x0D: [95, 0x69, 0x50]})):
+            with self.subTest(silent_ping=dev.silent_ping):
+                self.use(receiver(0xC525), {b"long": ({1: dev}, b"short")})
+                [st] = L.LogitechProvider().poll()
+                self.assertEqual((st.name, st.level, st.charging, st.online),
+                                 ("Logitech MX Revolution", 95, True, True))
+
+    def test_the_cradle_register_is_not_read_for_other_models(self):
+        dev = FakeHidpp(silent_ping=True, registers={0x0D: [95, 0x69, 0x50]})
+        self.use(receiver(0xC539), {b"long": ({1: dev}, b"short")})
+        self.assertEqual(L.LogitechProvider().poll(), [])
 
     def test_the_status_register_charging_byte(self):
         dev = FakeHidpp(registers={0x07: [5, 0x21, 0x00, 0x00]})

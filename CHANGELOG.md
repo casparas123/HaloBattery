@@ -177,6 +177,13 @@ and the project follows [Semantic Versioning](https://semver.org/).
   the mouse pictogram; the existing charge-register reader already returned
   75% on the reporter's receiver. Confirmed on hardware by @breezywine in
   [#449](https://github.com/HeyOkay/HaloBattery/issues/449).
+- Logitech MX Revolution (`046D:C525`): read the charge register even when the
+  2.0 ping gets no answer. In its powered cradle the mouse's 2.4 GHz link is
+  off, but the cradle still answers register `0x0D` with the charging status
+  (`0x50`), so the icon shows charging instead of "device asleep" (a USBPcap
+  capture and SetPoint screenshots from @breezywine in
+  [#489](https://github.com/HeyOkay/HaloBattery/pull/489); test build with the
+  reporter).
 - Logitech G435 LIGHTSPEED over its Realtek receiver (`046D:0ACB`): battery as an
   approximate level, read at most once every 15 minutes and cached between reads
   because each read mutes USB audio for about 0.8 s.

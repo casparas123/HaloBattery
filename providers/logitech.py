@@ -493,11 +493,20 @@ class LogitechProvider(Provider):
             if st is not None:
                 return st
         if not self._ping(ch, slot):
-            if ch.error and ch.error_code == ERR_OLD_PROTOCOL:
-                # HID++ 1.0: no feature table, but the old battery registers
+            ping_error = ch.error_code if ch.error else None
+            # HID++ 1.0: no feature table, but the old battery registers. The MX
+            # Revolution also answers them from its powered cradle while the mouse's
+            # own 2.4 GHz link - and with it the 2.0 ping - is gone; register 0x0D
+            # then carries the charging status (#489).
+            if ping_error == ERR_OLD_PROTOCOL or pid in HIDPP10_MODELS:
                 st = self._register_battery(ch, slot, pid, idx, instance, multi)
                 if st is None:
                     self._diag.append(f"  idx={idx}: no battery register answered")
+                else:
+                    self._asleep.discard(slot)
+                    if ping_error not in (None, ERR_OLD_PROTOCOL):
+                        self._diag.append(f"  idx={idx}: the cradle answered the battery "
+                                          f"register")
                 return st
             return None
         if slot in self._ids:

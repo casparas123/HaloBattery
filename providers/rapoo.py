@@ -355,14 +355,18 @@ class RapooProvider(Provider):
             out.append(DeviceStatus(key, name, level, charging, True, "rapoo",
                                     kind=kind))
         # silent: a receiver cannot tell a switched-off mouse from one that went
-        # to sleep a few seconds ago, so keep the last value greyed out for a while
+        # to sleep a few seconds ago, so keep the last value greyed out for a while.
+        # A silent device also cannot confirm a charger: the last reading may have
+        # come from the charging cable, and keeping its charging flag showed
+        # "charging (last known value, device asleep)" after the cable was removed
+        # (#109, test build 4). The cable id's presence is the charging signal.
         now = time.time()
         for key, last in self._last.items():
             if key in found or now - last[2] >= ASLEEP_KEEP:
                 continue
             name, kind = self._meta.get(key, ("Rapoo device", "mouse"))
-            out.append(DeviceStatus(key, name, last[0], last[1], False, "rapoo",
-                                    kind=kind))
+            out.append(DeviceStatus(key, name, last[0], False, False, "rapoo",
+                                    kind=kind, charging_known=False, wake_on_input=True))
         return out
 
     def diagnostics(self) -> List[str]:

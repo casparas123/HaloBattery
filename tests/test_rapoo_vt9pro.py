@@ -206,6 +206,17 @@ class VT9ProTests(unittest.TestCase):
         self.assertNotIn("rapoo:185a", self.provider._last)
         self.assertEqual(self.poll([item], {b"vt9pro": Device()}), [])
 
+    def test_a_greyed_reading_does_not_keep_claiming_charging(self):
+        # #109 test build 4: the last reading came from the charging cable, and the
+        # greyed tray kept saying "charging" after the cable was removed
+        item = descriptor(b"vt9pro")
+        charging = bytes.fromhex("bb b0 42 20 03 02 50")
+        self.poll([item], {item["path"]: Device([charging])})
+        out = self.poll([item], {item["path"]: Device([])})
+        self.assertEqual([(s.level, s.charging, s.online, s.charging_known, s.wake_on_input)
+                          for s in out],
+                         [(80, False, False, False, True)])
+
     def test_passive_read_attempts_are_bounded_and_cache_expires(self):
         item = descriptor(b"vt9pro")
         self.poll([item], {b"vt9pro": Device([CAPTURE])})

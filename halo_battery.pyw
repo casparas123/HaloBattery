@@ -45,7 +45,7 @@ APP_NAME = "HaloBattery"
 # caches the initial tooltip; do not reuse the unbranded prototype's label.
 TRAY_APP_TIP = "HaloBattery - wireless device batteries"
 APP_TITLE = "Halo Battery"
-VERSION = "1.17.0"
+VERSION = "1.18.0"
 PRETEND_VERSION = ""             # --pretend-version 1.0.0: test the updater with a built copy
 LEGACY_NAME = "BatteryTray"      # the app's previous name (settings and autostart are migrated)
 
@@ -56,6 +56,21 @@ else:
     # Frozen builds use PyInstaller's module path. Loose sources beside the EXE
     # must not override its bundled packages (for example an older halo/ folder).
     sys.path.insert(0, BASE_DIR)
+
+# Disposable icon work must not initialize profiles, UI, providers or app mutexes.
+if "--iconify-worker" in sys.argv[1:]:
+    if sys.argv[1:] != ["--iconify-worker"]:
+        raise SystemExit(2)
+    from halo.iconify_worker import main as _iconify_worker_main
+    raise SystemExit(_iconify_worker_main())
+
+# Explicit diagnostics dispatch before profiles, logging, UI or HID imports.
+from halo import device_diagnostics as _device_diagnostics
+_diagnostic_exit = _device_diagnostics.dispatch(sys.argv[1:])
+if _diagnostic_exit is not None:
+    raise SystemExit(_diagnostic_exit)
+
+from halo.provider_policy import available_provider_labels, provider_available
 
 APPDATA_DIR = os.environ.get("APPDATA", os.path.expanduser("~"))
 PORTABLE_MARKER = "portable.txt"   # next to the app: keep settings and the log in its folder
@@ -139,8 +154,9 @@ except ImportError:
 import pystray  # noqa: E402
 from pystray import Menu, MenuItem as Item  # noqa: E402
 
-from halo import app_icon, flyout, history, icons, tray_history, updates, whatsnew, winevents  # noqa: E402
+from halo import app_icon, build_info, flyout, history, icons, tray_history, updates, whatsnew, winevents  # noqa: E402
 from halo import i18n, tray_dpi  # noqa: E402
+
 from providers import hidlist  # noqa: E402
 from providers.base import is_coarse_reading  # noqa: E402
 from providers import (AmInfinityProvider, AstroProvider, AsusProvider,  # noqa: E402
@@ -148,22 +164,40 @@ from providers import (AmInfinityProvider, AstroProvider, AsusProvider,  # noqa:
                        DeviceStatus, DjiProvider, DarmosharkProvider,
                        EightBitDoProvider, PhoneLinkProvider,
                        GWolvesProvider, HyperXAlpha2Provider, HyperXCloud3Provider, HyperXCloud3SProvider,
-                       HyperXCloudCoreProvider, HyperXProvider, JblProvider, JblQuantum350Provider,
-                       KeychronProvider, LamzuProvider, LofreeProvider, LogitechProvider,
-                       LogitechCenturionProvider, LogitechG325Provider, LogitechG435RtkProvider,
+                       HyperXCloudCoreProvider, HyperXProvider, IoAuroraProvider, JblProvider,
+                       JblQuantum350Provider, KeychronProvider, LamzuProvider, LofreeProvider,
+                       LogitechProvider, LogitechCenturionProvider, LogitechG325Provider,
+                       LogitechG435RtkProvider,
                        MchoseProvider, NintendoProvider, NzxtProvider, PlayStationProvider, PulsarProvider,
                        RazerProvider, SteelSeriesEliteProvider, SteelSeriesProvider,
                        VaxeeProvider, WLmouseProvider, XInputProvider, SteamProvider, EndgameWEProvider,
-                       AjazzProvider, AtkKeyboardProvider, AtkNearlinkProvider, AttackSharkX66Provider, AulaProvider, AulaF108Provider, DareuProvider,
+                       AjazzProvider, AtkKeyboardProvider, AtkNearlinkProvider, AttackSharkX66Provider, AttackSharkR11Provider, AulaProvider, AulaF108Provider, DareuProvider,
                        EweadnProvider, EweadnYdxProvider, FinalmouseProvider, HyperXAlphaWirelessProvider, HyperXCloudFlightProvider,
                        InphicProvider, JabraProvider, LamzuAtlantisProvider, MchoseKbProvider, MchoseV9Provider, MonsGeekProvider, RapooProvider, ShieldProvider, SkullcandyProvider, SonyInzoneProvider, TurtleBeachProvider, Endgame4kProvider, PlantronicsProvider, HyperXNgenuityProvider, IRocksProvider, AlienwareProvider, GloriousProvider, Gs3075tProvider, LamzuSinowealthProvider, UrxProvider, KrakenV4Provider, BlackSharkV3XProvider, NinjutsoSoraV3Provider,
                        RedSquareProvider,
                        MchoseK99Provider,
                        CherryProvider, CoolerMasterProvider, JblHidV3Provider, RoyalKludgeProvider, ZowieProvider, FractalProvider,
-                       AresonProvider, FantechProvider, MsiProvider, WraithProvider, ArbiterProvider, MachenikeProvider, MoondropProvider, NinjutsoSprimeProvider)
+                       AresonProvider, FantechProvider, MsiProvider, WraithProvider, ArbiterProvider, MachenikeProvider, MoondropProvider, NinjutsoSprimeProvider,
+                       AttackSharkR5Provider, SonyH9IIProvider)
 from providers.bluetooth import BluetoothWatcher  # noqa: E402
 from providers.jbl import PROBE_LISTEN_S as JBL_PROBE_LISTEN_S  # noqa: E402
 from providers.bluetooth import NativeBluetoothWatcher  # noqa: E402
+
+BUILD_CHANNEL = build_info.channel(VERSION)
+
+
+def release_notes() -> dict:
+    """Preview builds use their own bundled notes, not an unpublished stable tag."""
+    if BUILD_CHANNEL == build_info.PRE_RELEASE:
+        return {"version": VERSION, "notes": build_info.preview_notes(),
+                "url": f"https://github.com/{updates.REPO}/blob/pre-release/CHANGELOG.md#unreleased", "date": ""}
+    try:
+        rel = updates.fetch_release(VERSION, VERSION)
+        return {"version": rel.version, "notes": rel.notes, "url": rel.url, "date": rel.published}
+    except Exception as e:
+        log.info("what's new: release notes not available (%s)", e)
+        return {"version": VERSION, "notes": "", "url": updates.RELEASES_URL, "date": ""}
+
 
 # Development-only escape hatch for controlled comparisons; the Windows app
 # uses the bounded native transport by default, without a bundle marker.
@@ -262,6 +296,8 @@ PROVIDER_LABELS = {
     "hyperx_cloud_flight": "HyperX Cloud Flight Wireless",
     "hyperx_ngenuity": "HyperX Pulsefire mice",
     "inphic": "Inphic / Attack Shark mice",
+    "attackshark_r5": "Attack Shark R5 Ultra",
+    "io_aurora": "IO Aurora",
     "irocks": "iRocks M31R",
     "kraken_v4": "Razer Kraken V4",
     "jabra": "Jabra headsets (Link 380 / 390 dongle)",
@@ -282,10 +318,11 @@ PROVIDER_LABELS = {
     "logitech_g435_rtk": "Logitech G435 LIGHTSPEED (046D:0ACB)",
     "mchose": "MCHOSE mice",
     "attackshark_x66": "ATTACKSHARK X66",
+    "attackshark_r11": "Attack Shark R11 Ultra",
     "mchose_kb": "MCHOSE keyboards",
     "mchose_v9": "MCHOSE V9 Pro",
     "monsgeek": "MonsGeek keyboards",
-    "msi": "MSI mice",
+    "msi": "MSI wireless devices",
     "nintendo": "Nintendo Switch controllers",
     "ninjutso_sora_v3": "Ninjutso Sora V3",
     "nzxt": "NZXT mice",
@@ -300,6 +337,7 @@ PROVIDER_LABELS = {
     "shield": "NVIDIA SHIELD controllers",
     "skullcandy": "Skullcandy headsets",
     "sony_inzone": "Sony INZONE H9 / H5",
+    "sony_h9ii": "Sony INZONE H9 II",
     "steam": "Steam Controller (2025)",
     "steelseries": "SteelSeries",
     "steelseries_elite": "SteelSeries Arctis Nova Elite",
@@ -320,14 +358,15 @@ def make_providers(jbl_listen_first: float = 0.0) -> list:
             JblProvider(listen_first=jbl_listen_first), JblHidV3Provider(), CherryProvider(), CoolerMasterProvider(), RoyalKludgeProvider(), ZowieProvider(), FractalProvider(), LogitechProvider(), SteelSeriesProvider(), XInputProvider(),
             PlayStationProvider(), EightBitDoProvider(), BarracudaProvider(), BarracudaXProvider(), NintendoProvider(),
             AsusProvider(), GWolvesProvider(), AulaProvider(), AulaF108Provider(), LofreeProvider(), AstroProvider(), CorsairProvider(),
-            LamzuProvider(), VaxeeProvider(), AmInfinityProvider(),
+            LamzuProvider(), IoAuroraProvider(), VaxeeProvider(), AmInfinityProvider(),
             SteelSeriesEliteProvider(), LogitechCenturionProvider(), LogitechG435RtkProvider(), HyperXCloud3SProvider(), NzxtProvider(),
             SteamProvider(), EndgameWEProvider(), PhoneLinkProvider(),
             MchoseV9Provider(), DareuProvider(), ShieldProvider(), LamzuAtlantisProvider(),
-            InphicProvider(), TurtleBeachProvider(), SkullcandyProvider(), RapooProvider(), AjazzProvider(),
+            InphicProvider(), AttackSharkR5Provider(), TurtleBeachProvider(), SkullcandyProvider(), RapooProvider(), AjazzProvider(),
             BlackSharkMtkProvider(),
             IRocksProvider(),
-            SonyInzoneProvider(), AtkNearlinkProvider(), FinalmouseProvider(), AtkKeyboardProvider(), AttackSharkX66Provider(),
+            SonyInzoneProvider(), SonyH9IIProvider(), AtkNearlinkProvider(), FinalmouseProvider(), AtkKeyboardProvider(), AttackSharkX66Provider(),
+            AttackSharkR11Provider(),
             HyperXAlphaWirelessProvider(), JabraProvider(), HyperXCloudFlightProvider(), MonsGeekProvider(),
             EweadnProvider(), EweadnYdxProvider(), MchoseKbProvider(), Endgame4kProvider(), PlantronicsProvider(), HyperXNgenuityProvider(), AlienwareProvider(), DjiProvider(), DarmosharkProvider(), GloriousProvider(), Gs3075tProvider(), LamzuSinowealthProvider(), UrxProvider(), MchoseK99Provider(), RedSquareProvider(), KrakenV4Provider(), NinjutsoSoraV3Provider(), LogitechG325Provider(), JblQuantum350Provider()]
 
@@ -1929,7 +1968,7 @@ class App:
 
         def provider_items():
             labels = [(name, tr("provider." + name) if "provider." + name in i18n.LANGUAGES["en"].catalog
-                       else label) for name, label in PROVIDER_LABELS.items()]
+                       else label) for name, label in available_provider_labels(PROVIDER_LABELS).items()]
             for name, label in sorted(labels, key=lambda kv: kv[1].lower()):
                 yield Item(label, flip_provider(name), checked=provider_on(name))
 
@@ -2236,6 +2275,8 @@ class App:
     def toggle_provider(self, name: str) -> None:
         """Turn one device type on or off. Off, its devices are not opened at all, and
         their icons go away at once rather than after the next two polls."""
+        if not provider_available(name, PROVIDER_LABELS):
+            raise ValueError("provider is not available for normal polling")
         with self.lock:
             off = self.disabled_providers()
             if name in off:
@@ -3203,7 +3244,8 @@ class App:
         if updates.invalidate_cache_for_repo(self.cfg):
             save_config(self.cfg)                # an offer cached from another repository is dropped
         seen = self.cfg.get("update_latest", "")
-        if self.cfg.get("update_check", True) and updates.is_newer(seen, VERSION):
+        if self.cfg.get("update_check", True) and updates.is_update_available(
+                seen, VERSION, current_prerelease=BUILD_CHANNEL == build_info.PRE_RELEASE):
             self.update = updates.Release(seen, self.cfg.get("update_url") or updates.RELEASES_URL)
         self.after_update()
         if self.stop_evt.wait(30):               # let the icons come up first
@@ -3258,7 +3300,8 @@ class App:
             return
         self.cfg.update(update_last=time.time(), update_latest=rel.version, update_url=rel.url,
                         update_repo=updates.REPO)
-        if updates.is_newer(rel.version, VERSION):
+        if updates.is_update_available(rel.version, VERSION,
+                                       current_prerelease=BUILD_CHANNEL == build_info.PRE_RELEASE):
             log.info("update available: v%s (running v%s)", rel.version, VERSION)
             self.update = rel
             self.refresh_menus()
@@ -3292,7 +3335,8 @@ class App:
             with self.update_lock:
                 if rel is None or not rel.zip_url:   # only the version is known (the last check)
                     rel = updates.fetch_latest(VERSION)
-                    if not updates.is_newer(rel.version, VERSION):
+                    if not updates.is_update_available(
+                            rel.version, VERSION, current_prerelease=BUILD_CHANNEL == build_info.PRE_RELEASE):
                         raise ValueError(f"v{VERSION} is already the latest version")
                     self.update = rel
                 self.notify_update("notification.update_downloading", version=rel.version)
@@ -3336,6 +3380,7 @@ class App:
             return
         with self.lock:
             prev = self.cfg.get("last_version")
+            prev_channel = self.cfg.get("last_channel", build_info.STABLE)
             had_attempt = "update_from" in self.cfg or "update_target" in self.cfg
             from_version = self.cfg.pop("update_from", None)
             target = self.cfg.pop("update_target", None)
@@ -3343,13 +3388,17 @@ class App:
             notes = self.cfg.get("whats_new_notes")
             if target is None and from_version is not None and isinstance(notes, dict):
                 target = notes.get("version")
-            failed = isinstance(target, str) and len(target) <= 64 and updates.is_newer(target, VERSION)
+            # All updater targets come from the stable release API. A preview
+            # still running at the same version has not completed that update.
+            failed = isinstance(target, str) and len(target) <= 64 and updates.is_update_available(
+                target, VERSION, current_prerelease=BUILD_CHANNEL == build_info.PRE_RELEASE)
             if failed:
                 self.cfg.pop("whats_new_notes", None)
                 self._pending_update_failure = dict(target=target, version=VERSION)
                 log.warning("update: v%s was requested, but v%s is still running", target, VERSION)
-            if prev != VERSION or had_attempt:
+            if prev != VERSION or prev_channel != BUILD_CHANNEL or had_attempt:
                 self.cfg["last_version"] = VERSION
+                self.cfg["last_channel"] = BUILD_CHANNEL
                 save_config(self.cfg)
         if failed:
             self.deliver_update_failure()
@@ -3358,7 +3407,9 @@ class App:
             # settings from a version before 1.15.0, which did not note its version
             upgraded = bool(getattr(self, "config_existed", False))
         else:
-            upgraded = updates.is_newer(VERSION, prev)
+            upgraded = updates.is_update_available(
+                VERSION, prev, current_prerelease=(prev_channel == build_info.PRE_RELEASE
+                                                   and BUILD_CHANNEL == build_info.STABLE))
         if upgraded and self.cfg.get("whats_new", True):
             self.show_whats_new(from_version or prev or "")
 
@@ -3379,14 +3430,9 @@ class App:
             notes = self.cfg.pop("whats_new_notes", None)
             language = self.cfg.get("language", "en")
             save_config(self.cfg)
-        if not isinstance(notes, dict) or notes.get("version") != VERSION or not notes.get("notes"):
-            try:
-                rel = updates.fetch_release(VERSION, VERSION)
-                notes = {"version": rel.version, "notes": rel.notes, "url": rel.url,
-                         "date": rel.published}
-            except Exception as e:
-                log.info("what's new: release notes not available (%s)", e)
-                notes = {"version": VERSION, "notes": "", "url": updates.RELEASES_URL, "date": ""}
+        if (BUILD_CHANNEL == build_info.PRE_RELEASE or not isinstance(notes, dict)
+                or notes.get("version") != VERSION or not notes.get("notes")):
+            notes = release_notes()
         host = self.ui_host
         whatsnew.show(host, VERSION, notes.get("notes", ""), notes.get("url") or updates.RELEASES_URL,
                       from_version=from_version, date=notes.get("date", ""), open_url=self.open_url,
@@ -3539,7 +3585,9 @@ class App:
             threading.Thread(target=self.anim_loop, daemon=True).start()
             threading.Thread(target=self.bt_loop, daemon=True).start()
             threading.Thread(target=self.update_loop, daemon=True).start()
-            self.ui_host.start()                    # tkinter is ready by the first activation
+            # The flyout's tkinter thread starts on the first menu or window (show()/call()
+            # start it, ~70 ms): starting it here kept about 4 MB of Tcl/Tk in memory for
+            # sessions that never open the menu.
             self.report_hid_backend_failure()
             self.report_custom_icon_failure()
             stop_file = verification_stop_file()
@@ -3650,13 +3698,8 @@ def show_whats_new_only() -> None:
     app.cfg = load_config()
     app.flyout = None
     host = flyout.FlyoutHost()
-    try:
-        rel = updates.fetch_release(VERSION, VERSION)
-        notes, url, date = rel.notes, rel.url, rel.published
-    except Exception as e:
-        log.info("what's new: release notes not available (%s)", e)
-        notes, url, date = "", updates.RELEASES_URL, ""
-    closed = whatsnew.show(host, VERSION, notes, url, from_version="", date=date,
+    notes = release_notes()
+    closed = whatsnew.show(host, VERSION, notes["notes"], notes["url"], from_version="", date=notes["date"],
                            open_url=app.open_url, language=app.cfg.get("language", "en"))
     closed.wait()
     host.stop()
@@ -3668,6 +3711,27 @@ def main():
     # stretches it on a scaled screen, which made the menu text small and blurry
     flyout.enable_dpi_awareness()
     if "--probe" in sys.argv:
+        # Do not let a generic probe interleave with the app or a targeted
+        # diagnostic. Keep its kernel lease until process exit, including when
+        # a synchronous native call does not return.
+        from halo.diagnostic_guard import InstanceGuard
+        global _probe_instance_guard
+        error = None
+        try:
+            _probe_instance_guard = InstanceGuard()
+            if not _probe_instance_guard.acquire():
+                _probe_instance_guard.close()
+                error = "probe: HaloBattery or another diagnostic is running"
+        except OSError:
+            error = "probe: exclusive device access unavailable"
+        if error is not None:
+            log.error("%s", error)
+            if sys.stderr is not None:
+                try:
+                    print(error, file=sys.stderr)
+                except (OSError, ValueError):
+                    pass  # A missing/unusable console must not permit polling.
+            raise SystemExit(1)
         probe()
         return
     try:

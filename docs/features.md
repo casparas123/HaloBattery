@@ -111,8 +111,8 @@ panel state are restored before the window is shown. Closing Settings releases i
 the saved page and scroll position while the app splash covers loading.
 Window preferences are stored natively in `settings-window.json` inside the
 active installed or portable profile. Settings remain available when no devices are
-connected. The interface supports nine languages: English, Spanish,
-French, Japanese, Kazakh, Ukrainian, Russian, Simplified Chinese and Traditional Chinese.
+connected. The interface supports eleven languages: English, Spanish, French, Polish,
+Portuguese, Japanese, Kazakh, Ukrainian, Russian, Simplified Chinese and Traditional Chinese.
 
 Scrolling beyond the top or bottom of a settings page fills a small neutral
 ring. Continuing past its resistance threshold opens the adjacent page; a pause
@@ -234,3 +234,11 @@ use-time estimates. See [source and verification limits](protocols.md#phone-link
 Ongoing updates depend on Phone Link's background synchronization. HaloBattery
 does not keep it alive or refresh it by opening its window. If Phone Link omits
 charging status, HaloBattery cannot reconstruct it from the battery percentage.
+
+### Guarded device diagnostics
+
+Explicit [local diagnostic commands](device-diagnostics.md) are separate from
+normal polling and require acknowledgement before opening hardware. Reports
+contain sanitized status and phase information, not raw HID paths or serials.
+Families with no enabled normal target are hidden from provider switches;
+saved preferences are retained and mixed families remain available.

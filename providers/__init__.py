@@ -56,12 +56,14 @@ from .zowie import ZowieProvider  # noqa: F401
 from .dji import DjiProvider  # noqa: F401
 from .darmoshark import DarmosharkProvider  # noqa: F401
 from .lamzu import LamzuAtlantisProvider, LamzuProvider  # noqa: F401
+from .io_aurora import IoAuroraProvider  # noqa: F401
 from .vaxee import VaxeeProvider  # noqa: F401
 from .am_infinity import AmInfinityProvider  # noqa: F401
 from .blackshark_mtk import BlackSharkMtkProvider  # noqa: F401
 from .nzxt import NzxtProvider  # noqa: F401
 from .steam import SteamProvider  # noqa: F401
 from .inphic import InphicProvider  # noqa: F401
+from .attackshark_r5 import AttackSharkR5Provider  # noqa: F401
 from .irocks import IRocksProvider  # noqa: F401
 from .turtlebeach import TurtleBeachProvider  # noqa: F401
 from .urx import UrxProvider  # noqa: F401
@@ -69,12 +71,14 @@ from .skullcandy import SkullcandyProvider  # noqa: F401
 from .rapoo import RapooProvider  # noqa: F401
 from .ajazz import AjazzProvider  # noqa: F401
 from .sony_inzone import SonyInzoneProvider  # noqa: F401
+from .sony_h9ii import SonyH9IIProvider  # noqa: F401
 from .atk_nearlink import AtkNearlinkProvider  # noqa: F401
 from .fantech import FantechProvider  # noqa: F401
 from .finalmouse import FinalmouseProvider  # noqa: F401
 from .fractal import FractalProvider  # noqa: F401
 from .atk_keyboard import AtkKeyboardProvider  # noqa: F401
 from .attackshark_x66 import AttackSharkX66Provider  # noqa: F401
+from .attackshark_r11 import AttackSharkR11Provider  # noqa: F401
 from .hyperx_alpha_wireless import HyperXAlphaWirelessProvider  # noqa: F401
 from .jabra import JabraProvider  # noqa: F401
 from .hyperx_cloud_flight import HyperXCloudFlightProvider  # noqa: F401

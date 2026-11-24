@@ -10,6 +10,7 @@ import threading
 from pathlib import Path
 from types import SimpleNamespace
 
+from .provider_policy import available_provider_labels, provider_available
 from . import icons
 from providers.base import DeviceStatus
 
@@ -27,8 +28,7 @@ class SettingsController:
         self._preview_state = None
         self._preview_art = None
         self._preview_background = None
-        self._catalog = None
-        self._catalog_lock = threading.Lock()
+        self._asset_store_lock = threading.Lock()
         self._icon_selection_revisions = {}
         self._icon_upgrade_started = False
 
@@ -74,7 +74,7 @@ class SettingsController:
         devices.sort(key=lambda row: row["name"].casefold())
         providers = [dict(name=name,
                          label=i18n.translate("provider." + name, language=cfg["language"]) if ctx["has_translation"]("provider." + name) else label,
-                         enabled=name not in disabled) for name, label in ctx["provider_labels"].items()]
+                         enabled=name not in disabled) for name, label in available_provider_labels(ctx["provider_labels"]).items()]
         providers.sort(key=lambda row: row["label"].casefold())
         result["providers"] = providers
         result["autostart"] = ctx["autostart_enabled"]()
@@ -148,7 +148,7 @@ class SettingsController:
         app.wake.set()
 
     def set_provider(self, name, enabled):
-        if name not in self.context["provider_labels"] or not isinstance(enabled, bool):
+        if not provider_available(name, self.context["provider_labels"]) or not isinstance(enabled, bool):
             raise ValueError("invalid provider")
         if (name not in self.app.disabled_providers()) != enabled:
             self.app.toggle_provider(name)
@@ -263,18 +263,36 @@ class SettingsController:
                            width=width * pixels / 64, eligible=bool(eligible))
 
     def icon_catalog(self):
-        # Independent from app.lock: registry/file/network work is never on a poll.
-        with self._catalog_lock:
-            if self._catalog is None:
-                from .iconify_catalog import IconifyCatalog
-                self._catalog = IconifyCatalog(self.context["data_dir"])
-            return self._catalog
+        # Only app._custom_assets owns selected masters long term. A store used
+        # for startup, pinning or migration must not keep old glyphs/registries
+        # alive for the rest of the tray process's lifetime.
+        from .iconify_catalog import IconifyCatalog
+        return IconifyCatalog(self.context["data_dir"])
+
+    def release_preview(self):
+        """Drop frames owned by a closed Settings window, not its tray icons."""
+        self._preview_state = self._preview_art = self._preview_background = None
+
+    def _pin_custom_icon(self, asset_id):
+        # Stores are short-lived; serialize read-modify-write of pins across
+        # overlapping retiring/new view commits in this authoritative process.
+        with self._asset_store_lock:
+            self.icon_catalog().pin(asset_id)
 
     def create_browse_catalog(self):
         # Each settings window owns independent disposable search/preview RAM.
         # Only applied assets share the persistent, offline tray asset store.
         from .iconify_catalog import IconifyCatalog
-        return IconifyCatalog(self.context["data_dir"], transient=True)
+        catalog = IconifyCatalog(self.context["data_dir"], transient=True)
+        with self.app.lock:
+            assets = tuple(getattr(self.app, "_custom_assets", {}).values())
+        # Share already verified, compressed selections instead of rasterizing
+        # their masters again after disposable lookup files have been cleared.
+        # cached() still checks the current registry/evidence and renderer.
+        with catalog._lock:
+            for asset in assets:
+                catalog._remember(asset)
+        return catalog
 
     def custom_icon_in_use(self, icon_id):
         with self.app.lock:
@@ -282,6 +300,14 @@ class SettingsController:
             ids = set(saved.values()) if isinstance(saved, dict) else set()
             return any(asset.id in ids and asset.icon_id == icon_id
                        for asset in getattr(self.app, "_custom_assets", {}).values())
+
+    def custom_icon_bindings(self, icon_id):
+        """Capture the choices a background representation upgrade may replace."""
+        with self.app.lock:
+            assets = getattr(self.app, "_custom_assets", {})
+            return {key: (asset_id, self._icon_selection_revisions.get(key, 0))
+                    for key, asset_id in self.app._settings_map("custom_icons").items()
+                    if getattr(assets.get(asset_id), "icon_id", None) == icon_id}
 
     def custom_icon_ids(self):
         with self.app.lock:
@@ -373,7 +399,7 @@ class SettingsController:
             if key not in self._statuses() or revision is not None and self._icon_selection_revisions.get(key) != revision:
                 return False
         if asset is not None:
-            self.icon_catalog().pin(asset.id)
+            self._pin_custom_icon(asset.id)
         with app.lock:
             # Pinning may perform disk IO; a newer selection wins during it.
             if key not in self._statuses() or revision is not None and self._icon_selection_revisions.get(key) != revision:
@@ -410,7 +436,7 @@ class SettingsController:
                     matches[key] = (old_id, revision)
         if not matches:
             return False
-        catalog.pin(asset.id)
+        self._pin_custom_icon(asset.id)
         with app.lock:
             target = app._settings_map("custom_icons")
             if getattr(app, "stop_evt", None) is not None and app.stop_evt.is_set():
@@ -433,10 +459,12 @@ class SettingsController:
         if self._icon_upgrade_started:
             return
         self._icon_upgrade_started = True
-        catalog = self._catalog
-        if catalog is None:
-            return
         app = self.app
+        # Empty profiles do not need a store or an upgrade thread at all.
+        with app.lock:
+            if not getattr(app, "_custom_assets", {}):
+                return
+        catalog = self.icon_catalog()
         with app.lock:
             pending = {}
             for key, asset_id in app._settings_map("custom_icons").items():

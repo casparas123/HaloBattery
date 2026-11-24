@@ -17,6 +17,7 @@ from halo import settings_host as host
 
 def controller():
     model = Mock()
+    model.context = {"data_dir": Path("data")}
     status = SimpleNamespace(level=42, charging=None, online=True)
     model.snapshot.return_value = dict(cfg=dict(language="en", low=20, interval=60, icon_theme="auto",
         badges=True, percent_in_icon=False, animation=True, names={"a": "private"}),
@@ -657,7 +658,7 @@ class SettingsHostTests(unittest.TestCase):
 
     def test_hide_disposes_only_temporary_catalog_and_suppresses_old_replies(self):
         self.hello()
-        with patch("halo.iconify_host.IconCatalogJobs") as jobs_type:
+        with patch("halo.iconify_process.IconifyProcessJobs") as jobs_type:
             first = self.manager._ensure_icon_jobs(self.session)
             current = jobs_type.call_args.args[3]
             self.assertTrue(current())
@@ -778,6 +779,17 @@ class SettingsHostTests(unittest.TestCase):
                 self.assertTrue(state["labels"]["whatsnew.title"])
                 self.assertTrue(all(type(value) in (bool, int, str) for value in state["settings"].values()))
                 host.encode_message(state)
+
+    def test_polish_settings_uses_complete_localized_catalog(self):
+        self.controller.snapshot.return_value["cfg"]["language"] = "pl"
+        _, state = self.hello()
+        self.assertEqual(state["language"], "pl")
+        self.assertIn(dict(value="pl", label="Polski"), state["options"]["languages"])
+        self.assertEqual(state["labels"]["settings.title"], "Ustawienia")
+        self.assertEqual(state["labels"]["settings.website"], "Strona internetowa")
+        self.assertEqual(state["labels"]["icon.phone"], "Telefon")
+        self.assertEqual(state["labels"]["settings.open_failed"].count("{preferences}"), 1)
+        self.assertIn("Społeczność", state["labels"]["settings.discord"])
 
     def test_ready_callback_waits_for_first_visible_ack_and_runs_once(self):
         ready = Mock()

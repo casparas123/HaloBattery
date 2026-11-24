@@ -21,6 +21,50 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Label the MSI provider as wireless devices in Portuguese, including keyboards.
+- Reduce the memory peak when Settings prepares Iconify search: build the name
+  index in one buffer without filling the browsing fingerprint cache.
+- Read the verified registry and icon manifests in small bounded chunks,
+  avoiding large temporary buffers while retaining size and integrity checks.
+- Use UTF-8 on both sides of the Iconify worker pipes so non-ASCII author names,
+  searches and profile paths load correctly on Windows with legacy code pages.
+- Send selected-icon changes as bounded deltas instead of repeating the full
+  list on every browse request; report corrupt registry streams consistently.
+- Reuse verified selected icon masters when reopening the catalog, and release
+  closed Settings sessions without waiting for cyclic garbage collection.
+- Browse and render Iconify candidates in a disposable process, releasing its
+  search indexes and rendering memory when Settings closes. Keep only selected
+  tray artwork in the app, and discard closed Settings preview frames.
+
+- Restrict battery requests to sourced HID control collections, keep confirmed
+  cable routes, hold unsourced receiver paths, and restore Barracuda receiver
+  mode after failed reads. Correct
+  URX and MCHOSE K87 request framing; identify Azoth 96 HE on its shared receiver.
+  Barracuda `1532:0550` automatic writes are held pending a sourced capture;
+  the owner-confirmed whole-build level does not identify its battery exchange.
+
+- Identify supported Sony USB controllers by their own pairing address so one
+  controller keeps its identity across USB ports and Bluetooth. Keep ambiguous
+  or anonymous controllers separate instead of transferring another pad's settings.
+- Refuse invalid controller battery states and capacities; report Sony battery
+  faults without repeatedly treating the controller as newly connected. Avoid
+  assigning Windows battery reports to multiple XInput pads by list order.
+- Identify the next pre-release as 1.18.0 and allow its updater to install the
+  stable 1.18.0 when available. Preview What's new uses the bundled changelog.
+- Refuse malformed Attack Shark R5 battery replies instead of turning an invalid
+  percentage into 0%. Keep the X820 keyboard's unsupported charging state unknown.
+- Keep custom icon artwork compressed in memory: about 20-60 KB per icon instead of
+  1 MB (single colour) or 4-8 MB (colour) of raw pixels.
+- Custom Iconify tray icons no longer load the whole icon-library registry at start-up
+  (about 4 MB, with a 12 MB peak while reading it); it is read when Settings browses
+  icons or an older selection has to be checked.
+- Start the tray menu's window system when the menu (or another window) first opens,
+  not at start-up: about 4 MB less for sessions that never open the menu, at the
+  cost of about 70 ms on the first open.
+- Use less memory while running: the app no longer keeps its full-size (1024 px)
+  icon artwork in memory after drawing the small icons it needs (about 4 MB), and
+  saving a tray icon no longer loads every Pillow image plugin (about 1.3 MB).
+
 - Wait briefly for GitHub release-attestation availability before completing
   pre-release verification.
 
@@ -32,6 +76,10 @@ and the project follows [Semantic Versioning](https://semver.org/).
   process, which used about 80 MB of memory on its own (#509). Same devices,
   levels and connect/disconnect timing; PowerShell stays the fallback if the
   in-app read fails.
+- Keep a Bluetooth phone's icon and last level live through Windows connection
+  flaps of up to 30 seconds instead of greying and removing it for a doze.
+  Expiry greys only that phone once; later missing snapshots remove it without
+  restarting the grace or changing other devices' disconnect counters.
 - Rename the Settings > About "Project page" link to "GitHub page", and move the
   interface font and Lucide credits from their own card into Authors and
   licenses.
@@ -53,7 +101,47 @@ and the project follows [Semantic Versioning](https://semver.org/).
   and fade the header wordmark on hover. Share Close
   and Exit HaloBattery hover colors, with themed pressed feedback.
 
+- Refresh documented device-test evidence and distinguish pending support fixes
+  from released behavior.
+
+- Use independent protocol fixtures and cover the six originally surviving
+  battery/history mutations without changing device requests or controller identities.
+
 ### Added
+- Read the Attack Shark R11 Ultra on its 2.4 GHz CompX 8K receiver
+  (`3554:FB44`) with the shared 17-byte power query, so the tray shows its
+  level and charging state (#525).
+  While charging it keeps the higher of the pre-cable level and the reply (the
+  mouse can report a few points lower, and a plug-in poll can catch the drop).
+  Reset that hold after receiver loss or a long gap; allow 30 seconds of query
+  and scheduling delay beyond the five-minute quiet interval for fresh replies.
+- Razer Basilisk V4 Pro (`1532:00E3` on its 2.4 GHz receiver, `1532:00E2` on
+  its USB cable): added to the Razer mice table, so the receiver is no longer
+  skipped as an unknown device and the cable identity reports charging through
+  the same read ([#514](https://github.com/HeyOkay/HaloBattery/issues/514)).
+- MCHOSE A7 V2 Pro (`3837:100A` on its receiver, `3837:4018` on its cable):
+  the same 0x06 status read as the A7 V2 Ultra on interface 2 `FF01:0001`.
+  Level and charging confirmed on one unit - 85 %, and charging on the cable.
+- A Ko-fi shortcut in the settings rail, above the Discord shortcut, opens
+  [ko-fi.com/halobattery](https://ko-fi.com/halobattery). The repository also
+  shows a Sponsor button with Ko-fi and PayPal.
+- Read the 8BitDo Ultimate 2 in DInput mode (hold B while pressing Home) from
+  its 34-byte status report: level in byte 14, and the charging bit in bit 7.
+  On the reporter's unit that bit stayed clear with a charger connected, so
+  charging is not shown for this controller rather than guessed
+  ([#520](https://github.com/HeyOkay/HaloBattery/issues/520)). XInput mode keeps
+  the level-only dongle query, where the controller reports no charging bit.
+- Razer BlackShark V3 Pro (`1532:0577`) on its 2.4 GHz receiver: it exposes
+  the same `ff14:0001` collections as the BlackShark V3, so it is read by that path
+  ([#519](https://github.com/HeyOkay/HaloBattery/issues/519)). The reporter
+  confirmed that the tray icon and charging animation appear on their headset.
+- IO Aurora (`3554:FB08` receiver): read the level with the CompX report-8
+  query, and the charging state from the mouse's own cable identity
+  (`3554:FB09`), which appears when it leaves the receiver on the cable.
+  Prefer the cable and accept fresh replies only after a complete query on the
+  captured control collection; keep old readings greyed when a query fails.
+  Confirmed on a user's unit: 100 % matching IO Hub, the charging ring on the
+  PC cable and clearing when unplugged ([#493](https://github.com/HeyOkay/HaloBattery/issues/493)).
 - Sony INZONE H5 (`054C:0EBF`): read its dongle's vendor HID collection
   (`FF04:0001`) with the same Sony battery frame as the INZONE H9, which that
   dongle carries over a COM port instead. Shows the level and charging state,
@@ -63,9 +151,17 @@ and the project follows [Semantic Versioning](https://semver.org/).
 - Add an outline Discord shortcut at the bottom of the navigation rail, with
   a tooltip and a native fade to Discord's brand color on hover.
 - The 8BitDo Ultimate 2 Wireless is named as such in the controller list when it
-  is the only controller connected (next to another pad it keeps the generic name),
-  and its documentation says plainly that the 2.4 GHz dongle carries no battery
-  level while Bluetooth does (#461).
+  is the only controller connected (next to another pad it keeps the generic name)
+  (#461).
+- 8BitDo Ultimate 2 Wireless on its 2.4 GHz dongle (`2dc8:310b`): ask the dongle for
+  the controller's battery with the query 8BitDo's own software sends
+  (`81 04 21 01 00 00 06`, level at byte 18), as documented by
+  [8bitdo-ultimate2-linux](https://github.com/MiguelSanzBr/8bitdo-ultimate2-linux).
+  Only the vendor collection is used; the answer has no charging field, so the
+  charging state stays unknown. The level is confirmed on the reporters' units;
+  ([#520](https://github.com/HeyOkay/HaloBattery/issues/520)).
+- Add battery monitoring for MSI VERSA PRO WIRELESS (`0DB0:1FC6`) and
+  STRIKE PRO WIRELESS (`0DB0:1620`) ([#539](https://github.com/HeyOkay/HaloBattery/issues/539)).
 - MCHOSE G98 Pro (`41E4:2004`) keyboard over the same Sinowealth `13 4A 01`
   command as the K87, with the charging flag read from the reply's high
   nibble. Level and charging confirmed on the reporter's hardware in
@@ -162,8 +258,19 @@ and the project follows [Semantic Versioning](https://semver.org/).
   26 `0x01` (cable in, battery full) is shown as charging along with `0x02`.
 - ATTACKSHARK X66 (`0C45:FEFE` receiver, `X66 2.4G`): read the Sonix
   33-byte battery reply; confirmed on hardware in #446. Charging is not exposed.
+- **Attack Shark R5 Ultra** (`373E:0047`) reads its battery over the receiver's root `ffff:0000` collection using the R6/R8/M5 Ultra feature-report protocol. Confirmed on hardware in [#372](https://github.com/HeyOkay/HaloBattery/issues/372): 91 % on the 2.4 GHz receiver.
+- **Attack Shark X820 Ultra** on its own 2.4 GHz receiver (`3151:5006`, "2.4G Wireless Keyboard") reads through the ROYUAN/MonsGeek `0xF7` status query. Confirmed at 100 % in [#372](https://github.com/HeyOkay/HaloBattery/issues/372); the wired `3151:5002` collection is not used.
+- Sony INZONE H9 II (`054C:0FA8`) support over its receiver's `FF04:0001` HID
+  control channel, using the read-only status query from
+  marcinjakubowski/zoneout. The reporter confirmed the level in an earlier test
+  build (#387); this bounded, exact-target implementation has offline tests,
+  with fresh hardware and charging-transition confirmation still pending.
+- AJAZZ AJ159 PRO (`3151:402d`, "AJAZZ 2.4G 8K") reads its level through the AJ-series feature exchange (`0xF7` poll, `GET_FEATURE 0x05`), with no charging flag. Confirmed on hardware in [#289](https://github.com/HeyOkay/HaloBattery/issues/289); the Kysona Uranus on the same transport remains held until its own confirmation.
 - Russian localization, including native settings, tray menus, notifications,
   Windows language detection and Russian plural forms.
+- Polish interface translation, including Windows language detection and Polish
+  plural forms for estimates and device counts.
+- Portuguese interface translation, including Windows language detection and Portuguese plural forms for estimates and device counts.
 - License-only Iconify eligibility without independent brand/logo/Bluetooth
   name filters. Search all reviewed names with 50-candidate pages, round arrow
   and number buttons, predecoded neighboring previews and bounded parallel
@@ -193,7 +300,7 @@ and the project follows [Semantic Versioning](https://semver.org/).
   the 80 × 80 pixel tray preview uses the actual icon renderer at 500%.
   Double-clicking a device's tray icon opens settings for that exact device.
   The compact right-click menu keeps device settings, refresh, app settings,
-  diagnostics, updates when available and exit within reach. All seven
+  diagnostics, updates when available and exit within reach. All eleven
   interface languages remain available.
 - Bundled Outfit and Onest fonts (SIL Open Font License 1.1) and Lucide
   navigation and control glyphs for the settings window.
@@ -289,9 +396,17 @@ and the project follows [Semantic Versioning](https://semver.org/).
   exposed by this protocol, so the level is shown with the charger unknown.
   Test build pending on the reporter's unit.
 
+- Add explicitly acknowledged local device diagnostics with exclusive device access,
+  bounded native cleanup and sanitized JSON reports. Unverified device protocols
+  stay disabled during normal use.
+
 ### Fixed
 - Extend the Settings Close button hit target to the top-right corner while
   preserving its visible size, position and hover/pressed feedback.
+
+- 8BitDo Ultimate 2 on its USB cable: show no battery level rather than Windows'
+  `1000/1000` placeholder as 100 %. The pad answers its dongle only, and in XInput
+  mode - dongle or cable - it publishes no charging state either (#520).
 
 - Accept the documented Corsair Virtuoso XT USB cable (`1B1C:0A62`) battery
   and charging reply without relaxing receiver or other model validation.
@@ -414,6 +529,13 @@ and the project follows [Semantic Versioning](https://semver.org/).
 - Optically center asymmetric Iconify pictograms without changing their size
   or source colors.
 
+- Keychron Ultra-Link 8K: fall back to an output report when the receiver
+  rejects SET_FEATURE, read the charging flag in bit 7 of byte 20, and query
+  every matching receiver collection so two 8K dongles get separate icons,
+  each keyed on its own receiver so unplugging one never renames the other
+  (#373). Only documented battery collections are opened, and the output
+  retry is made only on `ffc1:0001`. The level was confirmed on a G4 with the
+  test build; the charging indication has not been reported yet.
 - Keychron Nape Pro (`3434:d026`): prefer the `ffc1:0001` battery collection
   over the `ff60` VIA page, retry the identical `b3 06` frame with `write()`
   on that collection when SET_FEATURE is refused or unanswered, and report the

@@ -27,10 +27,12 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import zlib
 
 API = "https://api.iconify.design"
 MAX_RESPONSE = 2 * 1024 * 1024
 MAX_REGISTRY = 24 * 1024 * 1024
+MAX_MANIFEST = 8 * 1024 * 1024
 CACHE_LIMIT = 48
 CACHE_TTL = 24 * 3600
 ASSET_CACHE_LIMIT = 256
@@ -232,6 +234,21 @@ def _read_json(path, maximum=MAX_RESPONSE):
     return result
 
 
+def _read_chunks(stream, maximum):
+    # CPython's BufferedReader.read(n), including GzipFile's reader, allocates
+    # for n before seeing EOF. Read only small chunks of the permitted limit,
+    # while retaining the extra byte that detects an oversized payload.
+    with io.BytesIO() as output:
+        remaining = maximum + 1
+        while remaining:
+            chunk = stream.read(min(1024 * 1024, remaining))
+            if not chunk:
+                break
+            output.write(chunk)
+            remaining -= len(chunk)
+        return output.getvalue()
+
+
 class IconifyCatalog:
     """Network work belongs on a worker; load selected glyphs into tray RAM once.
 
@@ -278,21 +295,51 @@ class IconifyCatalog:
         self._indices = OrderedDict()
         self._index_names = 0
         self._registry_dir = Path(registry_dir) if registry_dir is not None else Path(__file__).with_name("iconify_data")
-        if registry is None:
-            path = self._registry_dir / "registry.json.gz"
-            with gzip.open(path, "rb") as stream:
-                payload = stream.read(MAX_REGISTRY + 1)
-            if len(payload) > MAX_REGISTRY:
-                raise CatalogError("Oversized registry")
-            registry = json.loads(payload)
-        if not isinstance(registry, dict) or registry.get("schema") != 1:
-            raise CatalogError("Unsupported icon registry")
-        self.registry = registry
-        self._registry_key = _hash(registry)
-        self._collections = registry.get("collections")
-        if not isinstance(self._collections, dict) or not self._collections:
-            raise CatalogError("Missing verified collections")
-        for prefix, entry in self._collections.items():
+        self._registry_lock = threading.Lock()
+        # The reviewed registry - licence evidence for every collection, about 4 MB of RAM and a
+        # 12 MB peak while parsing - is read on first use: browsing, searching, attributions or
+        # checking an older selection. Sealed selections, which is every applied tray icon, load
+        # without it. A registry passed in (tests, tools) is still checked at once.
+        if registry is not None:
+            self._set_registry(registry)
+
+    def __getattr__(self, name):
+        # Only reached for attributes not set yet: the registry and what is derived from it.
+        if name in ("registry", "_registry_key", "_collections"):
+            self._set_registry(None)
+            try:
+                return self.__dict__[name]
+            except KeyError:
+                pass
+        raise AttributeError(f"{type(self).__name__!r} object has no attribute {name!r}")
+
+    def _set_registry(self, registry):
+        with self._registry_lock:
+            if "registry" in self.__dict__:
+                return
+            if registry is None:
+                path = self._registry_dir / "registry.json.gz"
+                try:
+                    with gzip.open(path, "rb") as stream:
+                        payload = _read_chunks(stream, MAX_REGISTRY)
+                except (gzip.BadGzipFile, EOFError, zlib.error) as exc:
+                    raise CatalogError("Verified icon registry unavailable", "license_unverified") from exc
+                if len(payload) > MAX_REGISTRY:
+                    raise CatalogError("Oversized registry")
+                registry = json.loads(payload)
+            if not isinstance(registry, dict) or registry.get("schema") != 1:
+                raise CatalogError("Unsupported icon registry")
+            collections = registry.get("collections")
+            if not isinstance(collections, dict) or not collections:
+                raise CatalogError("Missing verified collections")
+            self._validate_collections(collections)
+            self._registry_key = _hash(registry)
+            self._collections = collections
+            self.registry = registry                # last: marks the registry as loaded
+
+    @classmethod
+    def _validate_collections(cls, collections):
+        for prefix, entry in collections.items():
             if not isinstance(prefix, str) or not _NAME.fullmatch(prefix) or not isinstance(entry, dict):
                 raise CatalogError("Malformed verified collection")
             if (not isinstance(entry.get("author"), dict)
@@ -301,7 +348,7 @@ class IconifyCatalog:
                     or not entry["license_text"].strip()):
                 raise CatalogError("Missing verified license evidence")
             if "icons" in entry:
-                self._validate_index(entry["icons"])
+                cls._validate_index(entry["icons"])
             elif (entry.get("icons_manifest") != prefix + ".json.gz"
                     or not isinstance(entry.get("icons_sha256"), str)
                     or not _DIGEST.fullmatch(entry["icons_sha256"])
@@ -317,31 +364,37 @@ class IconifyCatalog:
             if not isinstance(name, str) or not _NAME.fullmatch(name) or not isinstance(digest, str) or not _DIGEST.fullmatch(digest):
                 raise CatalogError("Malformed verified icon fingerprint")
 
-    def _icon_index(self, prefix, entry):
+    def _icon_index(self, prefix, entry, *, cache=True):
         if "icons" in entry:
             return entry["icons"]
         with self._lock:
             if prefix in self._indices:
-                self._indices.move_to_end(prefix)
+                if cache:
+                    self._indices.move_to_end(prefix)
                 return self._indices[prefix]
             path = self._registry_dir / "manifests" / entry["icons_manifest"]
             try:
                 with path.open("rb") as stream:
-                    raw = stream.read(8 * 1024 * 1024 + 1)
-                if len(raw) > 8 * 1024 * 1024 or hashlib.sha256(raw).hexdigest() != entry["icons_sha256"]:
+                    size = os.fstat(stream.fileno()).st_size
+                    if not 0 <= size <= MAX_MANIFEST:
+                        raise CatalogError("Verified icon manifest failed integrity check", "license_unverified")
+                    raw = stream.read(size + 1)
+                if len(raw) != size or hashlib.sha256(raw).hexdigest() != entry["icons_sha256"]:
                     raise CatalogError("Verified icon manifest failed integrity check", "license_unverified")
                 with gzip.GzipFile(fileobj=io.BytesIO(raw)) as stream:
-                    payload = stream.read(MAX_REGISTRY + 1)
+                    payload = _read_chunks(stream, MAX_REGISTRY)
                 if len(payload) > MAX_REGISTRY:
                     raise CatalogError("Oversized verified icon manifest")
                 index = json.loads(payload)
                 self._validate_index(index)
                 if len(index) != entry["icons_count"]:
                     raise CatalogError("Verified icon manifest count changed")
-            except (OSError, ValueError, UnicodeError, RecursionError) as exc:
+            except (OSError, EOFError, zlib.error, ValueError, UnicodeError, RecursionError) as exc:
                 if isinstance(exc, CatalogError):
                     raise
                 raise CatalogError("Verified icon manifest unavailable", "license_unverified") from exc
+            if not cache:
+                return index
             self._indices[prefix] = index
             self._index_names += len(index)
             while len(self._indices) > 8 or self._index_names > 100000 and len(self._indices) > 1:
@@ -449,16 +502,26 @@ class IconifyCatalog:
             if self._name_blob is not None:
                 _cancel(cancel)
                 return
-            chunks, ranges, offset = [], [], 0
-            for prefix in sorted(self._collections):
+            ranges, offset = [], 0
+            with io.BytesIO() as stream:
+                for prefix in sorted(self._collections):
+                    _cancel(cancel)
+                    # Verify the full manifest, but do not populate or reorder
+                    # the browsing LRU just to extract names. Sorting releases
+                    # uncached fingerprint values before encoding this set.
+                    names = sorted(self._icon_index(prefix, self._collections[prefix], cache=False))
+                    stream.write(b"\n")
+                    stream.writelines(name.encode("ascii") + b"\n" for name in names)
+                    if not names:
+                        stream.write(b"\n")
+                    del names
+                    end = stream.tell()
+                    ranges.append((prefix, offset, end))
+                    offset = end
                 _cancel(cancel)
-                names = self._icon_index(prefix, self._collections[prefix])
-                blob = b"\n" + b"\n".join(name.encode("ascii") for name in sorted(names)) + b"\n"
-                chunks.append(blob)
-                ranges.append((prefix, offset, offset + len(blob)))
-                offset += len(blob)
-            _cancel(cancel)
-            self._name_blob = b"".join(chunks)
+                # One growing buffer avoids retaining every collection chunk
+                # beside a second, joined copy of the whole name index.
+                self._name_blob = stream.getvalue()
             self._name_ranges = tuple(ranges)
             self._name_starts = tuple(value[1] for value in ranges)
 

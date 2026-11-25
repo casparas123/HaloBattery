@@ -109,10 +109,15 @@ from . import atk_bitmouse, hidlist
 from .base import DeviceStatus, Provider, hexdump, log
 from .compx import (CHECKSUM_BASE, CMD_POWER, CONTROL_USAGE, PAYLOAD_HEADER, PAYLOAD_LEN,
                     POWER_INDEX, LEVEL_INDEX, VOLTAGE_SLICE, READ_ATTEMPTS, READ_TIMEOUT_MS,
-                    checksum, make_request, output_length, parse_power, voltage_mv)
+                    checksum, make_request, output_length, parse_power, set_output_query,
+                    voltage_mv)
 
 CONTROL_INTERFACE = 1           # the tool reads its 17-byte replies on interface 1
 FLUSH_TIMEOUT_MS = 30
+
+# This 8K dongle rejects WriteFile on its vendor collection and only answers
+# HID SET_REPORT, so it takes the path in compx.set_output_query().
+SET_REPORT_PIDS = {(0x373B, 0x1278)}
 
 SONIX_VID = 0x3710
 SONIX_PIDS = {
@@ -166,6 +171,9 @@ PIDS: Dict[int, Dict[int, str]] = {
         0x1085: "ATK VXE R1 SE+ (2.4 GHz)",
         0x101A: "ATK X1 Pro (2.4 GHz)",
         0x101B: "ATK Fire X 8K (2.4 GHz dongle)",
+        # 8K Compx dongle, shared by the F1 V3 Ultimate+ and the A9 Air+. Its
+        # firmware refuses the interrupt-OUT write, so it goes through SET_REPORT.
+        0x1278: "ATK F1 V3 Ultimate+ (2.4 GHz)",
     },
     0x3770: {
         0x0300: "Hitscan Hyperlight (8K receiver)",
@@ -387,6 +395,12 @@ class PulsarProvider(Provider):
                 if bitmouse:
                     reply = None
                     parsed = atk_bitmouse.read_power(d["path"], self._diag)
+                elif (vid, pid) in SET_REPORT_PIDS:
+                    self._diag.append("    sent with HID SET_REPORT (WriteFile is refused)")
+                    reply = set_output_query(d["path"])
+                    if reply is None:
+                        self._diag.append("    SET_REPORT was refused or the dongle did not answer")
+                    parsed = parse_power(reply)
                 else:
                     reply = self._query(d["path"])
                     parsed = parse_power(reply)

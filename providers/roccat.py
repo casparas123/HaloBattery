@@ -6,7 +6,7 @@ exposes a vendor collection on usage page `0xFF00`, usage `0x0001`: unnumbered
 
 The exchange is Turtle Beach Swarm's own, from the reporter's USB capture:
 
-    SET_REPORT feature id 7, 64 bytes:   07 03 88 00 01 00 ...
+    SET_REPORT feature id 7, 64 bytes:   07 04 88 00 01 00 ...
     input report, same collection:       07 04 88 00 41 <level>
 
 A frame is `07 <payload length> <command> <sub-command> <args>`. `0x41` marks a
@@ -39,7 +39,7 @@ USAGE_PAGE = 0xFF00
 USAGE = 0x0001
 REPORT_LEN = 64
 FEATURE_ID = 0x07
-REPORT_TYPE_FEATURE = 0x03
+PAYLOAD_LEN = 0x04
 CMD_BATTERY = 0x88
 SUB_LEVEL = 0x00
 SUB_PUSH = 0x05
@@ -52,10 +52,10 @@ KEY = "roccat:vulcan-mini-air"
 
 
 def make_query() -> bytes:
-    """Swarm's percentage query: feature report id 7, then `03 88 00 01`."""
+    """Swarm's percentage query: feature report id 7, then `04 88 00 01`."""
     frame = bytearray(REPORT_LEN)
     frame[0] = FEATURE_ID
-    frame[1] = REPORT_TYPE_FEATURE
+    frame[1] = PAYLOAD_LEN
     frame[2] = CMD_BATTERY
     frame[3] = SUB_LEVEL
     frame[4] = 0x01

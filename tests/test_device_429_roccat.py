@@ -50,7 +50,7 @@ class QueryTests(unittest.TestCase):
     def test_the_query_is_the_captured_set_report(self):
         q = R.make_query()
         self.assertEqual(64, len(q))
-        self.assertEqual("07 03 88 00 01", q[:5].hex(" "))
+        self.assertEqual("07 04 88 00 01", q[:5].hex(" "))
         self.assertEqual(bytes(59), q[5:])
 
     def test_the_captured_reply_reads_43(self):
@@ -92,7 +92,7 @@ class PollTests(unittest.TestCase):
                           for s in out],
                          [("roccat:vulcan-mini-air", "ROCCAT Vulcan II Mini Air",
                            43, False, False, "keyboard")])
-        self.assertEqual("07 03 88 00 01", dev.feature_writes[0][:5].hex(" "))
+        self.assertEqual("07 04 88 00 01", dev.feature_writes[0][:5].hex(" "))
         self.assertTrue(dev.closed)
 
     def test_a_push_before_the_reply_is_skipped_and_logged(self):

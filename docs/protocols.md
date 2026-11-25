@@ -1271,11 +1271,17 @@ the repository has no licence file, so the protocol facts are used and no code i
 copied. That project notes the dongle caches the level reported at the keyboard's
 last reconnect, so a level can lag until the keyboard is power-cycled.
 
-Charging is **not exposed** by this dongle. The B87 owner detects it from the
-presence of a separate wired USB device; the Ducky OK-M's wired id is not known,
-so this app reports the level only and marks the charger state unknown.
-**Unverified on the Ducky** - first test build in
-[#545](https://github.com/HeyOkay/HaloBattery/issues/545).
+Charging is **not exposed** by this dongle. The keyboard on its USB-C data cable
+enumerates as a second device, `28E9:31E2` (`Ducky OK-M-98 Gaming Keyboard`), and
+its presence is the charging signal - the same method the Yunzii B87 owner uses
+(their wired id is `28E9:30AD`). The wired collection is only enumerated, never
+opened, and its absence is shown as not charging; a wall charger that does not
+enumerate cannot be seen. Confirmed by @rileyliusp's wired/wireless diagnostics in
+[#545](https://github.com/HeyOkay/HaloBattery/issues/545): the wired id appears
+only with the cable connected.
+**Level verified on the Ducky** in #545 (80 %, 4.2 V reported by the dongle). The
+dongle caches the level from the keyboard's last reconnect, so a stale number
+until the keyboard is power-cycled is expected, not a parsing error.
 
 ### URX Core75 (2.4 GHz)
 

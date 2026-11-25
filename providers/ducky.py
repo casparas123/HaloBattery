@@ -11,9 +11,11 @@ read in jordan-lee-code/yunzii-applet (no licence file, so protocol facts only,
 no code copied). That project also notes the dongle caches the level from the
 keyboard's last reconnect, so a level can lag until the keyboard is power-cycled.
 
-Charging is not exposed by this dongle. The B87 owner detects it from a second
-wired USB device; the Ducky's wired id is not known yet, so the charger state is
-reported as unknown rather than guessed.
+Charging is not exposed by this dongle. The keyboard on its USB-C data cable
+enumerates as a second device (28e9:31e2, "Ducky OK-M-98 Gaming Keyboard"), and
+that device's presence is the charging signal; its collection is only enumerated,
+never opened. A wall charger that does not enumerate cannot be seen. The wired id
+was confirmed by the reporter's diagnostics in #545.
 """
 from __future__ import annotations
 
@@ -32,6 +34,15 @@ VID = 0x056D
 PID = 0xC077
 NAME = "Ducky OK-M"
 KEY = f"ducky:{PID:04x}"
+
+# The keyboard on its USB-C data cable enumerates as a second, differently named
+# device (28e9:31e2 'Ducky OK-M-98 Gaming Keyboard', from #545's diagnostics). The
+# dongle itself has no charging field, so the cable device's presence is the
+# charging signal - the same method the Yunzii B87 owner uses (their wired id is
+# 28e9:30ad, a different model).
+WIRED_VID = 0x28E9
+WIRED_PID = 0x31E2
+WIRED_WORDS = ("ducky", "ok-m")
 
 USAGE_PAGE, USAGE = 0xFF00, 0x0001
 PRODUCT_WORDS = ("ducky", "ok-m")
@@ -104,10 +115,11 @@ class DuckyProvider(Provider):
                     "not claiming it")
             return []
         d = pick(mine)
+        cable = self._cable_present()
         if d is None:
             self._diag.append(f"[Ducky] pid={PID:04x} '{NAME}': no 0xFF00:0x0001 channel")
-            return [DeviceStatus(KEY, NAME, None, False, False, "ducky",
-                                 kind="keyboard", charging_known=False)]
+            return [DeviceStatus(KEY, NAME, None, cable, False, "ducky",
+                                 kind="keyboard")]
         self._diag.append(f"[Ducky] pid={PID:04x} '{NAME}' iface={d.get('interface_number')} "
                           f"{USAGE_PAGE:04x}:{USAGE:04x}")
         parsed = self._ask(d)
@@ -115,14 +127,35 @@ class DuckyProvider(Provider):
             level, volts = parsed
             self._last = (level, time.time())
             self._diag.append(f"  -> {level}%" + (f", {volts / 10:.1f} V" if volts else ""))
-            return [DeviceStatus(KEY, NAME, level, False, True, "ducky",
-                                 kind="keyboard", charging_known=False)]
+            return [DeviceStatus(KEY, NAME, level, cable, True, "ducky",
+                                 kind="keyboard")]
         self._diag.append("  no answer (keyboard asleep or off)")
         if self._last and time.time() - self._last[1] < ASLEEP_KEEP:
-            return [DeviceStatus(KEY, NAME, self._last[0], False, False, "ducky",
-                                 kind="keyboard", charging_known=False)]
-        return [DeviceStatus(KEY, NAME, None, False, False, "ducky",
-                             kind="keyboard", charging_known=False)]
+            return [DeviceStatus(KEY, NAME, self._last[0], cable, False, "ducky",
+                                 kind="keyboard")]
+        return [DeviceStatus(KEY, NAME, None, cable, False, "ducky",
+                             kind="keyboard")]
+
+    def _cable_present(self) -> bool:
+        """True when the keyboard's wired USB-C device is enumerated.
+
+        Presence only - the wired collection is never opened. A wall charger that
+        does not enumerate cannot be seen, which is the same limit every
+        presence-based charging signal in this app has.
+        """
+        try:
+            infos = hidlist.enumerate(WIRED_VID)
+        except Exception:  # pragma: no cover - enumeration is best effort
+            return False
+        for d in infos:
+            if d.get("product_id") != WIRED_PID:
+                continue
+            name = (d.get("product_string") or "").lower()
+            if all(word in name for word in WIRED_WORDS):
+                self._diag.append(f"[Ducky] wired id {WIRED_VID:04x}:{WIRED_PID:04x} "
+                                  f"'{d.get('product_string')}': charging")
+                return True
+        return False
 
     def _ask(self, d: dict) -> Optional[Tuple[int, int]]:
         dev = hid.device()  # type: ignore[union-attr]

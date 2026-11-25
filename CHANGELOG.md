@@ -77,8 +77,8 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 - Ducky OK-M (`056D:C077` 2.4 GHz dongle): read the level and voltage
-  from the I-CHIP vendor report documented for the shared Yunzii B87 dongle;
-  charging is not exposed, so it is shown as unknown
+  from the I-CHIP vendor report documented for the shared Yunzii B87 dongle, and
+  show charging from the presence of the keyboard's USB-C device (`28E9:31E2`)
   ([#545](https://github.com/HeyOkay/HaloBattery/issues/545)).
 - Razer BlackShark V3 Pro (`1532:0577`) on its 2.4 GHz receiver: it exposes
   the same `ff14:0001` collections as the BlackShark V3, so it is read by that path

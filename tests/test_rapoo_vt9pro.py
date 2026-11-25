@@ -217,11 +217,14 @@ class VT9ProTests(unittest.TestCase):
                           for s in out],
                          [(80, False, False, False, True)])
 
-    def test_passive_read_attempts_are_bounded_and_cache_expires(self):
+    def test_passive_read_attempts_are_bounded_and_receiver_keeps_its_level(self):
         item = descriptor(b"vt9pro")
         self.poll([item], {b"vt9pro": Device([CAPTURE])})
         self.now += 301
         device = Device([[]] * 16 + [CAPTURE])
-        self.assertEqual(self.poll([item], {b"vt9pro": device}), [])
+        # An idle mouse is silent but the receiver is still plugged in: the last
+        # level stays greyed instead of the icon vanishing after five minutes.
+        result = self.poll([item], {b"vt9pro": device})
+        self.assertEqual([(s.level, s.online) for s in result], [(100, False)])
         self.assertEqual(len(device.calls), 16)
         self.assertEqual(device.closed, 1)

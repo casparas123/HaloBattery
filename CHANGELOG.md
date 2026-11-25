@@ -114,6 +114,10 @@ and the project follows [Semantic Versioning](https://semver.org/).
   battery/history mutations without changing device requests or controller identities.
 
 ### Added
+- Read the ATK F1 V3 Ultimate+ on its 2.4 GHz CompX 8K receiver (`373B:1278`)
+  with the shared 17-byte power query, so the tray shows its level and charging
+  state (#571). This dongle refuses the interrupt-OUT write, so the query goes
+  out as HID `SET_REPORT` and the reply is read from the same handle.
 - Read the Attack Shark R11 Ultra on its 2.4 GHz CompX 8K receiver
   (`3554:FB44`) with the shared 17-byte power query, so the tray shows its
   level and charging state (#525).

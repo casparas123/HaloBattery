@@ -113,6 +113,31 @@ class PollTests(unittest.TestCase):
         self.assertIn("no power reply after 3 queries",
                       "\n".join(self.provider.diagnostics()))
 
+    def test_a_silent_poll_keeps_the_last_reading_greyed(self):
+        # The receiver stays plugged in while the mouse sleeps. The icon must
+        # not disappear just because one poll missed the mouse's answer.
+        dev = FakeDevice([response(67)])
+        D.hid = types.SimpleNamespace(device=lambda: dev)
+        D.hidlist = types.SimpleNamespace(enumerate=lambda vid=0: list(INFO))
+        provider = D.DarmosharkProvider()
+        first = provider.poll()
+        self.assertEqual([(s.level, s.online) for s in first], [(67, True)])
+        second = provider.poll()
+        self.assertEqual([(s.level, s.online, s.charging, s.charging_known, s.wake_on_input)
+                          for s in second],
+                         [(67, False, False, False, True)])
+        self.assertIn("keeping 67% greyed", "\n".join(provider.diagnostics()))
+
+    def test_unplugging_the_receiver_drops_the_cached_reading(self):
+        dev = FakeDevice([response(67)])
+        D.hid = types.SimpleNamespace(device=lambda: dev)
+        D.hidlist = types.SimpleNamespace(enumerate=lambda vid=0: list(INFO))
+        provider = D.DarmosharkProvider()
+        provider.poll()
+        D.hidlist = types.SimpleNamespace(enumerate=lambda vid=0: [])
+        self.assertEqual(provider.poll(), [])
+        self.assertIsNone(provider._last)
+
     def test_the_captured_430_exchange_reads_63_on_battery(self):
         # #430 test build 1 diagnostics: the ack `1f 00 81 01 ...`, then the power
         # reply `41 00 8e 01 00 00 3f 00 01 02 03 ...` (63 %, the mouse showed 63 %).

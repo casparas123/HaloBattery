@@ -45,11 +45,13 @@ OP_BASE_INFO = 129
 SUB_POWER = 1
 # A sleeping mouse can ignore the first request; the receiver acknowledges it
 # (`1f 00 81 01`) and forwards nothing, so the query is repeated a few times
-# within one poll instead of waiting a full poll interval. See #430.
-READ_TIMEOUT_MS = 400
+# within one poll instead of waiting a full poll interval. See #430. The longer
+# read window also gives a just-woken mouse time to deliver the full reply.
+READ_TIMEOUT_MS = 1000
 READ_ATTEMPTS = 3
 QUERY_ROUNDS = 3
 ROUND_GAP_S = 0.15
+ASLEEP_KEEP = 300
 NAME = "Darmoshark N5"
 KEY = "darmoshark:n5"
 
@@ -115,6 +117,7 @@ class DarmosharkProvider(Provider):
 
     def __init__(self):
         self._diag: List[str] = []
+        self._last: Optional[Tuple[str, int, bool, bool, float]] = None
 
     def _read(self, d: dict) -> Optional[Tuple[int, bool, bool]]:
         wireless = d.get("product_id") == RECEIVER_PID
@@ -158,6 +161,7 @@ class DarmosharkProvider(Provider):
             return []
         found = candidates(infos)
         if not found:
+            self._last = None
             return []
         for d in found:
             self._diag.append(f"[Darmoshark] pid={d['product_id']:04x} "
@@ -167,10 +171,16 @@ class DarmosharkProvider(Provider):
             if parsed is not None:
                 level, charging, charging_known = parsed
                 name = NAME if d["product_id"] == RECEIVER_PID else NAME + " (USB cable)"
+                self._last = (name, level, charging, charging_known, time.time())
                 self._diag.append(f"  -> {level}% charging={charging} "
                                   f"known={charging_known}")
                 return [DeviceStatus(KEY, name, level, charging, True, self.name,
                                      kind="mouse", charging_known=charging_known)]
+        if self._last is not None and time.time() - self._last[4] < ASLEEP_KEEP:
+            name, level, _charging, _known, _when = self._last
+            self._diag.append(f"  keeping {level}% greyed (the mouse is asleep or the link is quiet)")
+            return [DeviceStatus(KEY, name, level, False, False, self.name,
+                                 kind="mouse", charging_known=False, wake_on_input=True)]
         return []
 
     def diagnostics(self) -> List[str]:

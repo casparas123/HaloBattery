@@ -142,6 +142,8 @@ PIDS: Dict[int, Dict[int, str]] = {
         0xF58C: "VXE R1 Pro Max (wired)",
         0xF505: "VGN Dragonfly 4K (receiver)",
         0xF506: "VGN Dragonfly 4K (wired)",
+        0xFB50: "VGN Dragonfly F1 SE (2.4 GHz)",
+        0xFB51: "VGN Dragonfly F1 SE (wired)",
         0xF5D5: "Redragon M991 / K1NG Max (2.4 GHz)",
         0xF55D: "Redragon M916 Pro / M913 (2.4 GHz)",
         0xF55E: "Redragon M991 (wired)",

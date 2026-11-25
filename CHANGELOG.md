@@ -95,6 +95,11 @@ and the project follows [Semantic Versioning](https://semver.org/).
   battery/history mutations without changing device requests or controller identities.
 
 ### Added
+- VGN Dragonfly F1 SE: read its receiver (`3554:FB50`) and cable (`3554:FB51`) with the
+  shared 17-byte Compx exchange, from the receiver id and battery frame validated on
+  hardware in Pimeng/VGNOrb (MIT, protocol reference only). Unverified in this app - a
+  test build is with the reporter of
+  [#562](https://github.com/HeyOkay/HaloBattery/issues/562).
 - Read the Attack Shark R11 Ultra on its 2.4 GHz CompX 8K receiver
   (`3554:FB44`) with the shared 17-byte power query, so the tray shows its
   level and charging state (#525).

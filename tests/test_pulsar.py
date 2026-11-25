@@ -366,6 +366,24 @@ class PulsarTest(unittest.TestCase):
                          (d.key, d.name, d.level))
         self.assertTrue(d.charging)
 
+    def test_the_vgn_dragonfly_f1_se_receiver_is_read(self):
+        # #562: the F1 SE receiver is 3554:fb50 with the same ff02:0002 frame;
+        # Pimeng/VGNOrb validated this id on hardware and captured
+        # 08 04 00 00 00 02 64 01 10 56 .. 7c (100 %, charging, 4182 mV)
+        bus = self.one_receiver(vid=0x3554, pid=0xFB50, replies=[reply(100, 1, 4182)])
+        [d] = P.PulsarProvider().poll()
+        self.assertEqual(("pulsar:3554fb50", "VGN Dragonfly F1 SE (2.4 GHz)", 100),
+                         (d.key, d.name, d.level))
+        self.assertTrue(d.charging)
+        self.assertEqual([(0xFF02, 0x0002)], bus.written())
+
+    def test_the_vgn_dragonfly_f1_se_on_its_cable_is_read(self):
+        self.one_receiver(vid=0x3554, pid=0xFB51, replies=[reply(87, 0, 3960)])
+        [d] = P.PulsarProvider().poll()
+        self.assertEqual(("pulsar:3554fb51", "VGN Dragonfly F1 SE (wired)", 87),
+                         (d.key, d.name, d.level))
+        self.assertFalse(d.charging)
+
     def test_the_vendor_control_collection_is_the_one_that_gets_the_request(self):
         bus = self.one_receiver(replies=[reply(64)])
         P.PulsarProvider().poll()

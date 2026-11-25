@@ -273,10 +273,13 @@ class RapooProvider(Provider):
             return []
         found: Dict[str, List[Tuple[int, bool, str, str]]] = {}   # key -> readings
         cable_seen = False
+        receiver_seen = False
         for pid, (name, kind, logical) in PIDS.items():
             mine = [d for d in infos if d["product_id"] == pid]
             if pid == VT9_PRO_CABLE:
                 cable_seen = bool(mine)
+            if pid == VT9_PRO_RECEIVER:
+                receiver_seen = bool(mine)
             if pid in VT9_PRO_PIDS:
                 # #109 identifies two vendor top-level collections on iface 1.
                 # The capture cannot say which Windows collection receives BB;
@@ -360,9 +363,18 @@ class RapooProvider(Provider):
         # come from the charging cable, and keeping its charging flag showed
         # "charging (last known value, device asleep)" after the cable was removed
         # (#109, test build 4). The cable id's presence is the charging signal.
+        # The VT9 Pro's receiver only forwards a frame while the mouse is awake, so
+        # its last level is kept for as long as the receiver itself is plugged in
+        # (unplugging it clears the cache above) - expiring it after five minutes
+        # made the icon vanish while the mouse was simply idle (#109, test build 5).
         now = time.time()
         for key, last in self._last.items():
-            if key in found or now - last[2] >= ASLEEP_KEEP:
+            if key in found:
+                continue
+            if key == vt9_key:
+                if not receiver_seen:
+                    continue
+            elif now - last[2] >= ASLEEP_KEEP:
                 continue
             name, kind = self._meta.get(key, ("Rapoo device", "mouse"))
             out.append(DeviceStatus(key, name, last[0], False, False, "rapoo",

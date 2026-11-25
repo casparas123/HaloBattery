@@ -114,8 +114,14 @@ def present_vids(paths: FrozenSet[str]) -> FrozenSet[int]:
     return frozenset(out)
 
 
-def enumerate(vid: int = 0) -> List[dict]:  # noqa: A001  (mirrors hid.enumerate)
-    """hid.enumerate(vid), re-run only when the set of HID devices changes."""
+def enumerate(vid: int = 0, *, refresh: bool = False) -> List[dict]:  # noqa: A001  (mirrors hid.enumerate)
+    """hid.enumerate(vid), re-run only when the set of HID devices changes.
+
+    ``refresh=True`` bypasses a cached result.  A caller that knows a
+    collection should be present uses it when hidapi's cached enumeration is
+    missing that collection (for example, a charging cable's vendor
+    collection that appeared after the cache was filled).
+    """
     if hid is None:
         return []
     paths = interface_paths()
@@ -128,7 +134,7 @@ def enumerate(vid: int = 0) -> List[dict]:  # noqa: A001  (mirrors hid.enumerate
             _stats["skipped"] += 1
             return []
         hit = _cache.get(vid)
-        if hit is not None and hit[0] == paths:
+        if hit is not None and hit[0] == paths and not refresh:
             # A short result means hidapi could not open one of the vendor's collections and
             # left it out. Serving that from the cache would hide the collection for the life
             # of the process, so ask again - rate limited, because a permanently unopenable

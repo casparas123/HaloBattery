@@ -114,6 +114,26 @@ class PollTest(unittest.TestCase):
         self.assertEqual([(r.key, r.level, r.charging, r.via) for r in res],
                          [("ninjutso:sora_v2", 79, True, "USB cable")])
 
+    def test_a_short_cached_enumeration_is_refreshed_for_the_cable(self):
+        # #528: hidapi can cache a list without the cable's vendor collection.
+        # The provider must ask for a fresh enumeration instead of waiting for
+        # the interface set to change.
+        calls = []
+        first = [entry(0xAE13, page=0x0001, usage=0x0006)]
+        second = [entry(0xAE13)]
+
+        def enum(vid=0, *, refresh=False):
+            calls.append(refresh)
+            return list(second if refresh else first)
+
+        N.hid = fake_hid(FakeDevice([reply(71, charging=1)]))
+        N.hidlist = types.SimpleNamespace(enumerate=enum)
+        res = self.provider.poll()
+        self.assertEqual([(r.level, r.charging, r.via) for r in res],
+                         [(71, True, "USB cable")])
+        self.assertEqual([False, True], calls)
+        self.assertIn("refreshed the HID list", "\n".join(self.provider.diagnostics()))
+
     def test_the_cable_is_asked_before_the_receiver(self):
         # #528: the receiver can still be enumerated while the mouse charges
         dev = FakeDevice([reply(72, charging=1)])

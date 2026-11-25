@@ -33,7 +33,7 @@ class HidlistTest(unittest.TestCase):
         self.enumerations = 0
         self.script = []
 
-        def enum(vid=0):
+        def enum(vid=0, *, refresh=False):
             self.enumerations += 1
             got = self.script.pop(0) if self.script else ALL[:9]
             return [{"path": p, "product_id": vid} for p in got]
@@ -66,6 +66,15 @@ class HidlistTest(unittest.TestCase):
         self.assertEqual(len(hidlist.enumerate(VID)), 10)
         self.assertEqual(len(hidlist.enumerate(VID)), 10)
         self.assertEqual(self.enumerations, 1)
+
+    def test_refresh_bypasses_a_complete_cache(self):
+        # A provider that knows a collection should be present (for example,
+        # the charging cable's vendor collection) can ask for a fresh list
+        # without waiting for the interface set to change.
+        self.script = [ALL[:9], ALL]
+        self.assertEqual(len(hidlist.enumerate(VID)), 9)
+        self.assertEqual(len(hidlist.enumerate(VID, refresh=True)), 10)
+        self.assertEqual(self.enumerations, 2)
 
     def test_paths_for_counts_the_vendors_present_interfaces(self):
         self.assertEqual(len(hidlist.paths_for(PATHS, VID)), 10)

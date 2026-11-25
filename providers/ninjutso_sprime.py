@@ -48,6 +48,7 @@ BATTERY_ARGUMENT = 0x04
 FEATURE_LEN = 32
 READ_TIMEOUT_MS = 250
 LISTEN_MS = 500
+REFRESH_RETRY_S = 30.0
 
 
 def is_cable(pid: int) -> bool:
@@ -82,6 +83,7 @@ class NinjutsoSprimeProvider(Provider):
 
     def __init__(self):
         self._diag: List[str] = []
+        self._refreshed_at: Dict[int, float] = {}
 
     def poll(self) -> List[DeviceStatus]:
         self._diag = []
@@ -92,6 +94,37 @@ class NinjutsoSprimeProvider(Provider):
         except Exception as e:  # pragma: no cover
             log.warning("hid.enumerate(ninjutso): %s", e)
             return []
+
+        # If a charging cable is enumerated but its vendor collection is
+        # missing from the cached hidapi result, ask the cache for a fresh
+        # enumeration.  hidapi can return a short list while a collection is
+        # temporarily unopenable; the cache otherwise keeps that list until
+        # the whole interface set changes (#528).
+        cable_entries = []
+        for d in infos:
+            pid = d.get("product_id")
+            if not isinstance(pid, int):
+                continue
+            m = model(pid)
+            if m is not None and m[2]:
+                cable_entries.append(d)
+        if cable_entries and not any(
+                (d.get("usage_page"), d.get("usage")) == (PAGE, USAGE)
+                for d in cable_entries):
+            now = time.monotonic()
+            refreshable = [pid for pid in {d.get("product_id") for d in cable_entries}
+                           if isinstance(pid, int)
+                           and now - self._refreshed_at.get(pid, 0.0) >= REFRESH_RETRY_S]
+            if refreshable:
+                try:
+                    refreshed = hidlist.enumerate(VID, refresh=True)
+                except TypeError:      # a simple test double without refresh
+                    refreshed = None
+                for pid in refreshable:
+                    self._refreshed_at[pid] = now
+                if refreshed is not None:
+                    infos = refreshed
+                    self._diag.append("  refreshed the HID list for the charging cable")
 
         out: List[DeviceStatus] = []
         groups: Dict[str, List[Tuple[dict, int, str, bool]]] = {}

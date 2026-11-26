@@ -96,7 +96,7 @@ FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
 OTHER DEALINGS IN THE FONT SOFTWARE.
 </metadata>
   <defs>
-    <clipPath id="frame"><rect width="1000" height="219" rx="26"/></clipPath>
+    <clipPath id="frame"><rect width="1000" height="219" rx="0"/></clipPath>
     <mask id="charging-track" maskUnits="userSpaceOnUse" x="-60" y="-60" width="120" height="120"><rect x="-60" y="-60" width="120" height="120" fill="white"/><circle r="53" fill="none" stroke="black" stroke-width="6" pathLength="100" stroke-dasharray="65 100" transform="rotate(-90)" stroke-linecap="round"/></mask>
   </defs>
   <style>
@@ -151,5 +151,5 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
     </g>
 
   </g>
-  <rect x="0.675" y="0.675" width="998.65" height="217.65" rx="25.325" fill="none" stroke="#656565" stroke-width="1.35"/>
+  <rect x="0.675" y="0.675" width="998.65" height="217.65" rx="0" fill="none" stroke="#656565" stroke-width="1.35"/>
 </svg>

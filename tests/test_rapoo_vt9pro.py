@@ -187,6 +187,18 @@ class VT9ProTests(unittest.TestCase):
         self.assertEqual(a.opened, 0)
         self.assertEqual(b.opened, 1)
 
+    def test_duplicate_ff00_0002_paths_are_all_tried(self):
+        # Windows lists ff00:0002 twice on the #109 receiver, as two paths.
+        # The push may ride the second path: test build 2 opened all of them,
+        # but test build 6's shared candidate helper folded them by usage.
+        first, second = descriptor(b"one"), descriptor(b"two")
+        a, b = Device(), Device([CAPTURE])
+        result = self.poll([first, second], {b"one": a, b"two": b})
+        self.assertEqual([s.level for s in result], [100])
+        self.assertEqual(self.provider._chosen[0x185A], b"two")
+        self.assertEqual(len(a.calls), 16)
+        self.assertEqual(b.opened, 1)
+
     def test_transition_and_wrong_family_are_skipped_before_a_settled_frame(self):
         item = descriptor(b"vt9pro")
         device = Device([REPORT7, bytes.fromhex("bb b0 42 20 03 00 64"), CAPTURE])

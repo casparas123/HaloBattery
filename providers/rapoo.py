@@ -122,6 +122,7 @@ QUIET_RESCAN_EVERY = 5                # a silent device is fully re-scanned occa
 ASLEEP_KEEP = 300                     # s, as in the other receiver providers
 VT9_PRO_ATTEMPTS = 16                # 4 s covers the observed ~3 s BB push cadence
 VT9_PRO_BUFFER_LIMIT = 64            # existing read(64) caller bound, NOT a descriptor/report size
+VT9_PRO_MAX_PATHS = 3                # 0002 twice + 000e; 3 x 4 s stays inside the 20 s deadline
 
 Reading = Tuple[int, bool]
 
@@ -221,6 +222,32 @@ def candidates(ifaces: List[dict]) -> List[dict]:
     return sorted(out, key=rank)
 
 
+def vt9pro_candidates(ifaces: List[dict], pid: int) -> List[dict]:
+    """The VT9 Pro's vendor collections by path, never folded by usage.
+
+    Windows lists ff00:0002 twice on the #109 receiver, as two top-level
+    collections with their own paths. The push rides one of them, and which one
+    is not visible before a run: test build 2 opened every path and read the
+    level, while folding the duplicate usage lost it again. Keep one entry per
+    exact path and order the two known usages as before.
+    """
+    mine: List[dict] = []
+    seen = set()
+    for d in ifaces:
+        if (d.get("product_id") != pid
+                or d.get("vendor_id", RAPOO_VID) != RAPOO_VID
+                or d.get("interface_number") != 1
+                or d.get("usage_page") != VENDOR_PAGE
+                or d.get("usage") not in PREFERRED_USAGES):
+            continue
+        path = d.get("path")
+        if path in seen:
+            continue
+        seen.add(path)
+        mine.append(d)
+    return sorted(mine, key=lambda d: PREFERRED_USAGES.index(d["usage"]))
+
+
 class RapooProvider(Provider):
     name = "rapoo"
 
@@ -275,19 +302,14 @@ class RapooProvider(Provider):
         cable_seen = False
         receiver_seen = False
         for pid, (name, kind, logical) in PIDS.items():
-            mine = [d for d in infos if d["product_id"] == pid]
+            if pid in VT9_PRO_PIDS:
+                mine = vt9pro_candidates(infos, pid)
+            else:
+                mine = [d for d in infos if d["product_id"] == pid]
             if pid == VT9_PRO_CABLE:
                 cable_seen = bool(mine)
             if pid == VT9_PRO_RECEIVER:
                 receiver_seen = bool(mine)
-            if pid in VT9_PRO_PIDS:
-                # #109 identifies two vendor top-level collections on iface 1.
-                # The capture cannot say which Windows collection receives BB;
-                # listen on these two, never on the pointer/key/consumer faces.
-                mine = [d for d in mine if d.get("vendor_id", RAPOO_VID) == RAPOO_VID
-                        and d.get("interface_number") == 1
-                        and d.get("usage_page") == VENDOR_PAGE
-                        and d.get("usage") in PREFERRED_USAGES]
             if not mine:
                 if pid == VT9_PRO_RECEIVER:
                     self._last.pop(f"rapoo:{logical:04x}", None)
@@ -298,7 +320,7 @@ class RapooProvider(Provider):
             self._meta[key] = (name, kind)
             self._diag.append(f"[Rapoo] pid={pid:04x} '{name}' "
                               f"'{(mine[0].get('product_string') or '').strip()}'")
-            order = candidates(mine)
+            order = mine if pid in VT9_PRO_PIDS else candidates(mine)
             if self._chosen.get(pid):
                 order = sorted(order, key=lambda d: d["path"] != self._chosen[pid])
             # a device that has stayed silent is listened on its first candidate
@@ -306,7 +328,7 @@ class RapooProvider(Provider):
             quiet = self._quiet.get(pid, 0)
             deep = self._chosen.get(pid) is None and (
                 quiet == 0 or quiet % QUIET_RESCAN_EVERY == 0)
-            max_candidates = 2 if pid in VT9_PRO_PIDS else MAX_CANDIDATES
+            max_candidates = VT9_PRO_MAX_PATHS if pid in VT9_PRO_PIDS else MAX_CANDIDATES
             budget = order[:max_candidates] if deep else order[:1]
             got = None
             for n, d in enumerate(budget):

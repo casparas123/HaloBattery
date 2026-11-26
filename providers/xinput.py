@@ -66,7 +66,10 @@ NAMED_PAD_IDS = {(0x2DC8, 0x310B): "8BitDo Ultimate 2"}
 
 
 # the vendors whose controllers this provider reads; Windows.Gaming.Input also reports
-# controllers of other vendors (a DualSense, a wheel) and they are not XInput pads
+# controllers of other vendors (a DualSense, a wheel) and they are not XInput pads.
+# A single unknown vendor report can still be exact when there is one XInput slot;
+# that case is accepted below (a third-party Xbox-protocol pad can have no
+# battery type through XInput at all).
 NAMED_VIDS = frozenset(vid for vid, _word, _name in NAMED)
 # The FlyDigi dongle's vendor id - one place, evaluated at import: the tests
 # replace the flydigi module with a stub that only has read_connected().
@@ -353,6 +356,20 @@ class XInputProvider(Provider):
         )
         reports = [r for r in all_reports if r.vid in NAMED_VIDS or r.vid == FLYDIGI_VID
                    or (single_beitong and (r.vid, r.pid) == BEITONG_IDS)]
+        # A third-party Xbox-protocol pad can report a real Windows.Gaming.Input
+        # percentage under its own vendor id, while XInput leaves BatteryType
+        # "disconnected" (or only "medium"). With one XInput slot and one WGI
+        # report the pairing is exact, so accept that report; this is the #596
+        # "Xbox One Game Controller" (2c16:a2b3) reporting 70 %. A placeholder
+        # (remain=full=1000) is still not a measurement.
+        if not reports and len(slots) == 1 and len(all_reports) == 1:
+            only = all_reports[0]
+            if only.level is not None and not only.placeholder:
+                reports = [only]
+                self._diag.append(
+                    f"[XInput] slot {slots[0][0]}: Windows.Gaming.Input report "
+                    f"{only.vid:04x}:{only.pid:04x} accepted for the single controller"
+                )
         # Naming only: the Ultimate 2's Windows report is a placeholder, so it never
         # reaches `reports` (its level must not be trusted); its identity still names the
         # pad. Equal counts do not pair reports with slots - with the Ultimate 2 listed

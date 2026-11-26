@@ -8,6 +8,11 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Read a third-party Xbox-protocol controller's real Windows.Gaming.Input
+  percentage when XInput reports no battery type (or only the coarse "medium"
+  fallback) and it is the only XInput controller/report. The reporter's
+  "Xbox One Game Controller" (`2c16:a2b3`) reported 70 % while Halo showed
+  "not reported yet"; its test build is waiting for confirmation (#596).
 - Retry post-publication release and asset attestation verification when GitHub
   has not yet made the proofs available. Persistent verification errors still
   fail the workflow; publication and uploads are never repeated by these retries.

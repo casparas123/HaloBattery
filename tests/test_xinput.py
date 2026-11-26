@@ -58,9 +58,10 @@ class FakeDll:
         return X.ERROR_SUCCESS
 
 
-def wgi_report(vid, pid, remain, full, status="Discharging"):
+def wgi_report(vid, pid, remain, full, status="Discharging",
+               name="Dispositivo de juego  compatible con HID"):
     return wgi.WgiController({"vid": vid, "pid": pid, "status": status, "remain": remain,
-                              "full": full, "name": "Dispositivo de juego  compatible con HID"})
+                              "full": full, "name": name})
 
 
 # the Xbox entry of the issue #108 diagnostics; the path is a USB-style path on purpose:
@@ -148,6 +149,47 @@ class NamingTest(ProviderTest):
 
     def test_the_vendor_id_stays_out_of_the_trusted_wgi_set(self):
         self.assertNotIn(0x2DC8, X.NAMED_VIDS)
+
+
+class ThirdPartyXboxTest(ProviderTest):
+    """#596: an Xbox-protocol pad under its own vendor id.
+
+    Windows.Gaming.Input recognises it as a gamepad and reports 70 %, while
+    XInput's BatteryType is "disconnected" (and sometimes "medium", which is
+    only the coarse 55 % fallback). The pad's vendor id is not one of the
+    names this provider knows, but with one slot and one report the pairing is
+    exact, so its real percentage must be used.
+    """
+
+    PAD = (0x2C16, 0xA2B3)
+
+    def test_issue_596_disconnected_xinput_uses_the_wgi_level(self):
+        p, res = self.poll({0: (X.TYPE_DISCONNECTED, 0)},
+                           [wgi_report(*self.PAD, 700, 1000,
+                                      name="Xbox One Game Controller")])
+        self.assertEqual([(r.key, r.name, r.level, r.charging) for r in res],
+                         [("xinput:0", "Xbox One Game Controller", 70, False)])
+        self.assertNotIn("battery level not reported yet", res[0].approx)
+
+    def test_issue_596_medium_is_replaced_by_the_real_percentage(self):
+        _, res = self.poll({0: (X.TYPE_ALKALINE, 2)},
+                           [wgi_report(*self.PAD, 700, 1000,
+                                      name="Xbox One Game Controller")])
+        self.assertEqual([(r.name, r.level) for r in res],
+                         [("Xbox One Game Controller", 70)])
+
+    def test_issue_596_charging_status_passes_through(self):
+        _, res = self.poll({0: (X.TYPE_DISCONNECTED, 0)},
+                           [wgi_report(*self.PAD, 700, 1000, "Charging",
+                                      name="Xbox One Game Controller")])
+        self.assertEqual([(r.level, r.charging) for r in res], [(70, True)])
+
+    def test_a_single_unknown_placeholder_is_still_not_a_level(self):
+        _, res = self.poll({0: (X.TYPE_DISCONNECTED, 0)},
+                           [wgi_report(*self.PAD, 1000, 1000,
+                                      name="Xbox One Game Controller")])
+        self.assertEqual([(r.level, r.charging) for r in res], [(None, False)])
+        self.assertIn("battery level not reported yet", res[0].approx)
 
 
 class XboxBluetoothTest(ProviderTest):

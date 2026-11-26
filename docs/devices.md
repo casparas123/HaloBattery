@@ -132,7 +132,7 @@
 | [WLmouse Beast X and Beast X Mini Pro](protocols.md#wlmouse-beast-x-and-beast-x-mini-pro) | 8K or 1K receiver, or USB cable | likely |
 | [WLmouse Beast X Max](protocols.md#wlmouse-beast-x-max) | 8K receiver or USB cable (`36A7:A881`) | yes (receiver, cable charging and unplug recovery) |
 | [Wraith W1 / W1 Freestyle](protocols.md#wraith-w1) | 2.4 GHz receiver or USB cable | unverified |
-| [Xbox-compatible controllers (other models)](protocols.md#xbox-compatible-controllers-other-models) | USB or the Xbox wireless adapter | likely |
+| [Xbox-compatible controllers (other models)](protocols.md#xbox-compatible-controllers-other-models) | 2.4 GHz receiver, USB or the Xbox wireless adapter | likely; third-party `2c16:a2b3` real-level fix waiting for the reporter's test (#596) |
 
 **PlayStation controllers over Bluetooth:** a DualShock 4 or DualSense sends its battery level over Bluetooth only in its "full report" mode. Switching a controller into that mode makes it invisible to games that use DirectInput until it is turned off and on again (#96), so the app does not switch it: the level shows while Steam or a game has already put the controller in that mode, and otherwise the icon shows the controller without a level. If you do not play such games, turn on **Preferences > PlayStation full mode (Bluetooth)** to always see the level. Over USB the level is always shown.
 

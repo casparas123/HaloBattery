@@ -1340,7 +1340,9 @@ above 100 is refused rather than shown.
 
 **Connection:** USB or the Xbox wireless adapter
 
-Any Xbox-compatible controller is read the same way as the GameSir G7 Pro: the battery level from `Windows.Gaming.Input.RawGameControllers`, with XInput's coarse level (low / medium / full) as the fallback. Controllers other than the GameSir have not been individually tested.
+Any Xbox-compatible controller is read the same way as the GameSir G7 Pro: the battery level from `Windows.Gaming.Input.RawGameControllers`, with XInput's coarse level (low / medium / full) as the fallback. Controllers other than the GameSir have not been individually tested on hardware.
+
+A third-party Xbox-protocol pad can leave XInput's battery type at "disconnected" (or report only the coarse "medium") while Windows.Gaming.Input still returns a real percentage. When exactly one XInput slot and one WGI report are present, use that report even if its vendor id is not one this provider names; this is the `2c16:a2b3` "Xbox One Game Controller" from [#596](https://github.com/HeyOkay/HaloBattery/issues/596), which reported 70 %. A `remain=full=1000` placeholder is still refused, and the acceptance is limited to the unambiguous one-slot/one-report case.
 
 WGI report order is not an XInput user index. Associate a level only with one
 eligible WGI report and one XInput slot; multiple pads keep their own coarse

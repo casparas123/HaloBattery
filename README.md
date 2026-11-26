@@ -1,115 +1,127 @@
 <p align="center">
-<a href="https://halobattery.app/"><img src="docs/readme/links/website.svg" align="middle" alt="Website" width="40"></a>&emsp;<strong>English</strong>&#8202;·&#8202;<a href="README.ru.md"><img src="docs/readme/links/ru-language.svg" align="middle" alt="Русский" width="46"></a>&#8202;·&#8202;<a href="README.zh-CN.md"><img src="docs/readme/links/language.svg" align="middle" alt="简体中文" width="50"></a>&emsp;<a href="docs/code-signing.md"><picture><source media="(max-width: 440px) and (prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/HeyOkay/HaloBattery/docs/readme-download-stats/signpath-compact-dark.svg"><source media="(max-width: 440px) and (prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/HeyOkay/HaloBattery/docs/readme-download-stats/signpath-compact.svg"><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/HeyOkay/HaloBattery/docs/readme-download-stats/signpath-dark.svg"><source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/HeyOkay/HaloBattery/docs/readme-download-stats/signpath.svg"><img src="https://raw.githubusercontent.com/HeyOkay/HaloBattery/docs/readme-download-stats/signpath.svg" align="middle" alt="Code signing"></picture></a>&nbsp;<a href="https://github.com/HeyOkay/HaloBattery/releases"><picture><source media="(max-width: 440px) and (prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/HeyOkay/HaloBattery/docs/readme-download-stats/downloads-compact-dark.svg"><source media="(max-width: 440px) and (prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/HeyOkay/HaloBattery/docs/readme-download-stats/downloads-compact-light.svg"><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/HeyOkay/HaloBattery/docs/readme-download-stats/downloads-en-dark.svg"><source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/HeyOkay/HaloBattery/docs/readme-download-stats/downloads-en-light.svg"><img src="https://raw.githubusercontent.com/HeyOkay/HaloBattery/docs/readme-download-stats/downloads-en-light.svg" align="middle" alt="Total release asset downloads"></picture></a>
-</p>
-
-<p align="center">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme/hero-dark.svg">
   <source media="(prefers-color-scheme: light)" srcset="docs/readme/hero-light.svg">
-  <img src="docs/readme/hero-light.svg" alt="Halo Battery — wireless battery monitoring for Windows" width="480">
+  <img src="docs/readme/hero-light.svg" alt="Halo Battery" width="360">
 </picture>
 </p>
 
-<div align="center">
+<p align="center">
+Battery levels of your wireless mouse, keyboard, headset and controller,<br>
+right in the Windows tray. No vendor software.
+</p>
 
-<h3>See your wireless devices’ battery levels in the Windows tray.</h3>
-
-A ring for your mouse, keyboard, headset and controller, each with its own low-battery alert.
-
-<a href="https://github.com/HeyOkay/HaloBattery/releases/latest"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/readme/buttons/stable-dark.svg"><source media="(prefers-color-scheme: light)" srcset="docs/readme/buttons/stable-light.svg"><img src="docs/readme/buttons/stable-light.svg" alt="Download the stable release for Windows"></picture></a>&ensp;<wbr><a href="https://github.com/HeyOkay/HaloBattery/releases"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/readme/buttons/prerelease-dark.svg"><source media="(prefers-color-scheme: light)" srcset="docs/readme/buttons/prerelease-light.svg"><img src="docs/readme/buttons/prerelease-light.svg" alt="Browse pre-release builds"></picture></a><br>
-<sub>Windows 10 / 11 · x64 · Installer and portable ZIP</sub>
-
-Support project via &nbsp;<a href="https://ko-fi.com/halobattery"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/readme/buttons/ko-fi-dark.svg"><source media="(prefers-color-scheme: light)" srcset="docs/readme/buttons/ko-fi.svg"><img src="docs/readme/buttons/ko-fi.svg" width="94" align="middle" alt="Support Halo Battery on Ko-fi"></picture></a>&ensp;<wbr><a href="https://paypal.me/hellobattery"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/readme/buttons/paypal-dark.svg"><source media="(prefers-color-scheme: light)" srcset="docs/readme/buttons/paypal.svg"><img src="docs/readme/buttons/paypal.svg" width="94" align="middle" alt="Donate to Halo Battery with PayPal"></picture></a>
-
-</div>
+<p align="center">
+<a href="https://github.com/HeyOkay/HaloBattery/releases/latest"><b>Download for Windows</b></a>
+&nbsp;·&nbsp; <a href="https://halobattery.app">Website</a>
+&nbsp;·&nbsp; <a href="https://discord.gg/K796KR9xtk">Discord</a>
+&nbsp;·&nbsp; <a href="README.ru.md">Русский</a>
+&nbsp;·&nbsp; <a href="README.zh-CN.md">简体中文</a>
+</p>
 
 <p align="center">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme/taskbar-dark.webp">
   <source media="(prefers-color-scheme: light)" srcset="docs/readme/taskbar-light.webp">
-  <img src="docs/readme/taskbar-light.webp" alt="Hovering across the HaloBattery tray icons shows the battery reading for each device." width="760">
+  <img src="docs/readme/taskbar-light.webp" alt="Hovering over the Halo Battery icons in the Windows tray shows each device's battery level" width="760">
 </picture>
 </p>
 
-## Features
+Every wireless device gets its own small ring in the tray. The ring empties as the
+battery drains, turns amber when it gets close to your alert level and red below it,
+and glows green while the device charges. Hover an icon for the exact percentage and
+how long the battery should last. Double-click it to open that device's settings.
+
+Halo Battery reads the level straight from the 2.4 GHz receiver, the USB cable or
+Windows Bluetooth, so Synapse, G HUB and the other vendor apps can stay closed.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme/devices-dark.svg">
   <source media="(prefers-color-scheme: light)" srcset="docs/readme/devices-light.svg">
-  <img src="docs/readme/devices-light.svg" alt="Mouse at 100%, charging keyboard at 65%, headset at 25%, and controller at 10%" width="100%">
+  <img src="docs/readme/devices-light.svg" alt="Tray icons for a mouse at 100%, a charging keyboard at 65%, a headset at 25% and a controller at 10%" width="100%">
 </picture>
 
-- **Read the ring.** With a 20% alert threshold, 21–30% is amber and 20% or less is red. Above 30%, the ring follows the tray theme. With charging animation enabled, a known level pulses green. If the device reports charging without a percentage, a green arc rotates.
-- **Read the device directly.** Halo Battery checks a 2.4 GHz receiver, a USB cable or Windows Bluetooth. You can close the vendor’s software.
-- **Set up each device.** Choose when each device needs attention. By default, alerts wait while a full-screen game is open.
+A few more things it does:
 
-The app supports 11 interface languages. It uses the Windows display language on first launch. You can change it in Settings.
+- Works with Razer, Logitech, SteelSeries, HyperX, Corsair, ASUS, Sony, Xbox, 8BitDo,
+  Pulsar and many more. The [device list](docs/devices.md) shows which ones have been
+  tested on real hardware.
+- Lets you set the name, the icon and the alert level for each device. Any icon from
+  [Iconify](docs/iconify.md) works too.
+- Holds alerts back while a full-screen game is open.
+- Updates itself from the tray menu.
+- Speaks 11 languages and follows the Windows light or dark theme.
 
-## Device settings
+Everything else is in [Features and settings](docs/features.md).
 
-Hover over a tray icon to see the charge and, once enough discharge history is available, the estimated time left. Double-click to open that device in Settings. Give it a recognizable name, choose its pictogram and set the battery level that should trigger an alert.
+## Settings
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme/settings-dark.png">
   <source media="(prefers-color-scheme: light)" srcset="docs/readme/settings-light.png">
-  <img src="docs/readme/settings-light.png" alt="Devices in Settings, showing battery levels and per-device controls" width="100%">
+  <img src="docs/readme/settings-light.png" alt="The Devices page in Halo Battery Settings" width="100%">
 </picture>
 
 ## Install
 
-Choose the stable release above, then pick a file under **Assets**. To try upcoming fixes, choose the newest entry marked **Pre-release** in the release list. Test builds may have bugs.
+Get the files from the [latest release](https://github.com/HeyOkay/HaloBattery/releases/latest). Windows 10 or 11, 64-bit.
 
-| Package | Getting started |
+| File | |
 | --- | --- |
-| `HaloBattery-<version>-setup.exe` | Recommended. Run the installer for your Windows account. It adds a Start menu entry and needs no administrator rights. |
-| `HaloBattery-<version>.zip` | Extract the entire archive to its own folder. Keep `_internal` beside `HaloBattery.exe`, then launch the executable. |
+| `HaloBattery-<version>-setup.exe` | The installer. Installs for your user account only, no administrator rights needed. |
+| `HaloBattery-<version>.zip` | Portable. Extract the whole archive to its own folder and run `HaloBattery.exe`. |
 
-To verify your download, compare its SHA-256 hash with the entry in `SHA256SUMS.txt` from the same release.
+`SHA256SUMS.txt` in the same release lists the checksums. Newer test builds are marked
+**Pre-release** on the [releases page](https://github.com/HeyOkay/HaloBattery/releases);
+they may have bugs. To run from source, see [Run from source](docs/features.md#run-from-source).
 
-<a href="docs/features.md"><img src="docs/readme/links/features.svg" align="middle" alt="Features and settings"></a> · <a href="docs/features.md#portable-mode"><img src="docs/readme/links/portable.svg" align="middle" alt="Portable mode"></a> · <a href="docs/features.md#run-from-source"><img src="docs/readme/links/source.svg" align="middle" alt="Run from source"></a>
+## My device isn't listed
 
-## Supported devices
+Send a diagnostics report. It takes about a minute:
 
-Mice, keyboards, headsets and controllers over a 2.4 GHz receiver, a USB cable or Bluetooth.
-**<a href="docs/devices.md"><img src="docs/readme/links/device-list.svg" align="middle" alt="See the full list →"></a>** It shows the connection and whether each device has been tested on real hardware.
-
-## Add your device
-
-Is your device not detected, or does it show a wrong level? Send a diagnostics report. It takes about a minute:
-
-1. Close the maker's software (Synapse, G HUB, the web driver and similar) and wake the device up (move the mouse, press a key).
-2. Right-click a Halo Battery icon and select **Diagnostics**. The "No devices found" icon has this item too.
+1. Close the maker's software (Synapse, G HUB, the web driver and so on) and wake the
+   device up by moving the mouse or pressing a key.
+2. Right-click a Halo Battery icon and choose **Diagnostics**. The "No devices found"
+   icon has this item too.
 
    <picture>
      <source media="(prefers-color-scheme: dark)" srcset="docs/contributing/diagnostics-menu-dark.png">
-     <img src="docs/contributing/diagnostics-menu-light.png" alt="The tray menu of a device, with the Diagnostics item marked" width="216">
+     <img src="docs/contributing/diagnostics-menu-light.png" alt="The tray menu of a device, with Diagnostics highlighted" width="216">
    </picture>
 
-3. Halo Battery opens `diagnostics.txt` in your default app for text files. <a href="../../issues/new?template=device.yml"><img src="docs/readme/links/issue.svg" align="middle" alt="Open an issue"></a>, write the device name and how it is connected (receiver, cable or Bluetooth), and drag the file into the comment box. By default the file is in `%APPDATA%\HaloBattery`. In portable mode it is beside the executable.
+3. `diagnostics.txt` opens in your text editor. [Open an issue](../../issues/new?template=device.yml),
+   say what the device is and how it is connected (receiver, cable or Bluetooth), and
+   drag the file into the comment box.
 
-The report contains Bluetooth MAC addresses and device serial numbers. You can replace them with `xx` before you post. <a href=".github/CONTRIBUTING.md"><img src="docs/readme/links/contributing.svg" align="middle" alt="CONTRIBUTING.md"></a> explains the report, how to record a USB capture of the maker's app, and how to open a pull request.
+The report contains Bluetooth MAC addresses and serial numbers. Replace them with `xx`
+if you like before posting. [CONTRIBUTING.md](.github/CONTRIBUTING.md) covers the report
+in detail, how to record a USB capture of the maker's app, and how to send a pull request.
 
 <details>
 <summary><b>Troubleshooting</b></summary>
 
-1. Close Synapse, the WLmouse web driver and other battery tools: they may hold the receiver.
-2. Wake the mouse up by moving it.
-3. If the battery level still does not appear and the device uses a USB receiver, unplug the receiver and plug it back in.
-4. Choose **Diagnostics** from the tray menu and send the report as <a href="#add-your-device"><img src="docs/readme/links/add-device.svg" align="middle" alt="Add your device"></a> tells you.
-5. **"python312.dll was not found"**, or **Start with Windows** says the app runs from a temporary folder: the app was started straight from the ZIP, or only `HaloBattery.exe` was copied out of it. Extract the whole ZIP to a folder of its own and run `HaloBattery.exe` from there.
+- **No level shows up.** Close Synapse, the WLmouse web driver and other battery tools,
+  since they can hold on to the receiver. Wake the device. If it uses a USB receiver,
+  unplug it and plug it back in. If that doesn't help, send a diagnostics report.
+- **"python312.dll was not found", or Start with Windows says the app runs from a
+  temporary folder.** The app was started from inside the ZIP, or only `HaloBattery.exe`
+  was copied out of it. Extract the whole ZIP to its own folder and run it from there.
 
-Settings, the log and the diagnostics report live in `%APPDATA%\HaloBattery` (in the app's own folder in <a href="docs/features.md#portable-mode"><img src="docs/readme/links/portable-inline.svg" align="middle" alt="portable mode"></a>). The `data folder:` line near the top of the diagnostics report shows the active folder.
+Settings, the log and the diagnostics report are in `%APPDATA%\HaloBattery`, or next to
+the app in [portable mode](docs/features.md#portable-mode). The `data folder:` line at
+the top of the diagnostics report shows which one is in use.
 
 </details>
 
-## Community
+## Thanks
 
-<a href=".github/CONTRIBUTING.md"><img src="docs/readme/links/contribute.svg" align="middle" alt="Contribute to the project"></a> · <a href="https://discord.gg/K796KR9xtk"><img src="docs/readme/links/discord.svg" align="middle" alt="Join the Discord community"></a>
+Device protocols come from [OpenRazer](https://github.com/openrazer/openrazer),
+[HeadsetControl](https://github.com/Sapd/HeadsetControl), [Solaar](https://github.com/pwr-Solaar/Solaar),
+[rivalcfg](https://github.com/flozz/rivalcfg), [G-Helper](https://github.com/seerge/g-helper) and other
+open projects, and from the captures and test runs people send in. [Full credits](docs/credits.md).
 
-## Credits
+If Halo Battery saves you from installing a vendor app, you can support it on
+[Ko-fi](https://ko-fi.com/halobattery) or [PayPal](https://paypal.me/hellobattery).
+Questions and device requests are welcome on [Discord](https://discord.gg/K796KR9xtk).
 
-Device protocols come from OpenRazer, HeadsetControl, Solaar, rivalcfg, G-Helper and other open projects, and from captures and test runs sent by the community. **<a href="docs/credits.md"><img src="docs/readme/links/credits.svg" align="middle" alt="Full credits →"></a>**
-
-MIT licensed, see <a href="LICENSE"><img src="docs/readme/links/license.svg" align="middle" alt="LICENSE"></a>. <a href="docs/code-signing.md"><img src="docs/readme/links/signing.svg" align="middle" alt="Code-signing policy"></a>.
-
-<a href="docs/privacy.md"><img src="docs/readme/links/privacy.svg" align="middle" alt="Privacy"></a>
+<sub>[MIT license](LICENSE) · [Code-signing policy](docs/code-signing.md) · [Privacy](docs/privacy.md)</sub>

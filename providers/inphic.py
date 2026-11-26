@@ -12,7 +12,7 @@ back first, which is why the app's parse starts one byte in:
     |  |  |  |  +-- level 0..100 (0x4b = 75) - on the 0x01 frames only
     |  |  |  +----- 0x01 level, 0x02 full (the app shows 100 %), 0x03 charging
     |  |  +-------- the battery command (0x40)
-    |  +----------- model code among 0x95 / 0x90 / 0x93 / 0x99
+    |  +----------- model code among 0x95 / 0x90 / 0x93 / 0x99 / 0x08
     +-------------- report id
 
 On an 0x03 frame the app starts a 30 ms breathing animation over its battery
@@ -31,7 +31,15 @@ away - a level is never invented.
 The same `40` command byte and level position appear in the earlier
 recordings of this chip family's receivers (the `03 55 40 01 4b` frame in
 the notes behind #69), so the family shapes agree with the vendor app's
-parse. Only 1d57:fa65 is claimed here - the dongle the diagnostics came from.
+parse.
+
+The Attack Shark X8 Pro uses model `0x08`. Some `1d57:fa65` firmware, including
+the X8 Pro receiver, exposes no `000a:0000` collection and pushes the same
+frames on the vendor page `ff00:0001`; the X8 Pro's cable is `1d57:2126`. The
+X8 Pro starts every link with a false "on battery, 100 %" frame, so a 100 %
+reading is confirmed by a second matching frame; a lower first reading is
+accepted directly. Its `0x02` and `0x03` frames mean external power and keep
+the last level.
 
 The support is **confirmed on hardware**: the reporter's run of the test build
 (#160) shows the level, and the charging state too: the reporter watched the
@@ -79,15 +87,21 @@ VID = 0x1D57
 # (90 %) on the R1's own receiver (#69), the shape blak0p's X6 protocol
 # documents validated live on the dongle. 0x4E is the X3 Max's code - its
 # reporter's diagnostics caught `03 4e 40 01 1e` (30 %) on the same receiver
-# (#228), the X11 shape under a model code of its own.
+# (#228), the X11 shape under a model code of its own. 0x08 is the Attack
+# Shark X8 Pro - its #592 frame `03 08 40 01 64`; the 8K receiver may expose
+# its status frames only on the vendor page FF00:0001. 0x2126 is the X8 Pro
+# on its cable.
 PIDS = {
-    0xFA65: ("Inphic In9 Pro", (0x95, 0x90, 0x93, 0x99, 0x3F)),
+    0xFA65: ("Inphic In9 Pro", (0x95, 0x90, 0x93, 0x99, 0x3F, 0x08)),
     0xFA60: ("Attack Shark X11 / R1 / X3 Max", (0x55, 0x10, 0x4E)),
+    0x2126: ("Attack Shark X8 Pro", (0x08,)),
 }
 # PR #407, pinned 675198a6b37bb221, Delux M900 Pro receiver capture:
 # 1D57:FA65, input 03 3F 40 01 4A = 74%. This adds a passive observed
 # model, not a request or a claim about its FA60 sibling.
-MODEL_NAMES = {(0xFA65, 0x3F): "Delux M900 Pro"}
+MODEL_NAMES = {(0xFA65, 0x3F): "Delux M900 Pro",
+               (0xFA65, 0x08): "Attack Shark X8 Pro",
+               (0x2126, 0x08): "Attack Shark X8 Pro"}
 
 REPORT_ID = 0x03                    # hidapi hands it back first on Windows
 CMD_BATTERY = 0x40
@@ -95,17 +109,24 @@ SUB_FULL = 0x02                     # charge complete: the app shows 100 %
 SUB_CHARGING = 0x03                 # on the cable: the app runs its animation
 # Not every model means "full" by 0x02: the X3 Max sends it one minute after plugging
 # in at 67 %, so there it is the charging state and the last level stays (#228).
-FULL_IS_CHARGING_MODELS = (0x4E,)
+# The X8 Pro sends 0x02/0x03 on external power too, and its level is frozen then.
+FULL_IS_CHARGING_MODELS = (0x4E, 0x08)
+# The X8 Pro emits a false "on battery, 100 %" frame when it links up; require
+# two agreeing level frames before publishing its level.
+CONFIRM_MODELS = (0x08,)
 X6_EVENT = 0x10                     # the X6/R1 generation's status event; its
                                     # heartbeat level arrives in X6_STEP steps
 X6_STEP = 10
 LEVEL_MIN, LEVEL_MAX = 1, 100
+# These receivers may have no 000a:0000 status collection at all and publish
+# their frames on the vendor page instead (BatteryTray's Xenta provider).
+VENDOR_STATUS_PIDS = (0xFA65, 0x2126)
 
 READ_SIZE = 100                     # the vendor app's read buffer
 READ_TIMEOUT_MS = 250
 READ_ATTEMPTS = 5                   # ~1.2 s on the remembered collection
 # The Delux/FA65 reports can be farther apart; keep FA60's existing budget.
-PID_READ_ATTEMPTS = {0xFA65: 12, 0xFA60: READ_ATTEMPTS}
+PID_READ_ATTEMPTS = {0xFA65: 12, 0xFA60: READ_ATTEMPTS, 0x2126: 12}
 SWEEP_ATTEMPTS = 2                  # ... and per collection while looking
 MAX_CANDIDATES = 4
 FRAME_HISTORY = 12                  # frames kept per receiver for the diagnostics
@@ -226,6 +247,7 @@ class InphicProvider(Provider):
             return None
         try:
             pending = None
+            confirmed_level = None
             for _ in range(attempts):
                 r = dev.read(READ_SIZE, READ_TIMEOUT_MS)
                 if not r:
@@ -238,8 +260,17 @@ class InphicProvider(Provider):
                                      else "  (not a battery frame)"))
                 if got is None:
                     continue
-                self._model[pid] = r[1] if r[0] == REPORT_ID else r[0]
+                model_code = r[1] if r[0] == REPORT_ID else r[0]
+                self._model[pid] = model_code
                 if got[0] is not None:
+                    if model_code in CONFIRM_MODELS:
+                        # Every link-up starts with a false "on battery, 100 %"
+                        # frame; only a 100 % reading needs a second frame. A
+                        # lower first reading is already trustworthy.
+                        if got[0] != 100 or confirmed_level == got[0]:
+                            return (got[0], True) if pending is not None else got
+                        confirmed_level = got[0]
+                        continue
                     # a level frame after a charging one: the level is fresh and the
                     # cable is still in (#228 follow-up - the first frame used to end
                     # the read, freezing the level until the cable came out)
@@ -249,6 +280,9 @@ class InphicProvider(Provider):
                 pending = got
             if pending is not None:
                 return pending
+            if confirmed_level is not None:
+                self._diag.append("    level needs a second agreeing frame")
+                return None
             self._diag.append("    no frame in the window "
                               "(the mouse announces every couple of seconds)")
             return None
@@ -299,9 +333,12 @@ class InphicProvider(Provider):
             # family's status collection anyway. It is a single collection, and it is
             # the one that answered on every device seen so far - while a poll that
             # listened nowhere left the diagnostics empty, so a report could not even
-            # show whether anything was tried (#228).
+            # show whether anything was tried (#228). Some FA65 firmware and the
+            # X8 Pro cable publish only on the vendor page, so use that as the
+            # fallback there.
+            fallback = (STATUS_USAGE, VENDOR_USAGE) if pid in VENDOR_STATUS_PIDS else (STATUS_USAGE,)
             budget = [d for d in order
-                      if (d.get("usage_page"), d.get("usage")) == STATUS_USAGE][:1]
+                      if (d.get("usage_page"), d.get("usage")) in fallback][:1]
             if not budget:
                 self._diag.append("  detection back-off; the next sweep comes later")
         got = None
@@ -309,7 +346,9 @@ class InphicProvider(Provider):
             is_chosen = d["path"] == chosen
             # The vendor app's own collection gets the full window while looking
             # for it; the rest only get a short listen before moving on.
-            patience = (d.get("usage_page"), d.get("usage")) == STATUS_USAGE
+            usage = (d.get("usage_page"), d.get("usage"))
+            patience = usage == STATUS_USAGE or (
+                pid in VENDOR_STATUS_PIDS and usage == VENDOR_USAGE)
             attempts = (PID_READ_ATTEMPTS.get(pid, READ_ATTEMPTS)
                         if is_chosen or patience else SWEEP_ATTEMPTS)
             self._diag.append(f"  listening on iface={d.get('interface_number')} "

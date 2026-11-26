@@ -8,6 +8,12 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Attack Shark X8 Pro (`1d57:fa65` 8K receiver, `1d57:2126` cable):
+  read model code `0x08`, including receivers that publish the family's
+  frames only on the `ff00:0001` vendor page, and confirm a 100% reading with
+  a second matching frame because the first link-up frame claims a false 100%.
+  100% frame is captured in [#592](https://github.com/HeyOkay/HaloBattery/issues/592);
+  cable charging still needs the reporter's test-build run.
 - Pulsar mice on the shared 8K Dongle Gen.2 (`3710:5406`) are named by the model the
   mouse reports (X2N, X2H, X3, Xlite CrazyLight and the other XS-1 generation shapes)
   instead of always "X2 CrazyLight Mini". Adds the X2N CrazyLight cable id `3710:3510`.

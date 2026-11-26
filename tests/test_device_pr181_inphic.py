@@ -49,6 +49,13 @@ AS_31 = [0x03, 0x55, 0x40, 0x01, 0x1F] + [0x00] * 95
 # the R1's own push from its receiver's probe run (#69) - the X6/R1
 # generation's heartbeat, level in steps of ten (0x09 -> 90 %)
 AS_R1_90 = [0x03, 0x10, 0x40, 0x01, 0x09] + [0x00] * 95
+# The Attack Shark X8 Pro's own frame from #592's diagnostics:
+# model 0x08, command 0x40, sub-command 0x01, level 0x64 = 100 %.
+AS_X8_100 = [0x03, 0x08, 0x40, 0x01, 0x64] + [0x00] * 95
+AS_X8_80 = [0x03, 0x08, 0x40, 0x01, 0x50] + [0x00] * 95
+AS_X8_CHARGING = [0x03, 0x08, 0x40, 0x03, 0x00] + [0x00] * 95
+AS_X8_FULL = [0x03, 0x08, 0x40, 0x02, 0x00] + [0x00] * 95
+X8 = (0x08,)
 INPHIC = I.PIDS[0xFA65][1]
 ATTACK = I.PIDS[0xFA60][1]
 
@@ -108,6 +115,18 @@ MOUSE_PATH = receiver_entries()[1]["path"]
 AS_STATUS_PATH = receiver_entries(pid=0xFA60, prefix=b"as")[4]["path"]
 
 
+def x8_receiver_entries():
+    # #592's 8K receiver exposes no 000a:0000 collection; its frames arrive on
+    # the vendor page instead of the vendor app's usual status collection.
+    entries = receiver_entries(prefix=b"x8")
+    return [e for e in entries
+            if (e["usage_page"], e["usage"]) != (0x000A, 0x0000)]
+
+
+X8_VENDOR_PATH = next(e["path"] for e in x8_receiver_entries()
+                      if (e["usage_page"], e["usage"]) == (0xFF00, 0x0001))
+
+
 class ParseTest(unittest.TestCase):
     def test_the_level_frame_reads_75(self):
         self.assertEqual(I.parse_frame(LEVEL75, INPHIC), (75, False))
@@ -140,6 +159,20 @@ class ParseTest(unittest.TestCase):
         self.assertEqual(I.parse_frame(AS_X3MAX_30, ATTACK), (30, False))
         self.assertEqual(I.parse_frame(AS_X3MAX_CHARGING, ATTACK), (None, True))
         self.assertIsNone(I.parse_frame(AS_X3MAX_30, INPHIC))   # not an Inphic code
+
+    def test_the_x8_pro_frame_reads_with_its_own_model_code(self):
+        # #592: the 8K receiver's own frame is 03 08 40 01 64, with the level
+        # in byte 4; the same code is used on the X8 Pro's cable (1d57:2126).
+        self.assertEqual(I.parse_frame(AS_X8_100, INPHIC), (100, False))
+        self.assertEqual(I.parse_frame(AS_X8_100, X8), (100, False))
+        self.assertEqual(I.parse_frame(AS_X8_80, X8), (80, False))
+        self.assertIsNone(I.parse_frame(AS_X8_100, ATTACK))   # not an X8 receiver
+
+    def test_the_x8_pro_charging_frames_do_not_show_a_level(self):
+        # 0x02 and 0x03 mean external power on the X8 Pro; the level in those
+        # frames is frozen, so the last confirmed level stays on screen.
+        self.assertEqual(I.parse_frame(AS_X8_CHARGING, X8), (None, True))
+        self.assertEqual(I.parse_frame(AS_X8_FULL, X8), (None, True))
 
     def test_the_attack_shark_frame_reads_with_its_own_models(self):
         # 0x55 is the Attack Shark X11/R1 code the reporter's probe caught
@@ -232,6 +265,53 @@ class PollTest(unittest.TestCase):
                          [("inphic:fa60", "Attack Shark X11 / R1 / X3 Max", 31, False,
                            "inphic", "mouse")])
         self.assertEqual(self.provider._chosen.get(0xFA60), AS_STATUS_PATH)
+
+    def test_the_x8_pro_reads_two_agreeing_frames_on_its_vendor_page(self):
+        # #592: the 8K receiver has no 000a:0000 collection; its frames arrive on
+        # FF00:0001. The first link-up frame is a false 100%, so two matching
+        # frames are required before the level is published.
+        entries = x8_receiver_entries()
+        cols = {e["path"]: FakeCollection(
+                    (AS_X8_100, AS_X8_80, AS_X8_80)
+                    if e["path"] == X8_VENDOR_PATH else ())
+                for e in entries}
+        out = self.poll(entries, cols)
+        self.assertEqual([(s.key, s.name, s.level, s.charging) for s in out],
+                         [("inphic:fa65", "Attack Shark X8 Pro", 80, False)])
+        self.assertEqual(self.provider._chosen.get(0xFA65), X8_VENDOR_PATH)
+
+    def test_the_x8_pro_does_not_publish_an_unconfirmed_link_up_100(self):
+        entries = x8_receiver_entries()
+        cols = {e["path"]: FakeCollection(
+                    (AS_X8_100, AS_X8_80)
+                    if e["path"] == X8_VENDOR_PATH else ())
+                for e in entries}
+        out = self.poll(entries, cols)
+        self.assertEqual([(s.name, s.level) for s in out],
+                         [("Attack Shark X8 Pro", 80)])
+        self.assertNotEqual(out[0].level, 100)
+
+    def test_the_x8_pro_uses_the_vendor_page_after_a_missed_sweep(self):
+        # The first poll can miss the two-second push; the next poll is on the
+        # DETECT_RETRY back-off and must still listen on the vendor page.
+        entries = x8_receiver_entries()
+        cols = {e["path"]: FakeCollection() for e in entries}
+        self.assertEqual(self.poll(entries, cols), [])
+        cols[X8_VENDOR_PATH].replies = [AS_X8_100, AS_X8_100]
+        out = self.poll(entries, cols)
+        self.assertEqual([(s.name, s.level) for s in out],
+                         [("Attack Shark X8 Pro", 100)])
+
+    def test_the_x8_pro_cable_shows_charging_and_keeps_the_level(self):
+        entries = receiver_entries(pid=0x2126, prefix=b"x8c")
+        status = receiver_entries(pid=0x2126, prefix=b"x8c")[4]["path"]
+        cols = self.cols(entries, replies=(AS_X8_100, AS_X8_100), answer=status)
+        out = self.poll(entries, cols)
+        self.assertEqual([(s.key, s.name, s.level, s.charging) for s in out],
+                         [("inphic:2126", "Attack Shark X8 Pro", 100, False)])
+        cols[status].replies = [AS_X8_CHARGING]
+        out = self.poll(entries, cols)
+        self.assertEqual([(s.level, s.charging) for s in out], [(100, True)])
 
     def test_the_r1_receivers_frame_reads_its_own_level(self):
         entries = receiver_entries(pid=0xFA60, prefix=b"as")
